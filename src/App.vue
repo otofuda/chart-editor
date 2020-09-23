@@ -4,17 +4,22 @@
 
     <v-container fluid class="panel">
       <v-row align="center">
-        <input
-          type="file"
+        <v-file-input
           accept=".json, application/json"
+          label="ファイルを選択"
+          outlined
+          dense
+          prepend-icon="mdi-folder"
           @change="readFile"
-        />
+        ></v-file-input>
         <v-col>
           <v-select
             :items="difficulties"
             label="難易度"
             v-model="currentDifficulty"
+            align="left"
             outlined
+            dense
           ></v-select>
         </v-col>
       </v-row>
@@ -41,6 +46,7 @@ export default {
     return {
       isLoaded: false,
       reader: new FileReader(),
+      fileName: "default-song.json",
       difficulties: ["raku", "easy", "normal", "hard", "extra"],
       currentDifficulty: "easy",
       chartObject: {},
@@ -56,8 +62,9 @@ export default {
     };
   },
   methods: {
-    readFile(event) {
-      this.reader.readAsText(event.target.files[0]);
+    readFile(e) {
+      this.fileName = e.name;
+      this.reader.readAsText(e);
     },
     zoomOut() {
       this.beatHeight = this.beatHeight - 10 || 0;

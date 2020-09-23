@@ -8,41 +8,48 @@
         height: `${entireHeight}px`
       }"
     >
-      <div
+      <Measure
         v-for="measure in measureData"
         :key="measure.measure"
-        :style="{
-          bottom: `${measure.measurePositionBottom}px`,
-          height: `${measure.measureHeight}px`
-        }"
-        class="preview__measure"
-      >
-        {{ measure.measure }}
-        <Note
-          v-for="(note, i) in currentChart.filter(
-            note => note.measure === measure.measure
-          )"
-          :key="i"
-          :note="note"
-          :measure="measure"
-        />
-      </div>
+        :measure="measure"
+        :notes="currentChart.filter(note => note.measure === measure.measure)"
+      />
+
+      <LongNote
+        v-for="(note, i) in currentChart.filter(note => note.type === 2)"
+        :key="i"
+        :note="note"
+        :measureData="measureData"
+      />
     </div>
     <div class="control">
-      <button @click="previewStart">再生</button>
-      <button @click="previewStop">停止</button>
+      <v-expansion-panels accordion>
+        <v-expansion-panel>
+          <v-expansion-panel-header />
+          <v-expansion-panel-content>
+            <v-btn class="mr-1" outlined color="success" @click="previewStart">
+              <v-icon left>mdi-play</v-icon> 再生
+            </v-btn>
+            <v-btn class="ml-1" outlined color="error" @click="previewStop">
+              <v-icon left>mdi-stop</v-icon> 停止
+            </v-btn>
+          </v-expansion-panel-content>
+        </v-expansion-panel>
+      </v-expansion-panels>
     </div>
   </div>
 </template>
 
 <script>
-import Note from "./Note.vue";
+import Measure from "./Measure.vue";
+import LongNote from "./LongNote.vue";
 
 export default {
   data() {
     return {
       isPreviewing: false,
-      currentPosition: 0
+      currentPosition: 0,
+      timeoutIds: []
     };
   },
   props: {
@@ -56,30 +63,35 @@ export default {
     }
   },
   methods: {
+    playFromMeasure(measure = 0) {
+      measure;
+      this.measureData.forEach((measure, index) => {
+        const next = this.measureData[index + 1] || {};
+        this.timeoutIds.append(
+          setTimeout(() => {
+            this.currentPosition = next.measurePositionBottom;
+            const transitionTime =
+              next.measureReachTime - measure.measureReachTime;
+            this.$refs.preview.style.transition = `${transitionTime}ms all linear`;
+            this.$refs.preview.style.bottom = `-${this.currentPosition}px`;
+          }, measure.measureReachTime)
+        );
+      });
+    },
     previewStart() {
       this.isPreviewing = true;
       this.$refs.preview.style.transition = "0ms all linear";
       this.$refs.preview.style.bottom = "0px";
 
-      setTimeout(() => {
-        this.$refs.preview.style.transition = `${this.measureData.first.measureReachTime}ms all linear`;
-        this.$refs.preview.style.bottom = `-${this.measureData.first.measurePositionBottom}px`;
-      }, 1);
-
-      this.measureData.forEach((measure, index) => {
-        const next = this.measureData[index + 1] || {};
-        setTimeout(() => {
-          this.currentPosition = next.measurePositionBottom;
-          const transitionTime =
-            next.measureReachTime - measure.measureReachTime;
-          this.$refs.preview.style.transition = `${transitionTime}ms all linear`;
-          this.$refs.preview.style.bottom = `-${this.currentPosition}px`;
-        }, measure.measureReachTime);
-      });
+      this.$refs.preview.style.transition = `${this.measureData.first.measureReachTime}ms all linear`;
+      this.$refs.preview.style.bottom = `-${this.measureData.first.measurePositionBottom}px`;
+      this.playFromMeasure();
     },
     previewStop() {
       this.isPreviewing = false;
       this.currentPosition = 0;
+      this.$refs.preview.style.bottom = "0px";
+      this.timeoutIds.forEach(id => clearInterval(id));
     }
   },
   computed: {
@@ -91,7 +103,8 @@ export default {
     }
   },
   components: {
-    Note
+    Measure,
+    LongNote
   }
 };
 </script>
@@ -100,33 +113,14 @@ export default {
 .preview {
   background: #202020;
   width: 100%;
+  width: 380px;
   right: 0;
-  &__measure {
-    width: 300px;
-    background: linear-gradient(
-      to left,
-      transparent 19.75%,
-      #606060 20%,
-      transparent 20.25%,
-      transparent 39.75%,
-      #606060 40%,
-      transparent 40.25%,
-      transparent 59.75%,
-      #606060 60%,
-      transparent 60.25%,
-      transparent 79.75%,
-      #606060 80%,
-      transparent 80.75%
-    );
-    box-shadow: inset 0 -1px 0 0 white;
-    color: #ffffff;
-    position: absolute;
-    right: 40px;
-  }
+  margin-left: calc(100% - 380px);
 }
 .control {
   position: fixed;
   top: 0;
   right: 0;
+  padding: 16px;
 }
 </style>
