@@ -1,6 +1,11 @@
 <template>
   <v-app id="app">
-    <Preview :currentChart="currentChart" :measureData="measureData" />
+    <Preview
+      :currentChart="currentChart"
+      :infoObject="chartObject.info"
+      :measureData="measureData"
+      :previewAudio="previewAudio"
+    />
 
     <v-container fluid class="panel">
       <v-row align="center">
@@ -32,6 +37,23 @@
         @click:append="zoomIn"
         @click:prepend="zoomOut"
       ></v-slider>
+      <v-row align="center">
+        <v-file-input
+          accept="audio/*"
+          label="楽曲ファイル選択"
+          outlined
+          dense
+          prepend-icon="mdi-music"
+          @change="readAudioFile"
+        ></v-file-input>
+      </v-row>
+      <v-row align="center">
+        <v-text-field
+          v-model.number="chartObject.info.offset"
+          label="オフセット"
+          required
+        ></v-text-field>
+      </v-row>
     </v-container>
   </v-app>
 </template>
@@ -46,10 +68,13 @@ export default {
     return {
       isLoaded: false,
       reader: new FileReader(),
+      previewAudio: new Audio(),
       fileName: "default-song.json",
       difficulties: ["raku", "easy", "normal", "hard", "extra"],
       currentDifficulty: "easy",
-      chartObject: {},
+      chartObject: {
+        info: {}
+      },
 
       beatHeight: 100
     };
@@ -65,6 +90,9 @@ export default {
     readFile(e) {
       this.fileName = e.name;
       this.reader.readAsText(e);
+    },
+    readAudioFile(e) {
+      this.previewAudio.src = window.URL.createObjectURL(e);
     },
     zoomOut() {
       this.beatHeight = this.beatHeight - 10 || 0;

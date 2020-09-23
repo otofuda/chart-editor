@@ -60,11 +60,24 @@ export default {
     measureData: {
       type: Array,
       default: () => []
+    },
+    previewAudio: {
+      type: HTMLAudioElement
+    },
+    infoObject: {
+      type: Object,
+      required: true
     }
   },
   methods: {
     playFromMeasure(measure = 0) {
       measure;
+
+      setTimeout(() => {
+        this.previewAudio.currentTime = 0;
+        this.previewAudio.play();
+      }, (60 / this.infoObject.bpm) * this.infoObject.beat * 1000);
+
       this.measureData.forEach((measure, index) => {
         const next = this.measureData[index + 1] || {};
         this.timeoutIds.append(
@@ -88,6 +101,7 @@ export default {
       this.playFromMeasure();
     },
     previewStop() {
+      this.previewAudio.pause();
       this.isPreviewing = false;
       this.currentPosition = 0;
       this.$refs.preview.style.bottom = "0px";
