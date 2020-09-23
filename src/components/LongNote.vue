@@ -87,7 +87,6 @@ i {
   opacity: 0.9;
   width: 40px;
   margin: 0 10px;
-  z-index: 80;
   border-left: 4px solid #6ecc6e;
   border-right: 4px solid #6ecc6e;
 }

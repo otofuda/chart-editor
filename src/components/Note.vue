@@ -51,12 +51,16 @@ export default {
       );
     },
     noteWidth() {
+      // TAP, ロング
       if ([1, 2].includes(this.note.type)) return 60;
+      // 左右フリック
       else if ([3, 4].includes(this.note.type)) {
-        let _width = this.note.option[0] || 1;
+        let _width = this.note.option[0] || 3;
         if (_width === -1) _width = 3;
         return 60 * _width;
-      } else if (this.note.type === 95) {
+      }
+      // 区切り線
+      else if (this.note.type === 95) {
         let _width = this.note.option[0] || 1;
         if (_width === -1) _width = 1;
         if (this.note.position === 0) _width = 5;
