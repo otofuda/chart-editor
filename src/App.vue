@@ -30,8 +30,8 @@
       </v-row>
       <v-slider
         v-model="beatHeight"
-        min="50"
-        max="200"
+        min="20"
+        max="250"
         append-icon="mdi-magnify-plus-outline"
         prepend-icon="mdi-magnify-minus-outline"
         @click:append="zoomIn"
@@ -53,6 +53,11 @@
           label="オフセット"
           required
         ></v-text-field>
+      </v-row>
+      <v-row>
+        <v-btn class="ml-1" color="success" @click="saveFile">
+          <v-icon left>mdi-content-save</v-icon> 保存
+        </v-btn>
       </v-row>
     </v-container>
   </v-app>
@@ -90,6 +95,17 @@ export default {
     readFile(e) {
       this.fileName = e.name;
       this.reader.readAsText(e);
+    },
+    saveFile() {
+      let blob = new Blob([JSON.stringify(this.chartObject, null, 4)], {
+        type: "application/json"
+      });
+      let a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = this.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     },
     readAudioFile(e) {
       this.previewAudio.src = window.URL.createObjectURL(e);
@@ -161,7 +177,7 @@ export default {
 
 <style lang="scss">
 #app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
+  font-family: "Open Sans", "Noto Sans JP", Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
@@ -173,6 +189,7 @@ export default {
     left: 0;
     width: calc(100% - 380px);
     min-height: 100vh;
+    padding: 12px 32px;
   }
 }
 </style>
