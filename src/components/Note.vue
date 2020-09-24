@@ -9,8 +9,11 @@
       bottom: `${positionBottom}px`,
       width: `${noteWidth}px`
     }"
-    >{{ note.position }}/{{ note.split }}</span
   >
+    {{ note.position }}/{{ note.split }}
+    <strong v-if="note.type === 97">BEAT {{ note.option[0] }}</strong>
+    <strong v-if="note.type === 98">BPM {{ note.option[0] }}</strong>
+  </span>
 </template>
 
 <script>
@@ -82,6 +85,10 @@ span {
   height: 4px;
   overflow: visible;
   color: transparent;
+  text-align: right;
+  strong {
+    color: #a0a0a0;
+  }
   &:hover {
     color: #909090;
   }
@@ -106,6 +113,14 @@ span {
     &.hidden {
       background: transparent;
     }
+  }
+  &.type97 {
+    height: 1px;
+    background: greenyellow;
+  }
+  &.type98 {
+    height: 1px;
+    background: yellow;
   }
 }
 </style>

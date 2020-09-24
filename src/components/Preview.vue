@@ -10,14 +10,14 @@
     >
       <Measure
         v-for="measure in measureData"
-        :key="measure.measure"
+        :key="`measure_${measure.measure}`"
         :measure="measure"
         :notes="currentChart.filter(note => note.measure === measure.measure)"
       />
 
       <LongNote
         v-for="(note, i) in currentChart.filter(note => note.type === 2)"
-        :key="i"
+        :key="`longnote_${i}`"
         :note="note"
         :measureData="measureData"
       />
@@ -27,6 +27,15 @@
         <v-expansion-panel>
           <v-expansion-panel-header />
           <v-expansion-panel-content>
+            <v-row class="control__info"
+              >BPM: {{ currentBpm }} BEAT: {{ currentBeat }}</v-row
+            >
+            <v-text-field
+              v-model.number="startFrom"
+              suffix="小節から"
+              outlined
+              dense
+            ></v-text-field>
             <v-btn class="mr-1" outlined color="success" @click="previewStart">
               <v-icon left>mdi-play</v-icon> 再生
             </v-btn>
@@ -49,7 +58,10 @@ export default {
     return {
       isPreviewing: false,
       currentPosition: 0,
-      timeoutIds: []
+      timeoutIds: [],
+      startFrom: 0,
+      currentBpm: 0,
+      currentBeat: 0
     };
   },
   props: {
@@ -70,25 +82,29 @@ export default {
     }
   },
   methods: {
-    playFromMeasure(measure = 0) {
-      measure;
+    playFromMeasure() {
+      const startOffset = this.startOffset;
 
       setTimeout(() => {
-        this.previewAudio.currentTime = 0;
+        this.previewAudio.currentTime = startOffset / 1000;
         this.previewAudio.play();
       }, (60 / this.infoObject.bpm) * this.infoObject.beat * 1000);
 
       this.measureData.forEach((measure, index) => {
         const next = this.measureData[index + 1] || {};
-        this.timeoutIds.append(
-          setTimeout(() => {
-            this.currentPosition = next.measurePositionBottom;
-            const transitionTime =
-              next.measureReachTime - measure.measureReachTime;
-            this.$refs.preview.style.transition = `${transitionTime}ms all linear`;
-            this.$refs.preview.style.bottom = `-${this.currentPosition}px`;
-          }, measure.measureReachTime)
-        );
+        if (measure.measureReachTime > startOffset) {
+          this.timeoutIds.append(
+            setTimeout(() => {
+              this.currentPosition = next.measurePositionBottom;
+              this.currentBpm = measure.measureBpm;
+              this.currentBeat = measure.measureBeat;
+              const transitionTime =
+                next.measureReachTime - measure.measureReachTime;
+              this.$refs.preview.style.transition = `${transitionTime}ms all linear`;
+              this.$refs.preview.style.bottom = `-${this.currentPosition}px`;
+            }, measure.measureReachTime - startOffset)
+          );
+        }
       });
     },
     previewStart() {
@@ -104,6 +120,8 @@ export default {
       this.previewAudio.pause();
       this.isPreviewing = false;
       this.currentPosition = 0;
+      this.currentBpm = 0;
+      this.currentBeat = 0;
       this.$refs.preview.style.bottom = "0px";
       this.timeoutIds.forEach(id => clearInterval(id));
     }
@@ -114,6 +132,9 @@ export default {
         this.measureData.last?.measurePositionBottom +
         this.measureData.last?.measureHeight
       );
+    },
+    startOffset() {
+      return this.measureData[this.startFrom].measureReachTime;
     }
   },
   components: {
@@ -136,5 +157,10 @@ export default {
   top: 0;
   right: 0;
   padding: 16px;
+  &__info {
+    justify-content: center;
+    font-weight: bold;
+    margin-bottom: 12px;
+  }
 }
 </style>

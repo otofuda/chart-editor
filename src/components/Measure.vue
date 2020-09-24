@@ -9,10 +9,10 @@
       hiddenControl: notes.find(note => note.type === 95 && note.position === 0)
     }"
   >
-    {{ measure.measure }}
+    <span class="measure__number" v-text="measure.measure"></span>
     <Note
       v-for="(note, i) in notes.filter(n => n.type !== 2)"
-      :key="i"
+      :key="`note_${measure.measure}_${i}`"
       :note="note"
       :measure="measure"
     />
@@ -66,6 +66,14 @@ export default {
   right: 40px;
   &:not(.hiddenControl) {
     box-shadow: inset 0 -1px 0 0 #606060;
+  }
+
+  &__number {
+    position: absolute;
+    bottom: 0;
+    right: 4px;
+    color: #606060;
+    font-size: 32px;
   }
 }
 </style>
