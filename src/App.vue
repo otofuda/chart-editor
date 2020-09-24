@@ -97,10 +97,11 @@ export default {
       this.reader.readAsText(e);
     },
     saveFile() {
-      let blob = new Blob([JSON.stringify(this.chartObject, null, 4)], {
+      const saveObject = this.chartObject;
+      const blob = new Blob([JSON.stringify(saveObject, null, 4)], {
         type: "application/json"
       });
-      let a = document.createElement("a");
+      const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = this.fileName;
       document.body.appendChild(a);
