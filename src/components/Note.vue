@@ -1,25 +1,180 @@
 <template>
-  <span
-    :class="{
-      [`type${note.type}`]: true,
-      hidden: isHiddenControl
-    }"
-    :style="{
-      left: `${positionLeft}px`,
-      bottom: `${positionBottom}px`,
-      width: `${noteWidth}px`
-    }"
+  <v-menu
+    v-model="menu"
+    :close-on-click="false"
+    :close-on-content-click="false"
+    absolute
+    left
+    :nudge-left="50"
+    :max-width="240"
   >
-    {{ note.position }}/{{ note.split }}
-    <strong v-if="note.type === 97">BEAT {{ note.option[0] }}</strong>
-    <strong v-if="note.type === 98">BPM {{ note.option[0] }}</strong>
-  </span>
+    <template v-slot:activator="{ on, attrs }">
+      <!-- 音符を描画 -->
+      <span
+        :class="{
+          [`type${note.type}`]: true,
+          hidden: isHiddenControl
+        }"
+        :style="{
+          left: `${positionLeft}px`,
+          bottom: `${positionBottom}px`,
+          width: `${noteWidth}px`
+        }"
+        v-bind="attrs"
+        v-on="on"
+      >
+        {{ note.position }}/{{ note.split }}
+        <strong v-if="note.type === 97">BEAT {{ note.option[0] }}</strong>
+        <strong v-if="note.type === 98">BPM {{ note.option[0] }}</strong>
+        <strong v-if="note.type === 99">EOF</strong>
+      </span>
+    </template>
+
+    <!-- ポップアップ編集 -->
+    <v-card>
+      <v-list>
+        <v-list-item>
+          <v-card-text>ノートの配置場所</v-card-text>
+          <v-spacer></v-spacer>
+          <v-btn icon @click="menu = false" right>
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-list-item>
+
+        <v-list-item>
+          <v-row>
+            <v-col>
+              <v-text-field
+                :value="note.measure"
+                @change="value => (note.measure = Number(value))"
+                hide-details
+                suffix="小節"
+                outlined
+                dense
+                min="1"
+                max="5"
+              ></v-text-field>
+            </v-col>
+          </v-row>
+        </v-list-item>
+
+        <v-list-item>
+          <v-row>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="note.position"
+                label="position"
+                outlined
+                dense
+                hide-details
+                type="number"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="note.split"
+                label="split"
+                outlined
+                dense
+                hide-details
+                type="number"
+              ></v-text-field>
+            </v-col>
+          </v-row>
+        </v-list-item>
+
+        <v-list-item>
+          LANE
+          <v-spacer></v-spacer>
+          <v-radio-group v-model="note.lane" row>
+            <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
+          </v-radio-group>
+        </v-list-item>
+
+        <v-list-item>
+          <v-select
+            :items="noteTypes"
+            hide-details
+            label="ノート種別"
+            v-model="note.type"
+            align="left"
+            outlined
+            dense
+          ></v-select>
+        </v-list-item>
+
+        <v-list-item v-if="noteOptions.length > 0">
+          <v-card-text>オプション</v-card-text>
+          <v-spacer></v-spacer>
+          <v-btn
+            href="https://github.com/mtsgi/fumenedit/blob/master/format.md"
+            target="_blank"
+            icon
+            right
+          >
+            <v-icon>mdi-help</v-icon>
+          </v-btn>
+        </v-list-item>
+
+        <v-list-item v-for="(opt, i) in noteOptions" :key="`option_${i}`">
+          <v-text-field
+            v-model="note.option[i]"
+            hide-details
+            :label="opt.label"
+            :type="opt.type"
+            outlined
+            dense
+          ></v-text-field>
+        </v-list-item>
+      </v-list>
+
+      <v-card-actions>
+        <v-btn color="error" disabled text @click="menu = false">
+          <v-icon left>mdi-delete</v-icon> ノートを削除
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-menu>
 </template>
 
 <script>
 export default {
   data() {
-    return {};
+    return {
+      menu: false,
+      noteTypes: [
+        {
+          text: "通常",
+          value: 1
+        },
+        {
+          text: "ロング",
+          value: 2,
+          disabled: true
+        },
+        {
+          text: "左フリック",
+          value: 3
+        },
+        {
+          text: "右フリック",
+          value: 4
+        },
+        {
+          text: "音札",
+          value: 5,
+          disabled: true
+        },
+        {
+          text: "区切り線",
+          value: 95
+        },
+        {
+          text: "EOF",
+          value: 99
+        }
+      ]
+    };
   },
   props: {
     note: {
@@ -72,6 +227,45 @@ export default {
     },
     isHiddenControl() {
       return this.note.type === 95 && this.note.position === 0;
+    },
+    noteOptions() {
+      if ([3, 4].includes(this.note.type))
+        return [
+          {
+            label: "width",
+            type: "number"
+          },
+          {
+            label: "offsetNumer",
+            type: "number"
+          },
+          {
+            label: "offsetDenom",
+            type: "number"
+          }
+        ];
+      else if (this.note.type === 95)
+        return [
+          {
+            label: "length",
+            type: "number"
+          }
+        ];
+      else if (this.note.type === 97)
+        return [
+          {
+            label: "beat",
+            type: "number"
+          }
+        ];
+      else if (this.note.type === 98)
+        return [
+          {
+            label: "bpm",
+            type: "number"
+          }
+        ];
+      else return [];
     }
   }
 };
@@ -81,7 +275,13 @@ export default {
 span {
   position: absolute;
   color: #606060;
-  background: #f0f0f0;
+  background: linear-gradient(
+    to left,
+    transparent 3.99%,
+    #ffffff 4%,
+    #ffffff 96%,
+    transparent 96.01%
+  );
   height: 4px;
   overflow: visible;
   color: transparent;
@@ -98,10 +298,34 @@ span {
   &.type3 {
     height: 6px;
     background: #87cefa;
+    &::before {
+      content: "";
+      display: inline-block;
+      position: absolute;
+      left: -10px;
+      top: -7.5px;
+      height: 0;
+      width: 0;
+      border-top: 10px solid transparent;
+      border-right: 20px solid #87cefa;
+      border-bottom: 10px solid transparent;
+    }
   }
   &.type4 {
     height: 6px;
     background: #f08080;
+    &::after {
+      content: "";
+      display: inline-block;
+      position: absolute;
+      right: -10px;
+      top: -7.5px;
+      height: 0;
+      width: 0;
+      border-top: 10px solid transparent;
+      border-left: 20px solid #f08080;
+      border-bottom: 10px solid transparent;
+    }
   }
   &.type5 {
     height: 8px;
@@ -109,7 +333,7 @@ span {
   }
   &.type95 {
     height: 1px;
-    background: #606060;
+    background: #a0a0a0;
     &.hidden {
       background: transparent;
     }
@@ -121,6 +345,22 @@ span {
   &.type98 {
     height: 1px;
     background: yellow;
+  }
+  &.type99 {
+    height: 0;
+    border-top: 2px dashed #ff5050;
+  }
+}
+
+.v-card {
+  &__text {
+    padding: 0;
+    text-align: left;
+  }
+  .v-input {
+    &--radio-group__input .v-radio {
+      margin: 0;
+    }
   }
 }
 </style>

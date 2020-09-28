@@ -97,10 +97,12 @@ export default {
       this.reader.readAsText(e);
     },
     saveFile() {
-      let blob = new Blob([JSON.stringify(this.chartObject, null, 4)], {
+      const saveObject = this.chartObject;
+      // TODO: Validationとオプション類の整形
+      const blob = new Blob([JSON.stringify(saveObject, null, 4)], {
         type: "application/json"
       });
-      let a = document.createElement("a");
+      const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = this.fileName;
       document.body.appendChild(a);
@@ -144,7 +146,7 @@ export default {
       let measureReachTime = this.musicOffset;
       let measurePositionBottom =
         (this.musicOffset / ((60 / measureBpm) * 1000)) * this.beatHeight;
-      this.maxMeasure.times(measure => {
+      (this.maxMeasure + 1).times(measure => {
         // type 97, 98 をfindして求める
         let beatChangeNote = this.currentChart.find(
           n => n.type === 97 && n.measure === measure

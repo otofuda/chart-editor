@@ -65,15 +65,15 @@ export default {
   position: absolute;
   right: 40px;
   &:not(.hiddenControl) {
-    box-shadow: inset 0 -1px 0 0 #606060;
+    box-shadow: inset 0 -1px 0 0 #a0a0a0;
   }
 
   &__number {
     position: absolute;
     bottom: 0;
-    right: 4px;
+    left: 100%;
     color: #606060;
-    font-size: 32px;
+    font-size: 20px;
   }
 }
 </style>

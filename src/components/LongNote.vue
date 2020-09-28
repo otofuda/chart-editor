@@ -69,7 +69,13 @@ export default {
 span {
   position: absolute;
   color: #606060;
-  background: #f0f0f0;
+  background: linear-gradient(
+    to left,
+    transparent 3.99%,
+    #ffffff 4%,
+    #ffffff 96%,
+    transparent 96.01%
+  );
   height: 4px;
   overflow: visible;
   color: transparent;
@@ -77,7 +83,13 @@ span {
     color: #909090;
   }
   &.type2 {
-    background: #e9b75c;
+    background: linear-gradient(
+      to left,
+      transparent 3.99%,
+      #e9b75c 4%,
+      #e9b75c 96%,
+      transparent 96.01%
+    );
     width: 60px;
   }
 }
@@ -85,8 +97,8 @@ i {
   position: absolute;
   background: #ffffec;
   opacity: 0.9;
-  width: 40px;
-  margin: 0 10px;
+  width: 38px;
+  margin: 0 11px;
   border-left: 4px solid #6ecc6e;
   border-right: 4px solid #6ecc6e;
 }
