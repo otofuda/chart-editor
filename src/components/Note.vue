@@ -26,6 +26,7 @@
         {{ note.position }}/{{ note.split }}
         <strong v-if="note.type === 97">BEAT {{ note.option[0] }}</strong>
         <strong v-if="note.type === 98">BPM {{ note.option[0] }}</strong>
+        <strong v-if="note.type === 99">EOF</strong>
       </span>
     </template>
 
@@ -167,6 +168,10 @@ export default {
         {
           text: "区切り線",
           value: 95
+        },
+        {
+          text: "EOF",
+          value: 99
         }
       ]
     };
@@ -270,7 +275,13 @@ export default {
 span {
   position: absolute;
   color: #606060;
-  background: #f0f0f0;
+  background: linear-gradient(
+    to left,
+    transparent 3.99%,
+    #ffffff 4%,
+    #ffffff 96%,
+    transparent 96.01%
+  );
   height: 4px;
   overflow: visible;
   color: transparent;
@@ -287,10 +298,34 @@ span {
   &.type3 {
     height: 6px;
     background: #87cefa;
+    &::before {
+      content: "";
+      display: inline-block;
+      position: absolute;
+      left: -10px;
+      top: -7.5px;
+      height: 0;
+      width: 0;
+      border-top: 10px solid transparent;
+      border-right: 20px solid #87cefa;
+      border-bottom: 10px solid transparent;
+    }
   }
   &.type4 {
     height: 6px;
     background: #f08080;
+    &::after {
+      content: "";
+      display: inline-block;
+      position: absolute;
+      right: -10px;
+      top: -7.5px;
+      height: 0;
+      width: 0;
+      border-top: 10px solid transparent;
+      border-left: 20px solid #f08080;
+      border-bottom: 10px solid transparent;
+    }
   }
   &.type5 {
     height: 8px;
@@ -298,7 +333,7 @@ span {
   }
   &.type95 {
     height: 1px;
-    background: #606060;
+    background: #a0a0a0;
     &.hidden {
       background: transparent;
     }
@@ -310,6 +345,10 @@ span {
   &.type98 {
     height: 1px;
     background: yellow;
+  }
+  &.type99 {
+    height: 0;
+    border-top: 2px dashed #ff5050;
   }
 }
 
