@@ -116,7 +116,7 @@
           </v-btn>
         </v-list-item>
 
-        <v-list-item v-for="(opt, i) in noteOptions" :key="`option_${i}`">
+        <v-list-item v-for="(opt, i) in noteOptions(note)" :key="`option_${i}`">
           <v-text-field
             v-model="note.option[i]"
             hide-details
@@ -138,42 +138,13 @@
 </template>
 
 <script>
+import noteTypes from "../mixins/noteTypes"
+
 export default {
+  mixins: [noteTypes],
   data() {
     return {
-      menu: false,
-      noteTypes: [
-        {
-          text: "通常",
-          value: 1
-        },
-        {
-          text: "ロング",
-          value: 2,
-          disabled: true
-        },
-        {
-          text: "左フリック",
-          value: 3
-        },
-        {
-          text: "右フリック",
-          value: 4
-        },
-        {
-          text: "音札",
-          value: 5,
-          disabled: true
-        },
-        {
-          text: "区切り線",
-          value: 95
-        },
-        {
-          text: "EOF",
-          value: 99
-        }
-      ]
+      menu: false
     };
   },
   props: {
@@ -227,45 +198,6 @@ export default {
     },
     isHiddenControl() {
       return this.note.type === 95 && this.note.position === 0;
-    },
-    noteOptions() {
-      if ([3, 4].includes(this.note.type))
-        return [
-          {
-            label: "width",
-            type: "number"
-          },
-          {
-            label: "offsetNumer",
-            type: "number"
-          },
-          {
-            label: "offsetDenom",
-            type: "number"
-          }
-        ];
-      else if (this.note.type === 95)
-        return [
-          {
-            label: "length",
-            type: "number"
-          }
-        ];
-      else if (this.note.type === 97)
-        return [
-          {
-            label: "beat",
-            type: "number"
-          }
-        ];
-      else if (this.note.type === 98)
-        return [
-          {
-            label: "bpm",
-            type: "number"
-          }
-        ];
-      else return [];
     }
   }
 };
@@ -286,6 +218,7 @@ span {
   overflow: visible;
   color: transparent;
   text-align: right;
+  transition: 0.1s all ease;
   strong {
     color: #a0a0a0;
   }

@@ -79,6 +79,7 @@ span {
   height: 4px;
   overflow: visible;
   color: transparent;
+  text-align: right;
   &:hover {
     color: #909090;
   }

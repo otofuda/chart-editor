@@ -64,6 +64,7 @@ export default {
   color: #ffffff;
   position: absolute;
   right: 40px;
+
   &:not(.hiddenControl) {
     box-shadow: inset 0 -1px 0 0 #a0a0a0;
   }
