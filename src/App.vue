@@ -52,7 +52,7 @@
           </v-col>
           <v-col cols="12" sm="3">
             <v-text-field
-              v-model="appendNote.measure"
+              v-model.number="appendNote.measure"
               label="measure"
               outlined
               dense
@@ -63,7 +63,7 @@
           </v-col>
           <v-col cols="12" sm="3">
             <v-text-field
-              v-model="appendNote.position"
+              v-model.number="appendNote.position"
               label="position"
               outlined
               dense
@@ -71,11 +71,15 @@
               type="number"
               min="0"
               :max="appendNote.split - 1"
+              background-color="#f0f0b0"
+              @keydown.enter="appendNotes([appendNote])"
+              @keydown.left="appendNoteToLeft"
+              @keydown.right="appendNoteToRight"
             ></v-text-field>
           </v-col>
           <v-col cols="12" sm="3">
             <v-text-field
-              v-model="appendNote.split"
+              v-model.number="appendNote.split"
               label="split"
               outlined
               dense
@@ -286,8 +290,21 @@ export default {
     },
     appendNotes(notesArray) {
       notesArray.forEach(note => {
-        this.chartObject[this.currentDifficulty]?.append({ ...note });
+        this.chartObject[this.currentDifficulty]?.append(
+          JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
+        );
       });
+    },
+    appendNoteToLeft() {
+      this.appendNote.lane = Math.max(this.appendNote.lane - 1, 1);
+    },
+    appendNoteToRight() {
+      this.appendNote.lane = Math.min(this.appendNote.lane + 1, 5);
+    },
+    deleteNote(target) {
+      this.chartObject[this.currentDifficulty] = this.chartObject[
+        this.currentDifficulty
+      ]?.delete(target);
     }
   },
   computed: {
@@ -368,5 +385,104 @@ export default {
       margin: 8px -12px;
     }
   }
+}
+.note {
+  position: absolute;
+  color: #606060;
+  background: linear-gradient(
+    to left,
+    transparent 3.99%,
+    #ffffff 4%,
+    #ffffff 96%,
+    transparent 96.01%
+  );
+  height: 4px;
+  overflow: visible;
+  color: transparent;
+  text-align: right;
+  transition: 0.1s all ease;
+  strong {
+    color: #a0a0a0;
+  }
+  &:hover {
+    color: #909090;
+  }
+  &.type2 {
+    background: linear-gradient(
+      to left,
+      transparent 3.99%,
+      #e9b75c 4%,
+      #e9b75c 96%,
+      transparent 96.01%
+    );
+    width: 60px;
+  }
+  &.type3 {
+    height: 6px;
+    background: #87cefa;
+    z-index: 1;
+    &::before {
+      content: "";
+      display: inline-block;
+      position: absolute;
+      left: -10px;
+      top: -7.5px;
+      height: 0;
+      width: 0;
+      border-top: 10px solid transparent;
+      border-right: 20px solid #87cefa;
+      border-bottom: 10px solid transparent;
+    }
+  }
+  &.type4 {
+    height: 6px;
+    background: #f08080;
+    z-index: 1;
+    &::after {
+      content: "";
+      display: inline-block;
+      position: absolute;
+      right: -10px;
+      top: -7.5px;
+      height: 0;
+      width: 0;
+      border-top: 10px solid transparent;
+      border-left: 20px solid #f08080;
+      border-bottom: 10px solid transparent;
+    }
+  }
+  &.type5 {
+    height: 8px;
+    background: linear-gradient(to right, gold, #fde08d, gold);
+  }
+  &.type95 {
+    height: 1px;
+    background: #a0a0a0;
+    &.hidden {
+      background: transparent;
+    }
+  }
+  &.type97 {
+    height: 1px;
+    background: greenyellow;
+  }
+  &.type98 {
+    height: 1px;
+    background: yellow;
+  }
+  &.type99 {
+    height: 0;
+    border-top: 2px dashed #ff5050;
+  }
+}
+
+.note-hold {
+  position: absolute;
+  background: #ffffec;
+  opacity: 0.9;
+  width: 38px;
+  margin: 0 11px;
+  border-left: 4px solid #6ecc6e;
+  border-right: 4px solid #6ecc6e;
 }
 </style>

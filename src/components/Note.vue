@@ -11,6 +11,7 @@
     <template v-slot:activator="{ on, attrs }">
       <!-- 音符を描画 -->
       <span
+        class="note"
         :class="{
           [`type${note.type}`]: true,
           hidden: isHiddenControl
@@ -103,7 +104,7 @@
           ></v-select>
         </v-list-item>
 
-        <v-list-item v-if="noteOptions.length > 0">
+        <v-list-item v-if="noteOptions(note).length > 0">
           <v-card-text>オプション</v-card-text>
           <v-spacer></v-spacer>
           <v-btn
@@ -129,7 +130,7 @@
       </v-list>
 
       <v-card-actions>
-        <v-btn color="error" disabled text @click="menu = false">
+        <v-btn color="error" text @click="deleteThisNote">
           <v-icon left>mdi-delete</v-icon> ノートを削除
         </v-btn>
       </v-card-actions>
@@ -138,7 +139,7 @@
 </template>
 
 <script>
-import noteTypes from "../mixins/noteTypes"
+import noteTypes from "../mixins/noteTypes";
 
 export default {
   mixins: [noteTypes],
@@ -155,6 +156,12 @@ export default {
     measure: {
       type: Object,
       required: true
+    }
+  },
+  methods: {
+    deleteThisNote() {
+      this.$root.$children.first.deleteNote(this.note); // HACK: どうにかしたい
+      this.menu = false;
     }
   },
   computed: {
@@ -204,87 +211,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-span {
-  position: absolute;
-  color: #606060;
-  background: linear-gradient(
-    to left,
-    transparent 3.99%,
-    #ffffff 4%,
-    #ffffff 96%,
-    transparent 96.01%
-  );
-  height: 4px;
-  overflow: visible;
-  color: transparent;
-  text-align: right;
-  transition: 0.1s all ease;
-  strong {
-    color: #a0a0a0;
-  }
-  &:hover {
-    color: #909090;
-  }
-  &.type2 {
-    background: #e9b75c;
-  }
-  &.type3 {
-    height: 6px;
-    background: #87cefa;
-    &::before {
-      content: "";
-      display: inline-block;
-      position: absolute;
-      left: -10px;
-      top: -7.5px;
-      height: 0;
-      width: 0;
-      border-top: 10px solid transparent;
-      border-right: 20px solid #87cefa;
-      border-bottom: 10px solid transparent;
-    }
-  }
-  &.type4 {
-    height: 6px;
-    background: #f08080;
-    &::after {
-      content: "";
-      display: inline-block;
-      position: absolute;
-      right: -10px;
-      top: -7.5px;
-      height: 0;
-      width: 0;
-      border-top: 10px solid transparent;
-      border-left: 20px solid #f08080;
-      border-bottom: 10px solid transparent;
-    }
-  }
-  &.type5 {
-    height: 8px;
-    background: linear-gradient(to right, gold, #fde08d, gold);
-  }
-  &.type95 {
-    height: 1px;
-    background: #a0a0a0;
-    &.hidden {
-      background: transparent;
-    }
-  }
-  &.type97 {
-    height: 1px;
-    background: greenyellow;
-  }
-  &.type98 {
-    height: 1px;
-    background: yellow;
-  }
-  &.type99 {
-    height: 0;
-    border-top: 2px dashed #ff5050;
-  }
-}
-
 .v-card {
   &__text {
     padding: 0;

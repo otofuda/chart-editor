@@ -203,5 +203,6 @@ export default {
   top: 0;
   right: 0;
   padding: 16px;
+  z-index: 2;
 }
 </style>

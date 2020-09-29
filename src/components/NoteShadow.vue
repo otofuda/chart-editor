@@ -3,6 +3,7 @@
   <div>
     <!-- 始点 -->
     <span
+      class="note"
       :class="`type${note.type}`"
       :style="{
         left: `${getAbsoluteLeft(note)}px`,
@@ -15,6 +16,7 @@
     <div v-for="(end, i) in note.end" :key="i">
       <!-- 終点 -->
       <span
+        class="note"
         :class="`type${end.type}`"
         :style="{
           left: `${getAbsoluteLeft(end)}px`,
@@ -25,6 +27,7 @@
       >
       <!-- 帯 -->
       <i
+        class="note-hold"
         :style="{
           bottom: `${getAbsoluteBottom(note)}px`,
           left: `${getAbsoluteLeft(end)}px`,
@@ -104,100 +107,6 @@ export default {
 
 <style lang="scss" scoped>
 span {
-  position: absolute;
   opacity: 0.5;
-  color: #606060;
-  background: linear-gradient(
-    to left,
-    transparent 3.99%,
-    #ffffff 4%,
-    #ffffff 96%,
-    transparent 96.01%
-  );
-  height: 4px;
-  overflow: visible;
-  color: transparent;
-  text-align: right;
-  transition: 0.1s all ease;
-  strong {
-    color: #a0a0a0;
-  }
-  &:hover {
-    color: #909090;
-  }
-  &.type2 {
-    background: linear-gradient(
-      to left,
-      transparent 3.99%,
-      #e9b75c 4%,
-      #e9b75c 96%,
-      transparent 96.01%
-    );
-    width: 60px;
-  }
-  &.type3 {
-    height: 6px;
-    background: #87cefa;
-    &::before {
-      content: "";
-      display: inline-block;
-      position: absolute;
-      left: -10px;
-      top: -7.5px;
-      height: 0;
-      width: 0;
-      border-top: 10px solid transparent;
-      border-right: 20px solid #87cefa;
-      border-bottom: 10px solid transparent;
-    }
-  }
-  &.type4 {
-    height: 6px;
-    background: #f08080;
-    &::after {
-      content: "";
-      display: inline-block;
-      position: absolute;
-      right: -10px;
-      top: -7.5px;
-      height: 0;
-      width: 0;
-      border-top: 10px solid transparent;
-      border-left: 20px solid #f08080;
-      border-bottom: 10px solid transparent;
-    }
-  }
-  &.type5 {
-    height: 8px;
-    background: linear-gradient(to right, gold, #fde08d, gold);
-  }
-  &.type95 {
-    height: 1px;
-    background: #a0a0a0;
-    &.hidden {
-      background: transparent;
-    }
-  }
-  &.type97 {
-    height: 1px;
-    background: greenyellow;
-  }
-  &.type98 {
-    height: 1px;
-    background: yellow;
-  }
-  &.type99 {
-    height: 0;
-    border-top: 2px dashed #ff5050;
-  }
-}
-i {
-  position: absolute;
-  background: #ffffec;
-  opacity: 0.9;
-  width: 38px;
-  margin: 0 11px;
-  border-left: 4px solid #6ecc6e;
-  border-right: 4px solid #6ecc6e;
 }
 </style>
