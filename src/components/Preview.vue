@@ -21,6 +21,12 @@
         :note="note"
         :measureData="measureData"
       />
+
+      <NoteShadow
+        v-if="appendNote"
+        :note="appendNote"
+        :measureData="measureData"
+      />
     </div>
     <div class="control">
       <v-expansion-panels accordion>
@@ -55,6 +61,7 @@
 <script>
 import Measure from "./Measure.vue";
 import LongNote from "./LongNote.vue";
+import NoteShadow from "./NoteShadow.vue";
 
 export default {
   data() {
@@ -84,6 +91,9 @@ export default {
     infoObject: {
       type: Object,
       required: true
+    },
+    appendNote: {
+      type: Object
     }
   },
   methods: {
@@ -174,7 +184,8 @@ export default {
   },
   components: {
     Measure,
-    LongNote
+    LongNote,
+    NoteShadow
   }
 };
 </script>
@@ -192,5 +203,6 @@ export default {
   top: 0;
   right: 0;
   padding: 16px;
+  z-index: 2;
 }
 </style>

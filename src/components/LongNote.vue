@@ -3,6 +3,7 @@
   <div>
     <!-- 始点 -->
     <span
+      class="note"
       :class="`type${note.type}`"
       :style="{
         left: `${getLeft(note)}px`,
@@ -15,6 +16,7 @@
     <div v-for="(end, i) in note.end" :key="i">
       <!-- 終点 -->
       <span
+        class="note"
         :class="`type${end.type}`"
         :style="{
           left: `${getLeft(end)}px`,
@@ -25,6 +27,7 @@
       >
       <!-- 帯 -->
       <i
+        class="note-hold"
         :style="{
           bottom: `${getBottom(note)}px`,
           left: `${getLeft(end)}px`,
@@ -65,41 +68,4 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
-span {
-  position: absolute;
-  color: #606060;
-  background: linear-gradient(
-    to left,
-    transparent 3.99%,
-    #ffffff 4%,
-    #ffffff 96%,
-    transparent 96.01%
-  );
-  height: 4px;
-  overflow: visible;
-  color: transparent;
-  &:hover {
-    color: #909090;
-  }
-  &.type2 {
-    background: linear-gradient(
-      to left,
-      transparent 3.99%,
-      #e9b75c 4%,
-      #e9b75c 96%,
-      transparent 96.01%
-    );
-    width: 60px;
-  }
-}
-i {
-  position: absolute;
-  background: #ffffec;
-  opacity: 0.9;
-  width: 38px;
-  margin: 0 11px;
-  border-left: 4px solid #6ecc6e;
-  border-right: 4px solid #6ecc6e;
-}
-</style>
+<style lang="scss" scoped></style>
