@@ -255,6 +255,16 @@ export default {
   mounted() {
     this.reader.onload = event => {
       this.chartObject = JSON.parse(event.target.result);
+      this.difficulties.forEach(d => {
+        this.chartObject[d] = this.chartObject[d].map((note, index) => {
+          // 編集用の情報を付加
+          return {
+            ...note,
+            index,
+            isSelected: false
+          };
+        });
+      });
       this.isLoaded = true;
     };
   },
@@ -268,8 +278,29 @@ export default {
       this.isLoaded = true;
     },
     saveFile() {
-      const saveObject = this.chartObject;
+      const saveObject = {
+        raku: [],
+        easy: [],
+        normal: [],
+        hard: [],
+        extra: [],
+        info: { ...this.chartObject.info }
+      };
       // TODO: Validationとオプション類の整形
+      this.difficulties.forEach(d => {
+        saveObject[d] = this.chartObject[d].map(note => {
+          return {
+            type: Number(note.type),
+            measure: Number(note.measure),
+            lane: Number(note.lane),
+            position: Number(note.position),
+            split: Number(note.split),
+            option: [...note.option],
+            end: note.end
+          };
+        });
+      });
+      console.log("saveObject", saveObject);
       const blob = new Blob([JSON.stringify(saveObject, null, 4)], {
         type: "application/json"
       });
@@ -296,10 +327,12 @@ export default {
       this.$vuetify.goTo(measurePositionTop);
     },
     appendNotes(notesArray) {
-      notesArray.forEach(note => {
-        this.chartObject[this.currentDifficulty]?.append(
-          JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
-        );
+      notesArray.each(note => {
+        this.currentChart?.append({
+          isSelected: false,
+          index: this.currentChart.size,
+          ...JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
+        });
       });
     },
     appendNoteToLeft() {
@@ -326,10 +359,10 @@ export default {
         if (this.isAutoFollow) this.scrollToMeasure(note.measure);
       } else note.position--;
     },
-    deleteNote(target) {
-      this.chartObject[this.currentDifficulty] = this.chartObject[
-        this.currentDifficulty
-      ]?.delete(target);
+    deleteNote(index) {
+      this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
+        note => note.index === index
+      );
     }
   },
   computed: {
