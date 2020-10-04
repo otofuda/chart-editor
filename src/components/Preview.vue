@@ -150,13 +150,34 @@ export default {
         }
       });
     },
+    playFromZero() {
+      // 拍子木分オフセット
+      setTimeout(() => {
+        this.previewAudio.currentTime = 0;
+        this.previewAudio.play();
+      }, (60 / this.infoObject.bpm) * this.infoObject.beat * 1000);
+      // 1小節ずつプレビュー
+      this.measureData.forEach((measure, index) => {
+        const next = this.measureData[index + 1] || {};
+        this.timeoutIds.append(
+          setTimeout(() => {
+            this.currentPosition = next.measurePositionBottom;
+            const transitionTime =
+              next.measureReachTime - measure.measureReachTime;
+            this.$refs.preview.style.transition = `${transitionTime}ms all linear`;
+            this.$refs.preview.style.bottom = `-${this.currentPosition}px`;
+          }, measure.measureReachTime)
+        );
+      });
+    },
     previewStart() {
       this.isPreviewing = true;
       this.$refs.preview.style.transition = "0ms all linear";
       // this.$refs.preview.style.bottom = "0px";
       // this.$refs.preview.style.transition = `${this.measureData.first.measureReachTime}ms all linear`;
       this.$refs.preview.style.bottom = `-${this.measureData.first.measurePositionBottom}px`;
-      this.playFromMeasure();
+      if (this.startFrom === 0) this.playFromZero();
+      else this.playFromMeasure();
     },
     previewStop() {
       this.previewAudio.pause();

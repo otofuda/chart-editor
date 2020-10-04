@@ -35,7 +35,7 @@
     <v-card>
       <v-list>
         <v-list-item>
-          <v-card-text>ノートの配置場所</v-card-text>
+          <v-card-text>#{{ note.index }} {{ noteTypeName }}</v-card-text>
           <v-spacer></v-spacer>
           <v-btn icon @click="menu = false" right>
             <v-icon>mdi-close</v-icon>
@@ -160,7 +160,7 @@ export default {
   },
   methods: {
     deleteThisNote() {
-      this.$root.$children.first.deleteNote(this.note); // HACK: どうにかしたい
+      this.$root.$children.first.deleteNote(this.note.index);
       this.menu = false;
     }
   },
@@ -205,6 +205,9 @@ export default {
     },
     isHiddenControl() {
       return this.note.type === 95 && this.note.position === 0;
+    },
+    noteTypeName() {
+      return this.noteTypes.find(t => t.value === this.note.type)?.text;
     }
   }
 };

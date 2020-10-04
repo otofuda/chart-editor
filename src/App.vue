@@ -38,7 +38,12 @@
 
       <v-checkbox v-model="isAppendMode" label="ノート挿入モード"></v-checkbox>
 
-      <div v-if="isAppendMode">
+      <div v-show="isAppendMode">
+        <v-checkbox
+          v-model="isAutoFollow"
+          label="編集小節を自動追従"
+          class="mt-0"
+        ></v-checkbox>
         <v-row>
           <v-col cols="12" sm="3">
             <v-select
@@ -68,13 +73,14 @@
               outlined
               dense
               hide-details
-              type="number"
               min="0"
               :max="appendNote.split - 1"
               background-color="#f0f0b0"
               @keydown.enter="appendNotes([appendNote])"
               @keydown.left="appendNoteToLeft"
               @keydown.right="appendNoteToRight"
+              @keydown.up="appendNoteToUp"
+              @keydown.down="appendNoteToDown"
             ></v-text-field>
           </v-col>
           <v-col cols="12" sm="3">
@@ -239,6 +245,7 @@ export default {
         option: []
       },
       isAppendMode: true,
+      isAutoFollow: true,
       scrollTo: 0,
 
       beatHeight: 100
@@ -248,6 +255,16 @@ export default {
   mounted() {
     this.reader.onload = event => {
       this.chartObject = JSON.parse(event.target.result);
+      this.difficulties.forEach(d => {
+        this.chartObject[d] = this.chartObject[d].map((note, index) => {
+          // 編集用の情報を付加
+          return {
+            ...note,
+            index,
+            isSelected: false
+          };
+        });
+      });
       this.isLoaded = true;
     };
   },
@@ -261,8 +278,29 @@ export default {
       this.isLoaded = true;
     },
     saveFile() {
-      const saveObject = this.chartObject;
+      const saveObject = {
+        raku: [],
+        easy: [],
+        normal: [],
+        hard: [],
+        extra: [],
+        info: { ...this.chartObject.info }
+      };
       // TODO: Validationとオプション類の整形
+      this.difficulties.forEach(d => {
+        saveObject[d] = this.chartObject[d].map(note => {
+          return {
+            type: Number(note.type),
+            measure: Number(note.measure),
+            lane: Number(note.lane),
+            position: Number(note.position),
+            split: Number(note.split),
+            option: [...note.option],
+            end: note.end
+          };
+        });
+      });
+      console.log("saveObject", saveObject);
       const blob = new Blob([JSON.stringify(saveObject, null, 4)], {
         type: "application/json"
       });
@@ -289,10 +327,12 @@ export default {
       this.$vuetify.goTo(measurePositionTop);
     },
     appendNotes(notesArray) {
-      notesArray.forEach(note => {
-        this.chartObject[this.currentDifficulty]?.append(
-          JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
-        );
+      notesArray.each(note => {
+        this.currentChart?.append({
+          isSelected: false,
+          index: this.currentChart.size,
+          ...JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
+        });
       });
     },
     appendNoteToLeft() {
@@ -301,10 +341,28 @@ export default {
     appendNoteToRight() {
       this.appendNote.lane = Math.min(this.appendNote.lane + 1, 5);
     },
-    deleteNote(target) {
-      this.chartObject[this.currentDifficulty] = this.chartObject[
-        this.currentDifficulty
-      ]?.delete(target);
+    appendNoteToUp() {
+      const note = this.appendNote;
+      if (note.split - 1 <= note.position) {
+        note.measure++;
+        note.position = 0;
+        // 小節切替時に自動追従
+        if (this.isAutoFollow) this.scrollToMeasure(note.measure);
+      } else note.position++;
+    },
+    appendNoteToDown() {
+      const note = this.appendNote;
+      if (note.position === 0) {
+        note.measure--;
+        note.position = note.split - 1;
+        // 小節切替時に自動追従
+        if (this.isAutoFollow) this.scrollToMeasure(note.measure);
+      } else note.position--;
+    },
+    deleteNote(index) {
+      this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
+        note => note.index === index
+      );
     }
   },
   computed: {
