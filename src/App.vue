@@ -38,7 +38,12 @@
 
       <v-checkbox v-model="isAppendMode" label="ノート挿入モード"></v-checkbox>
 
-      <div v-if="isAppendMode">
+      <div v-show="isAppendMode">
+        <v-checkbox
+          v-model="isAutoFollow"
+          label="編集小節を自動追従"
+          class="mt-0"
+        ></v-checkbox>
         <v-row>
           <v-col cols="12" sm="3">
             <v-select
@@ -68,13 +73,14 @@
               outlined
               dense
               hide-details
-              type="number"
               min="0"
               :max="appendNote.split - 1"
               background-color="#f0f0b0"
               @keydown.enter="appendNotes([appendNote])"
               @keydown.left="appendNoteToLeft"
               @keydown.right="appendNoteToRight"
+              @keydown.up="appendNoteToUp"
+              @keydown.down="appendNoteToDown"
             ></v-text-field>
           </v-col>
           <v-col cols="12" sm="3">
@@ -239,6 +245,7 @@ export default {
         option: []
       },
       isAppendMode: true,
+      isAutoFollow: true,
       scrollTo: 0,
 
       beatHeight: 100
@@ -300,6 +307,24 @@ export default {
     },
     appendNoteToRight() {
       this.appendNote.lane = Math.min(this.appendNote.lane + 1, 5);
+    },
+    appendNoteToUp() {
+      const note = this.appendNote;
+      if (note.split - 1 <= note.position) {
+        note.measure++;
+        note.position = 0;
+        // 小節切替時に自動追従
+        if (this.isAutoFollow) this.scrollToMeasure(note.measure);
+      } else note.position++;
+    },
+    appendNoteToDown() {
+      const note = this.appendNote;
+      if (note.position === 0) {
+        note.measure--;
+        note.position = note.split - 1;
+        // 小節切替時に自動追従
+        if (this.isAutoFollow) this.scrollToMeasure(note.measure);
+      } else note.position--;
     },
     deleteNote(target) {
       this.chartObject[this.currentDifficulty] = this.chartObject[
