@@ -7,6 +7,9 @@
         position: isPreviewing ? 'fixed' : 'relative',
         height: `${entireHeight}px`
       }"
+      :class="{
+        detail: isShowDetail
+      }"
     >
       <Measure
         v-for="measure in measureData"
@@ -94,6 +97,10 @@ export default {
     },
     appendNote: {
       type: Object
+    },
+    isShowDetail: {
+      type: Boolean,
+      default: false
     }
   },
   methods: {
@@ -186,7 +193,7 @@ export default {
       this.currentBpm = 0;
       this.currentBeat = 0;
       this.$refs.preview.style.bottom = "0px";
-      this.timeoutIds.forEach(id => clearInterval(id));
+      this.timeoutIds.each(id => clearInterval(id));
     }
   },
   computed: {

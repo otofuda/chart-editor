@@ -6,6 +6,7 @@
       :measureData="measureData"
       :previewAudio="previewAudio"
       :appendNote="getAppendNote"
+      :isShowDetail="isShowDetail"
     />
 
     <v-container fluid class="panel">
@@ -133,6 +134,7 @@
       </div>
 
       <h3>プレビュー設定</h3>
+
       <v-slider
         v-model="beatHeight"
         min="20"
@@ -168,6 +170,8 @@
           <v-icon left>mdi-arrow-right</v-icon> 遷移
         </v-btn>
       </v-row>
+
+      <v-checkbox v-model="isShowDetail" label="ノーツ詳細を表示"></v-checkbox>
 
       <h3>譜面情報</h3>
       <v-row align="center">
@@ -247,6 +251,7 @@ export default {
       isAppendMode: true,
       isAutoFollow: true,
       scrollTo: 0,
+      isShowDetail: false,
 
       beatHeight: 100
     };
@@ -255,7 +260,7 @@ export default {
   mounted() {
     this.reader.onload = event => {
       this.chartObject = JSON.parse(event.target.result);
-      this.difficulties.forEach(d => {
+      this.difficulties.each(d => {
         this.chartObject[d] = this.chartObject[d].map((note, index) => {
           // 編集用の情報を付加
           return {
@@ -287,7 +292,7 @@ export default {
         info: { ...this.chartObject.info }
       };
       // TODO: Validationとオプション類の整形
-      this.difficulties.forEach(d => {
+      this.difficulties.each(d => {
         saveObject[d] = this.chartObject[d].map(note => {
           return {
             type: Number(note.type),
@@ -532,6 +537,10 @@ export default {
     height: 0;
     border-top: 2px dashed #ff5050;
   }
+}
+.preview.detail .note {
+  color: #f0f0f0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .note-hold {
