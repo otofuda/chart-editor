@@ -7,7 +7,11 @@
         position: isPreviewing ? 'fixed' : 'relative',
         height: `${entireHeight}px`
       }"
+      :class="{
+        detail: isShowDetail
+      }"
     >
+      <!-- 各小節 -->
       <Measure
         v-for="measure in measureData"
         :key="`measure_${measure.measure}`"
@@ -15,6 +19,8 @@
         :notes="currentChart.filter(note => note.measure === measure.measure)"
       />
 
+      <!-- ロングノーツ -->
+      <!-- FIXME: 多分負荷でかい -->
       <LongNote
         v-for="(note, i) in currentChart.filter(note => note.type === 2)"
         :key="`longnote_${i}`"
@@ -22,11 +28,35 @@
         :measureData="measureData"
       />
 
+      <!-- 配置前のシャドー -->
       <NoteShadow
         v-if="appendNote"
         :note="appendNote"
         :measureData="measureData"
       />
+
+      <!-- 仮配置ノーツ -->
+      <NoteShadow
+        v-for="(note, i) in preAppendNotes"
+        :key="`shadow_${note.measure}_${i}`"
+        :note="note"
+        :measureData="measureData"
+        :isPreAppend="true"
+      />
+
+      <!-- LED -->
+      <div
+        class="led left"
+        :style="{
+          background: ledColor
+        }"
+      ></div>
+      <div
+        class="led right"
+        :style="{
+          background: ledColor
+        }"
+      ></div>
     </div>
     <div class="control">
       <v-expansion-panels accordion>
@@ -67,13 +97,15 @@ export default {
   data() {
     return {
       isPreviewing: false,
+      returnPosition: -1, // 戻る座標
       currentPosition: 0,
       timeoutIds: [],
       intervalId: null, // 小節プレビューセット用
       startFrom: 0,
       currentMeasure: 0,
       currentBpm: 0,
-      currentBeat: 0
+      currentBeat: 0,
+      ledColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)"
     };
   },
   props: {
@@ -94,6 +126,13 @@ export default {
     },
     appendNote: {
       type: Object
+    },
+    preAppendNotes: {
+      type: Array
+    },
+    isShowDetail: {
+      type: Boolean,
+      default: false
     }
   },
   methods: {
@@ -157,8 +196,9 @@ export default {
         this.previewAudio.play();
       }, (60 / this.infoObject.bpm) * this.infoObject.beat * 1000);
       // 1小節ずつプレビュー
-      this.measureData.forEach((measure, index) => {
-        const next = this.measureData[index + 1] || {};
+      const measureData = [...this.measureData];
+      measureData.forEach((measure, index) => {
+        const next = measureData[index + 1] || {};
         this.timeoutIds.append(
           setTimeout(() => {
             this.currentPosition = next.measurePositionBottom;
@@ -171,6 +211,7 @@ export default {
       });
     },
     previewStart() {
+      this.returnPosition = window.scrollY; // 停止後に戻る座標
       this.isPreviewing = true;
       this.$refs.preview.style.transition = "0ms all linear";
       // this.$refs.preview.style.bottom = "0px";
@@ -185,8 +226,11 @@ export default {
       this.currentPosition = 0;
       this.currentBpm = 0;
       this.currentBeat = 0;
+      this.$refs.preview.style.transition = "0ms all linear";
       this.$refs.preview.style.bottom = "0px";
-      this.timeoutIds.forEach(id => clearInterval(id));
+      this.timeoutIds.each(id => clearInterval(id));
+      this.$vuetify.goTo(this.returnPosition);
+      this.returnPosition = -1;
     }
   },
   computed: {
@@ -215,15 +259,27 @@ export default {
 .preview {
   background: #202020;
   width: 100%;
-  width: 380px;
+  width: 420px;
   right: 0;
-  margin-left: calc(100% - 380px);
+  margin-left: calc(100% - 420px);
 }
 .control {
   position: fixed;
   top: 0;
   right: 0;
-  padding: 16px;
+  padding: 16px 36px;
   z-index: 2;
+}
+.led {
+  position: fixed;
+  top: 0;
+  width: 20px;
+  height: 100%;
+  &.left {
+    right: 400px;
+  }
+  &.right {
+    right: 0;
+  }
 }
 </style>

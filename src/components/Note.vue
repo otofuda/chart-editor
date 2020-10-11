@@ -14,7 +14,8 @@
         class="note"
         :class="{
           [`type${note.type}`]: true,
-          hidden: isHiddenControl
+          hidden: isHiddenControl,
+          menu
         }"
         :style="{
           left: `${positionLeft}px`,
@@ -24,6 +25,13 @@
         v-bind="attrs"
         v-on="on"
       >
+        <input
+          type="checkbox"
+          v-model="note.isSelected"
+          :id="note.index"
+          @click.stop
+        />
+
         {{ note.position }}/{{ note.split }}
         <strong v-if="note.type === 97">BEAT {{ note.option[0] }}</strong>
         <strong v-if="note.type === 98">BPM {{ note.option[0] }}</strong>
@@ -32,7 +40,7 @@
     </template>
 
     <!-- ポップアップ編集 -->
-    <v-card>
+    <v-card v-if="menu">
       <v-list>
         <v-list-item>
           <v-card-text>#{{ note.index }} {{ noteTypeName }}</v-card-text>
@@ -131,7 +139,7 @@
 
       <v-card-actions>
         <v-btn color="error" text @click="deleteThisNote">
-          <v-icon left>mdi-delete</v-icon> ノートを削除
+          ノートを削除
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -160,6 +168,7 @@ export default {
   },
   methods: {
     deleteThisNote() {
+      // FIXME: なんとかする
       this.$root.$children.first.deleteNote(this.note.index);
       this.menu = false;
     }

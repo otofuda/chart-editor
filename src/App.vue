@@ -6,6 +6,8 @@
       :measureData="measureData"
       :previewAudio="previewAudio"
       :appendNote="getAppendNote"
+      :preAppendNotes="preAppendNotes"
+      :isShowDetail="isShowDetail"
     />
 
     <v-container fluid class="panel">
@@ -76,7 +78,7 @@
               min="0"
               :max="appendNote.split - 1"
               background-color="#f0f0b0"
-              @keydown.enter="appendNotes([appendNote])"
+              @keydown.enter="placeNotes(appendNote)"
               @keydown.left="appendNoteToLeft"
               @keydown.right="appendNoteToRight"
               @keydown.up="appendNoteToUp"
@@ -84,15 +86,13 @@
             ></v-text-field>
           </v-col>
           <v-col cols="12" sm="3">
-            <v-text-field
+            <v-combobox
               v-model.number="appendNote.split"
+              :items="[4, 8, 16, 32, 12, 24, 48]"
               label="split"
               outlined
               dense
-              hide-details
-              type="number"
-              min="0"
-            ></v-text-field>
+            ></v-combobox>
           </v-col>
         </v-row>
 
@@ -121,18 +121,25 @@
           >
             <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
           </v-radio-group>
-          <v-btn
-            class="ml-1"
-            color="primary"
-            @click="appendNotes([appendNote])"
-          >
-            ノートを挿入
-            <v-icon right>mdi-keyboard-return</v-icon>
-          </v-btn>
+          <div>
+            <v-btn class="ml-1" color="primary" @click="placeNotes(appendNote)">
+              ノートを仮配置
+              <v-icon right>mdi-keyboard-return</v-icon>
+            </v-btn>
+            <v-btn
+              class="ml-1 white--text"
+              color="orange darken-4"
+              @click="appendNotes(...preAppendNotes)"
+            >
+              挿入する
+              <v-icon right>mdi-plus-circle-outline</v-icon>
+            </v-btn>
+          </div>
         </v-row>
       </div>
 
       <h3>プレビュー設定</h3>
+
       <v-slider
         v-model="beatHeight"
         min="20"
@@ -169,7 +176,57 @@
         </v-btn>
       </v-row>
 
+      <v-checkbox
+        v-model="isShowDetail"
+        label="ノーツ詳細とチェックボックスを表示"
+      ></v-checkbox>
+
+      <h3>選択ノーツ</h3>
+
+      <v-row align="center">
+        <v-btn color="primary" text @click="selectionClear">
+          <v-icon left>mdi-select-off</v-icon>
+          すべて選択解除
+        </v-btn>
+
+        <v-dialog v-model="dialog.selectionDelete" width="500">
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn
+              color="error"
+              text
+              @click="dialog.selectionDelete = true"
+              v-bind="attrs"
+              v-on="on"
+            >
+              <v-icon left>mdi-delete-forever</v-icon>
+              選択ノーツを削除
+            </v-btn>
+          </template>
+          <v-card>
+            <v-card-title class="headline">確認</v-card-title>
+            <v-card-text>
+              本当に選択したノーツをすべて削除しますか？
+            </v-card-text>
+            <v-divider></v-divider>
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn
+                color="primary"
+                text
+                @click="dialog.selectionDelete = false"
+              >
+                キャンセル
+              </v-btn>
+              <v-btn color="error" text @click="selectionDelete">
+                削除する
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+      </v-row>
+
       <h3>譜面情報</h3>
+
       <v-row align="center">
         <v-col>
           <v-text-field
@@ -199,8 +256,9 @@
           ></v-text-field>
         </v-col>
       </v-row>
+
       <v-row>
-        <v-btn class="ml-1" color="success" @click="saveFile">
+        <v-btn class="ml-1 mb-8" color="success" @click="saveFile">
           <v-icon left>mdi-content-save</v-icon> 名前をつけて保存
         </v-btn>
       </v-row>
@@ -236,26 +294,32 @@ export default {
           beat: 4
         }
       },
+      dialog: {
+        selectionDelete: false
+      },
+      // 配置するノート
       appendNote: {
         type: 1,
         lane: 1,
         measure: 1,
         position: 0,
-        split: 4,
+        split: 8,
         option: []
       },
+      preAppendNotes: [], // 保管する配置ノーツ
       isAppendMode: true,
       isAutoFollow: true,
       scrollTo: 0,
+      isShowDetail: false,
 
-      beatHeight: 100
+      beatHeight: 100 // 一拍あたりの高さ(px)
     };
   },
   beforeCreate: Bury.init,
   mounted() {
     this.reader.onload = event => {
       this.chartObject = JSON.parse(event.target.result);
-      this.difficulties.forEach(d => {
+      this.difficulties.each(d => {
         this.chartObject[d] = this.chartObject[d].map((note, index) => {
           // 編集用の情報を付加
           return {
@@ -287,7 +351,7 @@ export default {
         info: { ...this.chartObject.info }
       };
       // TODO: Validationとオプション類の整形
-      this.difficulties.forEach(d => {
+      this.difficulties.each(d => {
         saveObject[d] = this.chartObject[d].map(note => {
           return {
             type: Number(note.type),
@@ -326,11 +390,23 @@ export default {
         this.measureData[measureNumber].measurePositionBottom;
       this.$vuetify.goTo(measurePositionTop);
     },
-    appendNotes(notesArray) {
-      notesArray.each(note => {
+    // ノーツを挿入
+    appendNotes(...notes) {
+      notes.each(note => {
         this.currentChart?.append({
           isSelected: false,
           index: this.currentChart.size,
+          ...JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
+        });
+      });
+      this.preAppendNotes = [];
+    },
+    // ノーツを仮配置
+    placeNotes(...notes) {
+      notes.each(note => {
+        this.preAppendNotes.append({
+          isSelected: false,
+          index: this.preAppendNotes.size,
           ...JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
         });
       });
@@ -347,7 +423,8 @@ export default {
         note.measure++;
         note.position = 0;
         // 小節切替時に自動追従
-        if (this.isAutoFollow) this.scrollToMeasure(note.measure);
+        if (this.isAutoFollow && this.measureData[note.measure])
+          this.scrollToMeasure(note.measure);
       } else note.position++;
     },
     appendNoteToDown() {
@@ -363,6 +440,29 @@ export default {
       this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
         note => note.index === index
       );
+    },
+    cancelNote(index) {
+      this.preAppendNotes = this.preAppendNotes?.delete_if(
+        note => note.index === index
+      );
+    },
+    // すべて選択解除
+    selectionClear() {
+      this.chartObject[this.currentDifficulty] = this.currentChart?.map(
+        note => {
+          return {
+            ...note,
+            isSelected: false
+          };
+        }
+      );
+    },
+    // 選択ノーツを削除
+    selectionDelete() {
+      this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
+        note => note.isSelected
+      );
+      this.dialog.selectionDelete = false;
     }
   },
   computed: {
@@ -431,13 +531,15 @@ export default {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #333333;
+  background: #202020;
   .panel {
     position: fixed;
     background: #f0f0f0;
     top: 0;
     left: 0;
-    width: calc(100% - 380px);
-    min-height: 100vh;
+    width: calc(100% - 420px);
+    height: 100vh;
+    overflow-y: auto;
     padding: 12px 32px;
     h3 {
       margin: 8px -12px;
@@ -461,6 +563,15 @@ export default {
   transition: 0.1s all ease;
   strong {
     color: #a0a0a0;
+  }
+  input[type="checkbox"] {
+    position: absolute;
+    right: 0;
+    top: -20px;
+    display: none;
+  }
+  &.menu {
+    box-shadow: 0 0 4px 4px rgba(125, 255, 125, 0.5);
   }
   &:hover {
     color: #909090;
@@ -531,6 +642,13 @@ export default {
   &.type99 {
     height: 0;
     border-top: 2px dashed #ff5050;
+  }
+}
+.preview.detail .note {
+  color: #f0f0f0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  input[type="checkbox"] {
+    display: block;
   }
 }
 

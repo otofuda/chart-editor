@@ -31,6 +31,7 @@
         </v-list-item>
       </v-list>
     </v-menu>
+
     <span class="measure__number" v-text="measure.measure"></span>
     <Note
       v-for="(note, i) in notes.filter(n => n.type !== 2)"
@@ -85,7 +86,7 @@ export default {
   );
   color: #ffffff;
   position: absolute;
-  right: 40px;
+  right: 60px;
 
   &:not(.hiddenControl) {
     box-shadow: inset 0 -1px 0 0 #a0a0a0;
