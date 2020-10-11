@@ -14,7 +14,8 @@
         class="note"
         :class="{
           [`type${note.type}`]: true,
-          hidden: isHiddenControl
+          hidden: isHiddenControl,
+          menu
         }"
         :style="{
           left: `${positionLeft}px`,
@@ -160,6 +161,7 @@ export default {
   },
   methods: {
     deleteThisNote() {
+      // FIXME: なんとかする
       this.$root.$children.first.deleteNote(this.note.index);
       this.menu = false;
     }

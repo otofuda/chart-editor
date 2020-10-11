@@ -6,6 +6,7 @@
       :measureData="measureData"
       :previewAudio="previewAudio"
       :appendNote="getAppendNote"
+      :preAppendNotes="preAppendNotes"
       :isShowDetail="isShowDetail"
     />
 
@@ -77,7 +78,7 @@
               min="0"
               :max="appendNote.split - 1"
               background-color="#f0f0b0"
-              @keydown.enter="appendNotes([appendNote])"
+              @keydown.enter="placeNotes(appendNote)"
               @keydown.left="appendNoteToLeft"
               @keydown.right="appendNoteToRight"
               @keydown.up="appendNoteToUp"
@@ -122,14 +123,19 @@
           >
             <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
           </v-radio-group>
-          <v-btn
-            class="ml-1"
-            color="primary"
-            @click="appendNotes([appendNote])"
-          >
-            ノートを挿入
-            <v-icon right>mdi-keyboard-return</v-icon>
-          </v-btn>
+          <div>
+            <v-btn class="ml-1" color="primary" @click="placeNotes(appendNote)">
+              ノートを仮配置
+              <v-icon right>mdi-keyboard-return</v-icon>
+            </v-btn>
+            <v-btn
+              class="ml-1 white--text"
+              color="orange darken-4"
+              @click="appendNotes(...preAppendNotes)"
+            >
+              挿入
+            </v-btn>
+          </div>
         </v-row>
       </div>
 
@@ -204,7 +210,7 @@
         </v-col>
       </v-row>
       <v-row>
-        <v-btn class="ml-1" color="success" @click="saveFile">
+        <v-btn class="ml-1 mb-8" color="success" @click="saveFile">
           <v-icon left>mdi-content-save</v-icon> 名前をつけて保存
         </v-btn>
       </v-row>
@@ -240,6 +246,7 @@ export default {
           beat: 4
         }
       },
+      // 配置するノート
       appendNote: {
         type: 1,
         lane: 1,
@@ -248,12 +255,13 @@ export default {
         split: 4,
         option: []
       },
+      preAppendNotes: [], // 保管する配置ノーツ
       isAppendMode: true,
       isAutoFollow: true,
       scrollTo: 0,
       isShowDetail: false,
 
-      beatHeight: 100
+      beatHeight: 100 // 一拍あたりの高さ(px)
     };
   },
   beforeCreate: Bury.init,
@@ -331,11 +339,23 @@ export default {
         this.measureData[measureNumber].measurePositionBottom;
       this.$vuetify.goTo(measurePositionTop);
     },
-    appendNotes(notesArray) {
-      notesArray.each(note => {
+    // ノーツを挿入
+    appendNotes(...notes) {
+      notes.each(note => {
         this.currentChart?.append({
           isSelected: false,
           index: this.currentChart.size,
+          ...JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
+        });
+      });
+      this.preAppendNotes = [];
+    },
+    // ノーツを仮配置
+    placeNotes(...notes) {
+      notes.each(note => {
+        this.preAppendNotes.append({
+          isSelected: false,
+          index: this.preAppendNotes.size,
           ...JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
         });
       });
@@ -352,7 +372,8 @@ export default {
         note.measure++;
         note.position = 0;
         // 小節切替時に自動追従
-        if (this.isAutoFollow) this.scrollToMeasure(note.measure);
+        if (this.isAutoFollow && this.measureData[note.measure])
+          this.scrollToMeasure(note.measure);
       } else note.position++;
     },
     appendNoteToDown() {
@@ -366,6 +387,11 @@ export default {
     },
     deleteNote(index) {
       this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
+        note => note.index === index
+      );
+    },
+    cancelNote(index) {
+      this.preAppendNotes = this.preAppendNotes?.delete_if(
         note => note.index === index
       );
     }
@@ -442,7 +468,8 @@ export default {
     top: 0;
     left: 0;
     width: calc(100% - 380px);
-    min-height: 100vh;
+    height: 100vh;
+    overflow-y: auto;
     padding: 12px 32px;
     h3 {
       margin: 8px -12px;
@@ -466,6 +493,9 @@ export default {
   transition: 0.1s all ease;
   strong {
     color: #a0a0a0;
+  }
+  &.menu {
+    box-shadow: 0 0 4px 4px #27ad27;
   }
   &:hover {
     color: #909090;

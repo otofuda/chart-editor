@@ -11,6 +11,7 @@
         detail: isShowDetail
       }"
     >
+      <!-- 各小節 -->
       <Measure
         v-for="measure in measureData"
         :key="`measure_${measure.measure}`"
@@ -18,6 +19,8 @@
         :notes="currentChart.filter(note => note.measure === measure.measure)"
       />
 
+      <!-- ロングノーツ -->
+      <!-- FIXME: 多分負荷でかい -->
       <LongNote
         v-for="(note, i) in currentChart.filter(note => note.type === 2)"
         :key="`longnote_${i}`"
@@ -25,10 +28,20 @@
         :measureData="measureData"
       />
 
+      <!-- 配置前のシャドー -->
       <NoteShadow
         v-if="appendNote"
         :note="appendNote"
         :measureData="measureData"
+      />
+
+      <!-- 仮配置ノーツ -->
+      <NoteShadow
+        v-for="(note, i) in preAppendNotes"
+        :key="`shadow_${note.measure}_${i}`"
+        :note="note"
+        :measureData="measureData"
+        :isPreAppend="true"
       />
     </div>
     <div class="control">
@@ -97,6 +110,9 @@ export default {
     },
     appendNote: {
       type: Object
+    },
+    preAppendNotes: {
+      type: Array
     },
     isShowDetail: {
       type: Boolean,
