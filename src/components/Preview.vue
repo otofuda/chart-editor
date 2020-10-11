@@ -43,6 +43,20 @@
         :measureData="measureData"
         :isPreAppend="true"
       />
+
+      <!-- LED -->
+      <div
+        class="led left"
+        :style="{
+          background: ledColor
+        }"
+      ></div>
+      <div
+        class="led right"
+        :style="{
+          background: ledColor
+        }"
+      ></div>
     </div>
     <div class="control">
       <v-expansion-panels accordion>
@@ -83,13 +97,15 @@ export default {
   data() {
     return {
       isPreviewing: false,
+      returnPosition: -1, // 戻る座標
       currentPosition: 0,
       timeoutIds: [],
       intervalId: null, // 小節プレビューセット用
       startFrom: 0,
       currentMeasure: 0,
       currentBpm: 0,
-      currentBeat: 0
+      currentBeat: 0,
+      ledColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)"
     };
   },
   props: {
@@ -195,6 +211,7 @@ export default {
       });
     },
     previewStart() {
+      this.returnPosition = window.scrollY; // 停止後に戻る座標
       this.isPreviewing = true;
       this.$refs.preview.style.transition = "0ms all linear";
       // this.$refs.preview.style.bottom = "0px";
@@ -209,8 +226,11 @@ export default {
       this.currentPosition = 0;
       this.currentBpm = 0;
       this.currentBeat = 0;
+      this.$refs.preview.style.transition = "0ms all linear";
       this.$refs.preview.style.bottom = "0px";
       this.timeoutIds.each(id => clearInterval(id));
+      this.$vuetify.goTo(this.returnPosition);
+      this.returnPosition = -1;
     }
   },
   computed: {
@@ -239,15 +259,27 @@ export default {
 .preview {
   background: #202020;
   width: 100%;
-  width: 380px;
+  width: 420px;
   right: 0;
-  margin-left: calc(100% - 380px);
+  margin-left: calc(100% - 420px);
 }
 .control {
   position: fixed;
   top: 0;
   right: 0;
-  padding: 16px;
+  padding: 16px 36px;
   z-index: 2;
+}
+.led {
+  position: fixed;
+  top: 0;
+  width: 20px;
+  height: 100%;
+  &.left {
+    right: 400px;
+  }
+  &.right {
+    right: 0;
+  }
 }
 </style>

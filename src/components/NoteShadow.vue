@@ -78,7 +78,7 @@ export default {
       }
     },
     getAbsoluteLeft(note) {
-      return this.getLeft(note) + 40;
+      return this.getLeft(note) + 60;
     },
     getBottom(note) {
       const targetMeasure =
@@ -133,7 +133,7 @@ export default {
 
 <style lang="scss" scoped>
 .shadow {
-  animation: blink 0.3s infinite;
+  animation: blink 0.5s infinite;
 }
 .preappend {
   opacity: 1;

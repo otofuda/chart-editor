@@ -86,15 +86,13 @@
             ></v-text-field>
           </v-col>
           <v-col cols="12" sm="3">
-            <v-text-field
+            <v-combobox
               v-model.number="appendNote.split"
+              :items="[4, 8, 16, 32, 12, 24, 48]"
               label="split"
               outlined
               dense
-              hide-details
-              type="number"
-              min="0"
-            ></v-text-field>
+            ></v-combobox>
           </v-col>
         </v-row>
 
@@ -133,7 +131,8 @@
               color="orange darken-4"
               @click="appendNotes(...preAppendNotes)"
             >
-              挿入
+              挿入する
+              <v-icon right>mdi-plus-circle-outline</v-icon>
             </v-btn>
           </div>
         </v-row>
@@ -177,9 +176,57 @@
         </v-btn>
       </v-row>
 
-      <v-checkbox v-model="isShowDetail" label="ノーツ詳細を表示"></v-checkbox>
+      <v-checkbox
+        v-model="isShowDetail"
+        label="ノーツ詳細とチェックボックスを表示"
+      ></v-checkbox>
+
+      <h3>選択ノーツ</h3>
+
+      <v-row align="center">
+        <v-btn color="primary" text @click="selectionClear">
+          <v-icon left>mdi-select-off</v-icon>
+          すべて選択解除
+        </v-btn>
+
+        <v-dialog v-model="dialog.selectionDelete" width="500">
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn
+              color="error"
+              text
+              @click="dialog.selectionDelete = true"
+              v-bind="attrs"
+              v-on="on"
+            >
+              <v-icon left>mdi-delete-forever</v-icon>
+              選択ノーツを削除
+            </v-btn>
+          </template>
+          <v-card>
+            <v-card-title class="headline">確認</v-card-title>
+            <v-card-text>
+              本当に選択したノーツをすべて削除しますか？
+            </v-card-text>
+            <v-divider></v-divider>
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn
+                color="primary"
+                text
+                @click="dialog.selectionDelete = false"
+              >
+                キャンセル
+              </v-btn>
+              <v-btn color="error" text @click="selectionDelete">
+                削除する
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+      </v-row>
 
       <h3>譜面情報</h3>
+
       <v-row align="center">
         <v-col>
           <v-text-field
@@ -209,6 +256,7 @@
           ></v-text-field>
         </v-col>
       </v-row>
+
       <v-row>
         <v-btn class="ml-1 mb-8" color="success" @click="saveFile">
           <v-icon left>mdi-content-save</v-icon> 名前をつけて保存
@@ -246,13 +294,16 @@ export default {
           beat: 4
         }
       },
+      dialog: {
+        selectionDelete: false
+      },
       // 配置するノート
       appendNote: {
         type: 1,
         lane: 1,
         measure: 1,
         position: 0,
-        split: 4,
+        split: 8,
         option: []
       },
       preAppendNotes: [], // 保管する配置ノーツ
@@ -394,6 +445,24 @@ export default {
       this.preAppendNotes = this.preAppendNotes?.delete_if(
         note => note.index === index
       );
+    },
+    // すべて選択解除
+    selectionClear() {
+      this.chartObject[this.currentDifficulty] = this.currentChart?.map(
+        note => {
+          return {
+            ...note,
+            isSelected: false
+          };
+        }
+      );
+    },
+    // 選択ノーツを削除
+    selectionDelete() {
+      this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
+        note => note.isSelected
+      );
+      this.dialog.selectionDelete = false;
     }
   },
   computed: {
@@ -462,12 +531,13 @@ export default {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #333333;
+  background: #202020;
   .panel {
     position: fixed;
     background: #f0f0f0;
     top: 0;
     left: 0;
-    width: calc(100% - 380px);
+    width: calc(100% - 420px);
     height: 100vh;
     overflow-y: auto;
     padding: 12px 32px;
@@ -494,8 +564,14 @@ export default {
   strong {
     color: #a0a0a0;
   }
+  input[type="checkbox"] {
+    position: absolute;
+    right: 0;
+    top: -20px;
+    display: none;
+  }
   &.menu {
-    box-shadow: 0 0 4px 4px #27ad27;
+    box-shadow: 0 0 4px 4px rgba(125, 255, 125, 0.5);
   }
   &:hover {
     color: #909090;
@@ -571,6 +647,9 @@ export default {
 .preview.detail .note {
   color: #f0f0f0;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  input[type="checkbox"] {
+    display: block;
+  }
 }
 
 .note-hold {

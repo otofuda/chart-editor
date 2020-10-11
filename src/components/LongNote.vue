@@ -85,7 +85,7 @@ export default {
   },
   methods: {
     getLeft(note) {
-      return (note.lane - 1) * 60 + 40;
+      return (note.lane - 1) * 60 + 60;
     },
     getBottom(note) {
       return (
