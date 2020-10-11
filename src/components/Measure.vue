@@ -31,6 +31,7 @@
         </v-list-item>
       </v-list>
     </v-menu>
+
     <span class="measure__number" v-text="measure.measure"></span>
     <Note
       v-for="(note, i) in notes.filter(n => n.type !== 2)"

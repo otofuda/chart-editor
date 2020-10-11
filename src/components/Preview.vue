@@ -180,8 +180,9 @@ export default {
         this.previewAudio.play();
       }, (60 / this.infoObject.bpm) * this.infoObject.beat * 1000);
       // 1小節ずつプレビュー
-      this.measureData.forEach((measure, index) => {
-        const next = this.measureData[index + 1] || {};
+      const measureData = [...this.measureData];
+      measureData.forEach((measure, index) => {
+        const next = measureData[index + 1] || {};
         this.timeoutIds.append(
           setTimeout(() => {
             this.currentPosition = next.measurePositionBottom;
