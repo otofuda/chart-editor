@@ -32,10 +32,15 @@
       </v-list>
     </v-menu>
 
-    <span class="measure__separator" v-for="n in 4" :key="n" :style="{
-      left: `${n * 60 - 1}px`,
-      height: `${measure.measureHeight}px`
-    }"></span>
+    <span
+      class="measure__separator"
+      v-for="n in 4"
+      :key="n"
+      :style="{
+        left: `${n * 60 - 1}px`,
+        height: `${measure.measureHeight}px`
+      }"
+    ></span>
 
     <span class="measure__number" v-text="measure.measure"></span>
 
@@ -44,6 +49,7 @@
       :key="`note_${measure.measure}_${i}`"
       :note="note"
       :measure="measure"
+      :currentChart="notes"
     />
   </div>
 </template>

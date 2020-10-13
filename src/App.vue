@@ -602,6 +602,7 @@ export default {
 }
 .note {
   position: absolute;
+  z-index: 100;
   color: #606060;
   background: linear-gradient(
     to left,
@@ -641,6 +642,7 @@ export default {
     width: 60px;
   }
   &.type3 {
+    z-index: 99;
     height: 6px;
     background: #87cefa;
     z-index: 1;
@@ -658,6 +660,7 @@ export default {
     }
   }
   &.type4 {
+    z-index: 99;
     height: 6px;
     background: #f08080;
     z-index: 1;
@@ -679,6 +682,7 @@ export default {
     background: linear-gradient(to right, gold, #fde08d, gold);
   }
   &.type95 {
+    z-index: 98;
     height: 1px;
     background: #a0a0a0;
     &.hidden {
@@ -686,14 +690,17 @@ export default {
     }
   }
   &.type97 {
+    z-index: 98;
     height: 1px;
     background: greenyellow;
   }
   &.type98 {
+    z-index: 98;
     height: 1px;
     background: yellow;
   }
   &.type99 {
+    z-index: 98;
     height: 0;
     border-top: 2px dashed #ff5050;
   }

@@ -133,6 +133,7 @@ export default {
 
 <style lang="scss" scoped>
 .shadow {
+  color: #909090;
   animation: blink 0.5s infinite;
 }
 .preappend {
