@@ -32,7 +32,13 @@
       </v-list>
     </v-menu>
 
+    <span class="measure__separator" v-for="n in 4" :key="n" :style="{
+      left: `${n * 60 - 1}px`,
+      height: `${measure.measureHeight}px`
+    }"></span>
+
     <span class="measure__number" v-text="measure.measure"></span>
+
     <Note
       v-for="(note, i) in notes.filter(n => n.type !== 2)"
       :key="`note_${measure.measure}_${i}`"
@@ -69,27 +75,19 @@ export default {
 <style lang="scss" scoped>
 .measure {
   width: 300px;
-  background: linear-gradient(
-    to left,
-    #303030 19.75%,
-    #606060 20%,
-    #303030 20.25%,
-    #303030 39.75%,
-    #606060 40%,
-    #303030 40.25%,
-    #303030 59.75%,
-    #606060 60%,
-    #303030 60.25%,
-    #303030 79.75%,
-    #606060 80%,
-    #303030 80.75%
-  );
+  background: #303030;
   color: #ffffff;
   position: absolute;
   right: 60px;
 
   &:not(.hiddenControl) {
     box-shadow: inset 0 -1px 0 0 #a0a0a0;
+  }
+
+  &__separator {
+    position: absolute;
+    background: #606060;
+    width: 1px;
   }
 
   &__number {

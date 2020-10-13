@@ -8,6 +8,7 @@
       :appendNote="getAppendNote"
       :preAppendNotes="preAppendNotes"
       :isShowDetail="isShowDetail"
+      :isShowCheckbox="isShowCheckbox"
     />
 
     <v-container fluid class="panel">
@@ -91,6 +92,7 @@
               :items="[4, 8, 16, 32, 12, 24, 48]"
               label="split"
               outlined
+              hide-details
               dense
             ></v-combobox>
           </v-col>
@@ -122,12 +124,16 @@
             <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
           </v-radio-group>
           <div>
-            <v-btn class="ml-1" color="primary" @click="placeNotes(appendNote)">
+            <v-btn
+              class="ml-1 white--text"
+              color="green darken-1"
+              @click="placeNotes(appendNote)"
+            >
               ノートを仮配置
               <v-icon right>mdi-keyboard-return</v-icon>
             </v-btn>
             <v-btn
-              class="ml-1 white--text"
+              class="ml-4 white--text"
               color="orange darken-4"
               @click="appendNotes(...preAppendNotes)"
             >
@@ -163,7 +169,7 @@
         ></v-file-input>
       </v-row>
 
-      <v-row align="center" class="mb-8">
+      <v-row align="center">
         <v-text-field
           v-model.number="scrollTo"
           suffix="小節へ"
@@ -176,10 +182,17 @@
         </v-btn>
       </v-row>
 
-      <v-checkbox
-        v-model="isShowDetail"
-        label="ノーツ詳細とチェックボックスを表示"
-      ></v-checkbox>
+      <v-row align="center">
+        <v-checkbox
+          v-model="isShowDetail"
+          label="ノーツ詳細を表示"
+        ></v-checkbox>
+        <v-checkbox
+          class="ml-4"
+          v-model="isShowCheckbox"
+          label="チェックボックスを表示"
+        ></v-checkbox>
+      </v-row>
 
       <h3>選択ノーツ</h3>
 
@@ -263,17 +276,28 @@
         </v-btn>
       </v-row>
     </v-container>
+
+    <v-snackbar v-model="snackbar" vertical>
+      {{ snackbarText }}
+      <template v-slot:action="{ attrs }">
+        <v-btn color="error" text v-bind="attrs" @click="snackbar = false">
+          閉じる
+        </v-btn>
+      </template>
+    </v-snackbar>
   </v-app>
 </template>
 
 <script>
 import Bury from "buryjs";
 import Preview from "./components/Preview.vue";
+
 import noteTypes from "./mixins/noteTypes";
+import noteCheck from "./mixins/noteCheck";
 
 export default {
   name: "App",
-  mixins: [noteTypes],
+  mixins: [noteTypes, noteCheck],
   data() {
     return {
       isLoaded: false,
@@ -311,6 +335,10 @@ export default {
       isAutoFollow: true,
       scrollTo: 0,
       isShowDetail: false,
+      isShowCheckbox: false,
+
+      snackbar: false, // 通知表示管理
+      snackbarText: "メッセージ", // 通知内容
 
       beatHeight: 100 // 一拍あたりの高さ(px)
     };
@@ -351,6 +379,10 @@ export default {
         info: { ...this.chartObject.info }
       };
       // TODO: Validationとオプション類の整形
+      // type: 5 は lane: 3
+      // type: 96, 97, 98, 99は lane: -1
+      // type: 2 以外は end: []
+      // + optionキーのvalidation
       this.difficulties.each(d => {
         saveObject[d] = this.chartObject[d].map(note => {
           return {
@@ -393,6 +425,15 @@ export default {
     // ノーツを挿入
     appendNotes(...notes) {
       notes.each(note => {
+        const dup = this.isDuplicated(note, {
+          checkPreAppend: false
+        });
+        if (dup) {
+          this.showSnackbar(
+            `${dup}個のノーツと重複しているため、挿入できないノーツがあります`
+          );
+          return false;
+        }
         this.currentChart?.append({
           isSelected: false,
           index: this.currentChart.size,
@@ -404,6 +445,13 @@ export default {
     // ノーツを仮配置
     placeNotes(...notes) {
       notes.each(note => {
+        const dup = this.isDuplicated(note);
+        if (dup) {
+          this.showSnackbar(
+            `${dup}個のノーツと重複しているため、配置はキャンセルされました`
+          );
+          return false;
+        }
         this.preAppendNotes.append({
           isSelected: false,
           index: this.preAppendNotes.size,
@@ -463,6 +511,12 @@ export default {
         note => note.isSelected
       );
       this.dialog.selectionDelete = false;
+    },
+    // 通知を表示
+    showSnackbar(message) {
+      this.snackbar = false;
+      this.snackbarText = message;
+      setTimeout(() => (this.snackbar = true), 100);
     }
   },
   computed: {
@@ -647,9 +701,9 @@ export default {
 .preview.detail .note {
   color: #f0f0f0;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  input[type="checkbox"] {
-    display: block;
-  }
+}
+.preview.checkbox .note input[type="checkbox"] {
+  display: block;
 }
 
 .note-hold {
