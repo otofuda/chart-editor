@@ -8,7 +8,8 @@
         height: `${entireHeight}px`
       }"
       :class="{
-        detail: isShowDetail
+        detail: isShowDetail,
+        checkbox: isShowCheckbox
       }"
     >
       <!-- 各小節 -->
@@ -78,8 +79,11 @@
             >
               <v-icon left>mdi-play</v-icon> 再生
             </v-btn>
-            <v-btn class="ml-1" outlined color="error" @click="previewStop">
+            <v-btn class="ml-2" outlined color="error" @click="previewStop">
               <v-icon left>mdi-stop</v-icon> 停止
+            </v-btn>
+            <v-btn class="ml-2" text @click="screenshot">
+              <v-icon>mdi-camera</v-icon>
             </v-btn>
           </v-expansion-panel-content>
         </v-expansion-panel>
@@ -92,6 +96,7 @@
 import Measure from "./Measure.vue";
 import LongNote from "./LongNote.vue";
 import NoteShadow from "./NoteShadow.vue";
+import html2canvas from "html2canvas";
 
 export default {
   data() {
@@ -133,9 +138,20 @@ export default {
     isShowDetail: {
       type: Boolean,
       default: false
+    },
+    isShowCheckbox: {
+      type: Boolean,
+      default: false
     }
   },
   methods: {
+    screenshot() {
+      html2canvas(document.querySelector(".preview"), {
+        allowTaint: true
+      }).then(canvas => {
+        document.querySelector(".panel").appendChild(canvas);
+      });
+    },
     playFromMeasure() {
       const startOffset = this.startOffset;
 

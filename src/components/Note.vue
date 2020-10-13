@@ -32,6 +32,24 @@
           @click.stop
         />
 
+        <v-tooltip v-if="isDuplicated(note)" bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <v-icon color="warn" dark v-bind="attrs" v-on="on" class="mt-2">
+              mdi-alert
+            </v-icon>
+          </template>
+          <span>{{ isDuplicated(note) }}個の重複</span>
+        </v-tooltip>
+
+        <v-tooltip v-if="hasError(note)" bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <v-icon color="error" dark v-bind="attrs" v-on="on" class="mt-2">
+              mdi-alert-circle-outline
+            </v-icon>
+          </template>
+          <span>{{ hasError(note) }}</span>
+        </v-tooltip>
+
         {{ note.position }}/{{ note.split }}
         <strong v-if="note.type === 97">BEAT {{ note.option[0] }}</strong>
         <strong v-if="note.type === 98">BPM {{ note.option[0] }}</strong>
@@ -148,9 +166,10 @@
 
 <script>
 import noteTypes from "../mixins/noteTypes";
+import noteCheck from "../mixins/noteCheck";
 
 export default {
-  mixins: [noteTypes],
+  mixins: [noteTypes, noteCheck],
   data() {
     return {
       menu: false
@@ -163,6 +182,11 @@ export default {
     },
     measure: {
       type: Object,
+      required: true
+    },
+    // 重複判定に使用
+    currentChart: {
+      type: Array,
       required: true
     }
   },
