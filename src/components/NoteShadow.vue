@@ -95,7 +95,6 @@ export default {
       } else {
         const lastMeasure = this.measureData.last;
         const diff = note.measure - lastMeasure.measure;
-        console.log(diff);
         return (
           diff * lastMeasure.measureHeight +
           lastMeasure.measurePositionBottom +

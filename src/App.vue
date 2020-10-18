@@ -599,6 +599,9 @@ export default {
       margin: 8px -12px;
     }
   }
+  .v-menu__content {
+    z-index: 111 !important;
+  }
 }
 .note {
   position: absolute;

@@ -34,7 +34,7 @@
 
         <v-tooltip v-if="isDuplicated(note)" bottom>
           <template v-slot:activator="{ on, attrs }">
-            <v-icon color="warn" dark v-bind="attrs" v-on="on" class="mt-2">
+            <v-icon color="warning" dark v-bind="attrs" v-on="on" class="mt-2">
               mdi-alert
             </v-icon>
           </template>
