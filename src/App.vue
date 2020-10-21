@@ -53,6 +53,7 @@
               :items="noteTypes"
               hide-details
               label="ノート種別"
+              @change="changeAppendNoteType"
               v-model="appendNote.type"
               outlined
               dense
@@ -142,6 +143,34 @@
             </v-btn>
           </div>
         </v-row>
+
+        <div class="my-4" v-show="appendNote.type === 2">
+          <v-row align="center" justify="space-between">
+            <h4>ロングノーツ編集</h4>
+            <v-btn
+              class="white--text"
+              color="green darken-1"
+              @click="addEndToAppendNote"
+            >
+              終点を追加
+            </v-btn>
+          </v-row>
+
+          <EndForm
+            v-for="(end, i) in appendNote.end"
+            :key="`append_end_${i}`"
+            :end="end"
+            :parent="appendNote"
+            :index="i"
+            @delete-end="deleteEndOfAppendNote"
+            @append-to-left="appendNoteToLeft"
+            @append-to-right="appendNoteToRight"
+            @append-to-up="appendNoteToUp"
+            @append-to-down="appendNoteToDown"
+            @place-notes="placeNotes(appendNote)"
+          >
+          </EndForm>
+        </div>
       </div>
 
       <h3>プレビュー設定</h3>
@@ -291,6 +320,7 @@
 <script>
 import Bury from "buryjs";
 import Preview from "./components/Preview.vue";
+import EndForm from "./components/EndForm.vue";
 
 import noteTypes from "./mixins/noteTypes";
 import noteCheck from "./mixins/noteCheck";
@@ -328,7 +358,8 @@ export default {
         measure: 1,
         position: 0,
         split: 8,
-        option: []
+        option: [],
+        end: []
       },
       preAppendNotes: [], // 保管する配置ノーツ
       isAppendMode: true,
@@ -436,8 +467,8 @@ export default {
         }
         this.currentChart?.append({
           isSelected: false,
-          index: this.currentChart.size,
-          ...JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
+          ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
+          index: this.currentChart.size
         });
       });
       this.preAppendNotes = [];
@@ -458,6 +489,27 @@ export default {
           ...JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
         });
       });
+    },
+    // appendNoteに終点を追加
+    addEndToAppendNote() {
+      this.appendNote.end.append({
+        type: 1,
+        lane: this.appendNote.lane,
+        measure: this.appendNote.measure,
+        position: Math.min(this.appendNote.position + 1, this.appendNote.split),
+        split: this.appendNote.split,
+        option: [],
+        end: []
+      });
+    },
+    // appendNoteから終点を削除
+    deleteEndOfAppendNote(index) {
+      this.appendNote.end.delete_at(index);
+    },
+    // ノーツ種別変更時に終点を制御
+    changeAppendNoteType() {
+      if (this.appendNote.type === 2) this.addEndToAppendNote();
+      else this.appendNote.end = [];
     },
     appendNoteToLeft() {
       this.appendNote.lane = Math.max(this.appendNote.lane - 1, 1);
@@ -574,7 +626,8 @@ export default {
     }
   },
   components: {
-    Preview
+    Preview,
+    EndForm
   }
 };
 </script>
@@ -598,6 +651,9 @@ export default {
     h3 {
       margin: 8px -12px;
     }
+  }
+  .v-menu__content {
+    z-index: 111 !important;
   }
 }
 .note {
@@ -721,5 +777,6 @@ export default {
   margin: 0 11px;
   border-left: 4px solid #6ecc6e;
   border-right: 4px solid #6ecc6e;
+  transition: 0.1s all ease;
 }
 </style>

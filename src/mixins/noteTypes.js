@@ -8,8 +8,7 @@ export default {
         },
         {
           text: "ロング",
-          value: 2,
-          disabled: true
+          value: 2
         },
         {
           text: "左フリック",

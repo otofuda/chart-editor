@@ -5,7 +5,8 @@
       ref="preview"
       :style="{
         position: isPreviewing ? 'fixed' : 'relative',
-        height: `${entireHeight}px`
+        height: `${entireHeight}px`,
+        marginBottom: `${lift}px`
       }"
       :class="{
         detail: isShowDetail,
@@ -59,36 +60,91 @@
         }"
       ></div>
     </div>
+
     <div class="control">
       <v-expansion-panels accordion>
         <v-expansion-panel>
-          <v-expansion-panel-header />
-          <v-expansion-panel-content>
-            <v-text-field
-              v-model.number="startFrom"
-              suffix="小節から"
-              outlined
-              dense
-            ></v-text-field>
+          <v-expansion-panel-header>
             <v-btn
               class="mr-1"
               outlined
               color="success"
-              @click="previewStart"
+              @click.stop="previewStart"
               :disabled="isPreviewing"
             >
               <v-icon left>mdi-play</v-icon> 再生
             </v-btn>
-            <v-btn class="ml-2" outlined color="error" @click="previewStop">
+            <v-btn
+              class="ml-2 mr-2"
+              outlined
+              color="error"
+              @click.stop="previewStop"
+            >
               <v-icon left>mdi-stop</v-icon> 停止
             </v-btn>
-            <v-btn class="ml-2" text @click="screenshot">
-              <v-icon>mdi-camera</v-icon>
-            </v-btn>
+          </v-expansion-panel-header>
+          <v-expansion-panel-content>
+            <v-text-field
+              class="mb-4"
+              v-model.number="lift"
+              hide-details
+              label="LIFT"
+              suffix="px"
+              outlined
+              dense
+            ></v-text-field>
+            <v-text-field
+              class="mb-4"
+              v-model.number="sudden"
+              hide-details
+              label="SUDDEN"
+              suffix="px"
+              outlined
+              dense
+            ></v-text-field>
+            <v-text-field
+              class="mb-4"
+              v-model.number="hidden"
+              hide-details
+              label="HIDDEN"
+              suffix="px"
+              outlined
+              dense
+            ></v-text-field>
+            <v-text-field
+              v-model.number="startFrom"
+              hide-details
+              label="再生開始小節"
+              suffix="小節から"
+              outlined
+              dense
+            ></v-text-field>
           </v-expansion-panel-content>
         </v-expansion-panel>
       </v-expansion-panels>
     </div>
+
+    <div
+      class="lift"
+      :style="{
+        height: `${lift}px`
+      }"
+    ></div>
+
+    <div
+      class="sudden"
+      :style="{
+        height: `${sudden}px`
+      }"
+    ></div>
+
+    <div
+      class="hidden"
+      :style="{
+        height: `${hidden}px`,
+        bottom: `${lift - 2}px`
+      }"
+    ></div>
   </div>
 </template>
 
@@ -110,7 +166,10 @@ export default {
       currentMeasure: 0,
       currentBpm: 0,
       currentBeat: 0,
-      ledColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)"
+      ledColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)",
+      lift: 0, // LIFTオプション
+      sudden: 0, // SUDDENオプション
+      hidden: 0 // HIDDENオプション
     };
   },
   props: {
@@ -284,7 +343,7 @@ export default {
   top: 0;
   right: 0;
   padding: 16px 36px;
-  z-index: 2;
+  z-index: 111;
 }
 .led {
   position: fixed;
@@ -297,5 +356,30 @@ export default {
   &.right {
     right: 0;
   }
+}
+/* 各種オプション表示用 */
+.lift {
+  position: fixed;
+  bottom: -2px;
+  right: 20px;
+  width: 380px;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 110;
+  border-top: 2px solid #ff5151;
+}
+.sudden {
+  position: fixed;
+  top: 0;
+  right: 20px;
+  width: 380px;
+  background: #505050;
+  z-index: 110;
+}
+.hidden {
+  position: fixed;
+  right: 20px;
+  width: 380px;
+  background: #505050;
+  z-index: 110;
 }
 </style>

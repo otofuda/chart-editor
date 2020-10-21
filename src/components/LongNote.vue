@@ -32,7 +32,7 @@
             bottom: `${getBottom(end)}px`,
             width: `${getWidth(end)}px`
           }"
-          >{{ note.position }}/{{ note.split }}</span
+          >{{ end.position }}/{{ end.split }}</span
         >
         <!-- 帯 -->
         <i

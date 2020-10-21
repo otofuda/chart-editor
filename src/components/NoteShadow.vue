@@ -22,7 +22,11 @@
       <!-- 終点 -->
       <span
         class="note"
-        :class="`type${end.type}`"
+        :class="{
+          [`type${end.type}`]: true,
+          shadow: !isPreAppend,
+          preappend: isPreAppend
+        }"
         :style="{
           left: `${getAbsoluteLeft(end)}px`,
           bottom: `${getAbsoluteBottom(end)}px`,
@@ -33,6 +37,10 @@
       <!-- 帯 -->
       <i
         class="note-hold"
+        :class="{
+          shadow: !isPreAppend,
+          preappend: isPreAppend
+        }"
         :style="{
           bottom: `${getAbsoluteBottom(note)}px`,
           left: `${getAbsoluteLeft(end)}px`,
@@ -95,7 +103,6 @@ export default {
       } else {
         const lastMeasure = this.measureData.last;
         const diff = note.measure - lastMeasure.measure;
-        console.log(diff);
         return (
           diff * lastMeasure.measureHeight +
           lastMeasure.measurePositionBottom +
