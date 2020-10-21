@@ -15,8 +15,11 @@ export default {
             target.lane === note.lane &&
             target.position / target.split === posValue
           ) {
-            // 両方がフリックでなければ重複として加算
-            if (![3, 4].includes(target.type) && ![3, 4].includes(note.type))
+            // 両方がフリック、区切り線でなければ重複として加算
+            if (
+              ![3, 4, 95].includes(target.type) &&
+              ![3, 4, 95].includes(note.type)
+            )
               if (target.index !== note.index) {
                 // 対象自身は除外
                 cnt++;

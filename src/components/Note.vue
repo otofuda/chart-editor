@@ -159,6 +159,9 @@
         <v-btn color="error" text @click="deleteThisNote">
           ノートを削除
         </v-btn>
+        <v-btn color="secondary" text @click="showNoteInfo">
+          情報を見る
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-menu>
@@ -195,6 +198,12 @@ export default {
       // FIXME: なんとかする
       this.$root.$children.first.deleteNote(this.note.index);
       this.menu = false;
+    },
+    showNoteInfo() {
+      // FIXME: なんとかする
+      this.$root.$children.first.showSnackbar(
+        JSON.stringify(this.note, null, 2)
+      );
     }
   },
   computed: {
