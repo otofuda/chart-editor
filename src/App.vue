@@ -42,11 +42,22 @@
       <v-checkbox v-model="isAppendMode" label="ノート挿入モード"></v-checkbox>
 
       <div v-show="isAppendMode">
-        <v-checkbox
-          v-model="isAutoFollow"
-          label="編集小節を自動追従"
-          class="mt-0"
-        ></v-checkbox>
+        <v-row justify="space-between">
+          <v-checkbox
+            v-model="isAutoFollow"
+            label="編集小節を自動追従"
+            class="mt-0 ml-3"
+          ></v-checkbox>
+          <v-btn
+            class="ml-4 white--text"
+            color="orange darken-4"
+            text
+            @click="appendSimultaneously(appendNote)"
+          >
+            このノートのみを全難易度に同時挿入
+            <v-icon right>mdi-plus-circle</v-icon>
+          </v-btn>
+        </v-row>
         <v-row>
           <v-col cols="12" sm="3">
             <v-select
@@ -300,11 +311,30 @@
       </v-row>
 
       <v-row>
+        <v-btn class="ml-1 mb-8" color="primary" @click="analyze" text>
+          <v-icon left>mdi-chart-timeline-variant</v-icon> 譜面分析
+        </v-btn>
         <v-btn class="ml-1 mb-8" color="success" @click="saveFile">
           <v-icon left>mdi-content-save</v-icon> 名前をつけて保存
         </v-btn>
       </v-row>
     </v-container>
+
+    <v-dialog v-model="dialog.analyzer" width="800">
+      <v-card>
+        <v-card-title class="headline">譜面分析</v-card-title>
+        <v-card-text> ノーツ数：{{ analysisData.notesCount }} </v-card-text>
+        <v-divider></v-divider>
+        <v-sparkline
+          :labels="analysisData.trendLabels"
+          :value="analysisData.trendValues"
+          color="black"
+          line-width="2"
+          padding="10"
+          smooth="3"
+        ></v-sparkline>
+      </v-card>
+    </v-dialog>
 
     <v-snackbar v-model="snackbar" vertical>
       {{ snackbarText }}
@@ -349,7 +379,13 @@ export default {
         }
       },
       dialog: {
-        selectionDelete: false
+        selectionDelete: false,
+        analyzer: false
+      },
+      analysisData: {
+        notesCount: 0,
+        trendValues: [],
+        trendLabels: []
       },
       // 配置するノート
       appendNote: {
@@ -490,6 +526,31 @@ export default {
         });
       });
     },
+    // ノーツを全ての難易度に同時挿入
+    appendSimultaneously(...notes) {
+      notes.each(note => {
+        let difficultyCount = 0;
+        // 各難易度に対して重複検査＋append
+        this.difficulties.each(difficulty => {
+          const dup = this.isDuplicated(note, {
+            comparators: this.chartObject[difficulty]
+          });
+          if (dup) {
+            this.showSnackbar(
+              `${dup}個のノーツと重複しているため、挿入できないノーツがあります`
+            );
+            return false;
+          }
+          this.chartObject[difficulty]?.append({
+            isSelected: false,
+            ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
+            index: this.chartObject[difficulty].size
+          });
+          difficultyCount++;
+        });
+        this.showSnackbar(`ノートを${difficultyCount}難易度に同時挿入しました`);
+      });
+    },
     // appendNoteに終点を追加
     addEndToAppendNote() {
       this.appendNote.end.append({
@@ -569,6 +630,25 @@ export default {
       this.snackbar = false;
       this.snackbarText = message;
       setTimeout(() => (this.snackbar = true), 100);
+    },
+    // 譜面分析
+    analyze() {
+      this.analysisData.trendLabels = [];
+      this.analysisData.trendValues = [];
+      this.analysisData.notesCount = 0;
+      this.measureData.each(m => {
+        if (m.measure % 10 === 0)
+          this.analysisData.trendLabels.append(String(m.measure));
+        else this.analysisData.trendLabels.append(" ");
+        this.analysisData.trendValues.append(0);
+      });
+      this.currentChart.each(note => {
+        if ([1, 2, 3, 4, 5].includes(note.type)) {
+          this.analysisData.trendValues[note.measure] += 1;
+          this.analysisData.notesCount += 1;
+        }
+      });
+      this.dialog.analyzer = true;
     }
   },
   computed: {

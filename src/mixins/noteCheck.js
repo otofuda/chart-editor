@@ -3,13 +3,16 @@ export default {
     isDuplicated(
       note,
       option = {
-        checkPreAppend: true // preAppendNotes内を走査するかどうか
+        checkPreAppend: true, // preAppendNotes内を走査するかどうか
+        comparators: null // 比較対象となるノーツ配列
       }
     ) {
-      if (this.currentChart) {
+      const comparators = option.comparators || this.currentChart;
+      if (comparators) {
         const posValue = note.position / note.split;
         let cnt = 0;
-        this.currentChart.each(target => {
+        comparators.each(target => {
+          // TODO: 音札ノーツとLN始点の重複は許容
           if (
             target.measure === note.measure &&
             target.lane === note.lane &&
