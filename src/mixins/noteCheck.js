@@ -56,6 +56,32 @@ export default {
       else if (![1, 2, 3, 4, 5, 95, 96, 97, 98, 99].includes(note.type))
         return "不正なノートタイプです。";
       else return false;
+    },
+    // ノートのオプション配列をバリデーション
+    getValidatedOptions(note) {
+      const option = [];
+      // option: []
+      if ([1, 2, 5, 99].includes(note.type)) return option;
+      // option: [width: Float (, offsetNumer: Integer, offsetDenom: Integer)]
+      else if ([3, 4].includes(note.type)) {
+        option.append(note.option[0] ? Number(note.option[0]) : -1);
+        if (note.option[1] && note.option[2]) {
+          option.append(
+            Number(note.option[1]).floor,
+            Number(note.option[2]).floor
+          );
+        }
+        return option;
+      }
+      // option: [length: Integer]
+      // option: [beat: Integer(?)]
+      // option: [bpm: Float]
+      else if ([95, 97, 98].includes(note.type)) {
+        option.append(note.option[0] ? Number(note.option[0]) : -1);
+        return option;
+      }
+      // 不明なtypeの時はそのまま返す
+      else return [...note.option];
     }
   }
 };

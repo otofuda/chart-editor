@@ -458,7 +458,7 @@ export default {
             lane: Number(note.lane),
             position: Number(note.position),
             split: Number(note.split),
-            option: [...note.option],
+            option: this.getValidatedOptions(note),
             end: note.end
           };
         });
@@ -504,7 +504,8 @@ export default {
         this.currentChart?.append({
           isSelected: false,
           ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
-          index: this.currentChart.size
+          index: this.currentChart.size,
+          option: this.getValidatedOptions(note)
         });
       });
       this.preAppendNotes = [];
@@ -522,7 +523,8 @@ export default {
         this.preAppendNotes.append({
           isSelected: false,
           index: this.preAppendNotes.size,
-          ...JSON.parse(JSON.stringify(note)) // FIXME: deep-copyしたい
+          ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
+          option: this.getValidatedOptions(note)
         });
       });
     },
