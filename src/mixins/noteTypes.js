@@ -20,12 +20,16 @@ export default {
         },
         {
           text: "音札",
-          value: 5,
-          disabled: true
+          value: 5
         },
         {
           text: "区切り線",
           value: 95
+        },
+        {
+          text: "LED制御",
+          value: 96,
+          disabled: true
         },
         {
           text: "拍子変化",

@@ -3,13 +3,16 @@ export default {
     isDuplicated(
       note,
       option = {
-        checkPreAppend: true // preAppendNotes内を走査するかどうか
+        checkPreAppend: true, // preAppendNotes内を走査するかどうか
+        comparators: null // 比較対象となるノーツ配列
       }
     ) {
-      if (this.currentChart) {
+      const comparators = option.comparators || this.currentChart;
+      if (comparators) {
         const posValue = note.position / note.split;
         let cnt = 0;
-        this.currentChart.each(target => {
+        comparators.each(target => {
+          // TODO: 音札ノーツとLN始点の重複は許容
           if (
             target.measure === note.measure &&
             target.lane === note.lane &&
@@ -53,6 +56,32 @@ export default {
       else if (![1, 2, 3, 4, 5, 95, 96, 97, 98, 99].includes(note.type))
         return "不正なノートタイプです。";
       else return false;
+    },
+    // ノートのオプション配列をバリデーション
+    getValidatedOptions(note) {
+      const option = [];
+      // option: []
+      if ([1, 2, 5, 99].includes(note.type)) return option;
+      // option: [width: Float (, offsetNumer: Integer, offsetDenom: Integer)]
+      else if ([3, 4].includes(note.type)) {
+        option.append(note.option[0] ? Number(note.option[0]) : -1);
+        if (note.option[1] && note.option[2]) {
+          option.append(
+            Number(note.option[1]).floor,
+            Number(note.option[2]).floor
+          );
+        }
+        return option;
+      }
+      // option: [length: Integer]
+      // option: [beat: Integer(?)]
+      // option: [bpm: Float]
+      else if ([95, 97, 98].includes(note.type)) {
+        option.append(note.option[0] ? Number(note.option[0]) : -1);
+        return option;
+      }
+      // 不明なtypeの時はそのまま返す
+      else return [...note.option];
     }
   }
 };
