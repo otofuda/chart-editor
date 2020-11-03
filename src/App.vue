@@ -341,6 +341,7 @@
         </v-card-text>
         <v-divider></v-divider>
         <v-sparkline
+          v-if="dialog.analyzer"
           :labels="analysisData.trendLabels"
           :value="analysisData.trendValues"
           :gradient="['#f72047', '#ffd200', '#1feaea']"
@@ -350,6 +351,7 @@
           smooth="3"
         ></v-sparkline>
         <v-sparkline
+          v-if="dialog.analyzer"
           :value="analysisData.otofudaNotes"
           color="orange"
           line-width="2"
@@ -842,7 +844,6 @@ export default {
     z-index: 99;
     height: 6px;
     background: #87cefa;
-    z-index: 1;
     &::before {
       content: "";
       display: inline-block;
@@ -860,7 +861,6 @@ export default {
     z-index: 99;
     height: 6px;
     background: #f08080;
-    z-index: 1;
     &::after {
       content: "";
       display: inline-block;
@@ -909,13 +909,19 @@ export default {
 .preview.checkbox .note input[type="checkbox"] {
   display: block;
 }
-.preview.detail.capture .note.type95 {
-  color: transparent;
-  text-shadow: none;
+.preview.detail.capture {
+  .note {
+    color: #a0a0a0;
+  }
+  .note.type95 {
+    color: transparent;
+    text-shadow: none;
+  }
 }
 
 .note-hold {
   position: absolute;
+  z-index: 98;
   background: #ffffec;
   opacity: 0.9;
   width: 38px;
