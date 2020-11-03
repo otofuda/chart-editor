@@ -10,6 +10,7 @@
       }"
       :class="{
         detail: isShowDetail,
+        capture: isCaptureMode,
         checkbox: isShowCheckbox
       }"
     >
@@ -126,6 +127,7 @@
 
     <div
       class="lift"
+      v-show="isPreviewing"
       :style="{
         height: `${lift}px`
       }"
@@ -199,6 +201,10 @@ export default {
       default: false
     },
     isShowCheckbox: {
+      type: Boolean,
+      default: false
+    },
+    isCaptureMode: {
       type: Boolean,
       default: false
     }

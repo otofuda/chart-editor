@@ -8,6 +8,7 @@
       :appendNote="getAppendNote"
       :preAppendNotes="preAppendNotes"
       :isShowDetail="isShowDetail"
+      :isCaptureMode="isCaptureMode"
       :isShowCheckbox="isShowCheckbox"
     />
 
@@ -232,6 +233,11 @@
           v-model="isShowCheckbox"
           label="チェックボックスを表示"
         ></v-checkbox>
+        <v-checkbox
+          class="ml-4"
+          v-model="isCaptureMode"
+          label="キャプチャ用モード"
+        ></v-checkbox>
       </v-row>
 
       <h3>選択ノーツ</h3>
@@ -322,17 +328,57 @@
 
     <v-dialog v-model="dialog.analyzer" width="800">
       <v-card>
-        <v-card-title class="headline">譜面分析</v-card-title>
-        <v-card-text> ノーツ数：{{ analysisData.notesCount }} </v-card-text>
+        <v-card-title class="headline">
+          譜面分析 ({{ currentDifficulty }})
+        </v-card-title>
+        <v-card-text>
+          ノーツ数：{{ analysisData.notesCount }}
+          <br />
+          平均密度：{{
+            (analysisData.notesCount / measureData.last.measureReachTime) *
+              1000
+          }}Notes / 秒
+        </v-card-text>
         <v-divider></v-divider>
         <v-sparkline
           :labels="analysisData.trendLabels"
           :value="analysisData.trendValues"
+          :gradient="['#f72047', '#ffd200', '#1feaea']"
           color="black"
           line-width="2"
           padding="10"
           smooth="3"
         ></v-sparkline>
+        <v-sparkline
+          :value="analysisData.otofudaNotes"
+          color="orange"
+          line-width="2"
+          height="10"
+          padding="0"
+          smooth="0"
+          fill
+        ></v-sparkline>
+        <v-card-text class="mt-4">
+          ▲音札ノーツの位置
+        </v-card-text>
+        <v-simple-table>
+          <thead>
+            <tr>
+              <th class="text-left">
+                種類別ノーツ数
+              </th>
+              <th class="text-left">
+                数
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="type in noteTypes" :key="`note_count_${type.value}`">
+              <td>{{ type.text }}</td>
+              <td>{{ analysisData.typeCount[type.value] }}</td>
+            </tr>
+          </tbody>
+        </v-simple-table>
       </v-card>
     </v-dialog>
 
@@ -385,7 +431,9 @@ export default {
       analysisData: {
         notesCount: 0,
         trendValues: [],
-        trendLabels: []
+        trendLabels: [],
+        otofudaNotes: [],
+        typeCount: {}
       },
       // 配置するノート
       appendNote: {
@@ -403,6 +451,7 @@ export default {
       scrollTo: 0,
       isShowDetail: false,
       isShowCheckbox: false,
+      isCaptureMode: false,
 
       snackbar: false, // 通知表示管理
       snackbarText: "メッセージ", // 通知内容
@@ -635,20 +684,30 @@ export default {
     },
     // 譜面分析
     analyze() {
+      // 分析データを初期化
       this.analysisData.trendLabels = [];
       this.analysisData.trendValues = [];
+      this.analysisData.otofudaNotes = [];
       this.analysisData.notesCount = 0;
+      this.noteTypes.each(type => {
+        this.analysisData.typeCount[type.value] = 0;
+      });
+      // ラベルとデータ配列を初期化
       this.measureData.each(m => {
         if (m.measure % 10 === 0)
           this.analysisData.trendLabels.append(String(m.measure));
         else this.analysisData.trendLabels.append(" ");
         this.analysisData.trendValues.append(0);
+        this.analysisData.otofudaNotes.append(0);
       });
+      // 分析
       this.currentChart.each(note => {
         if ([1, 2, 3, 4, 5].includes(note.type)) {
           this.analysisData.trendValues[note.measure] += 1;
           this.analysisData.notesCount += 1;
         }
+        if (note.type === 5) this.analysisData.otofudaNotes[note.measure] += 1;
+        this.analysisData.typeCount[note.type] += 1;
       });
       this.dialog.analyzer = true;
     }
@@ -849,6 +908,10 @@ export default {
 }
 .preview.checkbox .note input[type="checkbox"] {
   display: block;
+}
+.preview.detail.capture .note.type95 {
+  color: transparent;
+  text-shadow: none;
 }
 
 .note-hold {
