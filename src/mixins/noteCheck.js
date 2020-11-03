@@ -77,6 +77,8 @@ export default {
       // option: [beat: Integer(?)]
       // option: [bpm: Float]
       else if ([95, 97, 98].includes(note.type)) {
+        // type95 小節線非表示制御の時は option: [-1]
+        if (note.type === 95 && note.position === 0) return [-1];
         option.append(note.option[0] ? Number(note.option[0]) : -1);
         return option;
       }
