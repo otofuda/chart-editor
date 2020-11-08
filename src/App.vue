@@ -317,6 +317,14 @@
       </v-row>
 
       <v-row>
+        <v-btn
+          class="ml-1 mb-8"
+          color="primary"
+          @click="dialog.help = true"
+          text
+        >
+          <v-icon left>mdi-help-circle</v-icon> 使い方
+        </v-btn>
         <v-btn class="ml-1 mb-8" color="primary" @click="analyze" text>
           <v-icon left>mdi-chart-timeline-variant</v-icon> 譜面分析
         </v-btn>
@@ -325,6 +333,19 @@
         </v-btn>
       </v-row>
     </v-container>
+
+    <v-dialog v-model="dialog.help" width="800">
+      <v-card>
+        <v-card-title class="headline">
+          エディタの使い方
+        </v-card-title>
+        <v-card-text>
+          <a target="_blank" rel="noopener noreferrer">
+            エディタの使い方
+          </a>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
 
     <v-dialog v-model="dialog.analyzer" width="800">
       <v-card>
@@ -428,7 +449,8 @@ export default {
       },
       dialog: {
         selectionDelete: false,
-        analyzer: false
+        analyzer: false,
+        help: false
       },
       analysisData: {
         notesCount: 0,
@@ -552,10 +574,15 @@ export default {
           );
           return false;
         }
+        // 配置ノートのindexは、currentChart内の最大index+1
+        const index =
+          this.currentChart.size === 0
+            ? 1
+            : this.currentChart.max_by(n => n.index).index + 1;
         this.currentChart?.append({
           isSelected: false,
           ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
-          index: this.currentChart.size,
+          index,
           option: this.getValidatedOptions(note)
         });
       });
@@ -571,9 +598,14 @@ export default {
           );
           return false;
         }
+        // 仮配置のindexは、preAppendNotes内の最大index+1
+        const index =
+          this.preAppendNotes.size === 0
+            ? 1
+            : this.preAppendNotes.max_by(n => n.index).index + 1;
         this.preAppendNotes.append({
           isSelected: false,
-          index: this.preAppendNotes.size,
+          index,
           ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
           option: this.getValidatedOptions(note)
         });
