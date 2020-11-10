@@ -4,6 +4,7 @@
       :currentChart="currentChart"
       :infoObject="chartObject.info"
       :measureData="measureData"
+      :audioVolume="audioVolume"
       :previewAudio="previewAudio"
       :appendNote="getAppendNote"
       :preAppendNotes="preAppendNotes"
@@ -189,6 +190,8 @@
 
       <v-slider
         v-model="beatHeight"
+        :thumb-size="24"
+        thumb-label="always"
         min="20"
         max="300"
         append-icon="mdi-magnify-plus-outline"
@@ -196,18 +199,30 @@
         @click:append="zoomIn"
         @click:prepend="zoomOut"
         step="10"
-        thumb-label
       ></v-slider>
 
       <v-row align="center">
-        <v-file-input
-          accept="audio/*"
-          label="楽曲ファイル選択"
-          outlined
-          dense
-          prepend-icon="mdi-music"
-          @change="readAudioFile"
-        ></v-file-input>
+        <v-col cols="12" sm="6">
+          <v-file-input
+            accept="audio/*"
+            label="楽曲ファイル選択"
+            outlined
+            dense
+            prepend-icon="mdi-music"
+            @change="readAudioFile"
+          ></v-file-input>
+        </v-col>
+        <v-col cols="12" sm="6">
+          <v-slider
+            v-model="audioVolume"
+            :thumb-size="24"
+            thumb-label="always"
+            min="0"
+            max="100"
+            prepend-icon="mdi-volume-high"
+            step="5"
+          ></v-slider>
+        </v-col>
       </v-row>
 
       <v-row align="center">
@@ -432,6 +447,7 @@ export default {
       isLoaded: false,
       reader: new FileReader(),
       previewAudio: new Audio(),
+      audioVolume: 100,
       fileName: "default-song.json",
       difficulties: ["raku", "easy", "normal", "hard", "extra"],
       currentDifficulty: "easy",
@@ -480,7 +496,8 @@ export default {
       snackbar: false, // 通知表示管理
       snackbarText: "メッセージ", // 通知内容
 
-      beatHeight: 100 // 一拍あたりの高さ(px)
+      // 一拍あたりの高さ(px)
+      beatHeight: localStorage.getItem("chart-editor__beat-height") || 100
     };
   },
   beforeCreate: Bury.init,
@@ -745,6 +762,11 @@ export default {
       });
       this.dialog.analyzer = true;
     }
+  },
+  // localStorageにコンフィグを書き込む
+  watch: {
+    beatHeight: value =>
+      localStorage.setItem("chart-editor__beat-height", value)
   },
   computed: {
     // 選択中の難易度の譜面データ配列

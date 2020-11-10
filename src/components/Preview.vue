@@ -85,6 +85,10 @@
             </v-btn>
           </v-expansion-panel-header>
           <v-expansion-panel-content>
+            <v-checkbox
+              v-model="isPlayGuide"
+              label="小節ガイド音を再生"
+            ></v-checkbox>
             <v-text-field
               class="mb-4"
               v-model.number="lift"
@@ -142,6 +146,7 @@
 
     <div
       class="hidden"
+      v-show="isPreviewing"
       :style="{
         height: `${hidden}px`,
         bottom: `${lift - 2}px`
@@ -157,23 +162,6 @@ import NoteShadow from "./NoteShadow.vue";
 import html2canvas from "html2canvas";
 
 export default {
-  data() {
-    return {
-      isPreviewing: false,
-      returnPosition: -1, // 戻る座標
-      currentPosition: 0,
-      timeoutIds: [],
-      intervalId: null, // 小節プレビューセット用
-      startFrom: 0,
-      currentMeasure: 0,
-      currentBpm: 0,
-      currentBeat: 0,
-      ledColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)",
-      lift: 0, // LIFTオプション
-      sudden: 0, // SUDDENオプション
-      hidden: 0 // HIDDENオプション
-    };
-  },
   props: {
     currentChart: {
       type: Array,
@@ -185,6 +173,10 @@ export default {
     },
     previewAudio: {
       type: HTMLAudioElement
+    },
+    audioVolume: {
+      type: Number,
+      default: 100
     },
     infoObject: {
       type: Object,
@@ -209,6 +201,30 @@ export default {
       default: false
     }
   },
+  data() {
+    return {
+      isPreviewing: false,
+      returnPosition: -1, // 戻る座標
+      currentPosition: 0,
+      timeoutIds: [],
+      intervalId: null, // 小節プレビューセット用
+      startFrom: 0,
+      currentMeasure: 0,
+      currentBpm: 0,
+      currentBeat: 0,
+      isPlayGuide: false,
+      guideAudio: new Audio("/chart-editor/guide.mp3"),
+      ledColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)",
+      lift: localStorage.getItem("chart-editor__lift") || 0, // LIFTオプション
+      sudden: localStorage.getItem("chart-editor__sudden") || 0, // SUDDENオプション
+      hidden: localStorage.getItem("chart-editor__hidden") || 0 // HIDDENオプション
+    };
+  },
+  watch: {
+    lift: value => localStorage.setItem("chart-editor__lift", value),
+    sudden: value => localStorage.setItem("chart-editor__sudden", value),
+    hidden: value => localStorage.setItem("chart-editor__hidden", value)
+  },
   methods: {
     screenshot() {
       html2canvas(document.querySelector(".preview"), {
@@ -224,6 +240,7 @@ export default {
         (60 / this.infoObject.bpm) * this.infoObject.beat * 1000;
 
       setTimeout(() => {
+        this.previewAudio.volume = this.audioVolume / 100;
         this.previewAudio.currentTime = startOffset / 1000;
         this.previewAudio.play();
       }, audioDelay);
@@ -265,6 +282,11 @@ export default {
                 next.measureReachTime - measure.measureReachTime;
               this.$refs.preview.style.transition = `${transitionTime}ms all linear`;
               this.$refs.preview.style.bottom = `-${this.currentPosition}px`;
+              // 小節ガイド音再生
+              if (this.isPlayGuide) {
+                this.guideAudio.currentTime = 0;
+                this.guideAudio.play();
+              }
             }, measure.measureReachTime - startOffset)
           );
         }
@@ -274,6 +296,7 @@ export default {
       // 拍子木分オフセット
       setTimeout(() => {
         this.previewAudio.currentTime = 0;
+        this.previewAudio.volume = this.audioVolume / 100;
         this.previewAudio.play();
       }, (60 / this.infoObject.bpm) * this.infoObject.beat * 1000);
       // 1小節ずつプレビュー
@@ -287,6 +310,11 @@ export default {
               next.measureReachTime - measure.measureReachTime;
             this.$refs.preview.style.transition = `${transitionTime}ms all linear`;
             this.$refs.preview.style.bottom = `-${this.currentPosition}px`;
+            // 小節ガイド音再生
+            if (this.isPlayGuide) {
+              this.guideAudio.currentTime = 0;
+              this.guideAudio.play();
+            }
           }, measure.measureReachTime)
         );
       });
@@ -310,7 +338,7 @@ export default {
       this.$refs.preview.style.transition = "0ms all linear";
       this.$refs.preview.style.bottom = "0px";
       this.timeoutIds.each(id => clearInterval(id));
-      this.$vuetify.goTo(this.returnPosition);
+      if (this.returnPosition >= 0) this.$vuetify.goTo(this.returnPosition);
       this.returnPosition = -1;
     }
   },

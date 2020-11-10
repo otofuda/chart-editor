@@ -23,6 +23,11 @@ export default {
           value: 5
         },
         {
+          text: "テクスチャ",
+          value: 94,
+          disabled: true
+        },
+        {
           text: "区切り線",
           value: 95
         },
