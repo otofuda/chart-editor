@@ -15,8 +15,10 @@
         width: `${getWidth(note)}px`
       }"
       @click="calcelThisNote"
-      >{{ note.position }}/{{ note.split }}</span
     >
+      {{ note.position }}/{{ note.split }}
+      <span v-if="isPreAppend" class="preappend__index">#{{ note.index }}</span>
+    </span>
 
     <div v-for="(end, i) in note.end" :key="i">
       <!-- 終点 -->
@@ -142,6 +144,9 @@ export default {
 .shadow {
   color: #909090;
   animation: blink 0.5s infinite;
+  &:active {
+    transform: scale(1.5);
+  }
 }
 .preappend {
   opacity: 1;
@@ -149,6 +154,11 @@ export default {
   transition: none;
   box-shadow: 0 0 4px 4px rgba(255, 255, 0, 0.25);
   cursor: pointer;
+  &__index {
+    display: block;
+    color: limegreen;
+    line-height: 10px;
+  }
 }
 
 @keyframes blink {

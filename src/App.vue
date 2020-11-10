@@ -4,6 +4,7 @@
       :currentChart="currentChart"
       :infoObject="chartObject.info"
       :measureData="measureData"
+      :audioVolume="audioVolume"
       :previewAudio="previewAudio"
       :appendNote="getAppendNote"
       :preAppendNotes="preAppendNotes"
@@ -189,6 +190,8 @@
 
       <v-slider
         v-model="beatHeight"
+        :thumb-size="24"
+        thumb-label="always"
         min="20"
         max="300"
         append-icon="mdi-magnify-plus-outline"
@@ -196,18 +199,30 @@
         @click:append="zoomIn"
         @click:prepend="zoomOut"
         step="10"
-        thumb-label
       ></v-slider>
 
       <v-row align="center">
-        <v-file-input
-          accept="audio/*"
-          label="楽曲ファイル選択"
-          outlined
-          dense
-          prepend-icon="mdi-music"
-          @change="readAudioFile"
-        ></v-file-input>
+        <v-col cols="12" sm="6">
+          <v-file-input
+            accept="audio/*"
+            label="楽曲ファイル選択"
+            outlined
+            dense
+            prepend-icon="mdi-music"
+            @change="readAudioFile"
+          ></v-file-input>
+        </v-col>
+        <v-col cols="12" sm="6">
+          <v-slider
+            v-model="audioVolume"
+            :thumb-size="24"
+            thumb-label="always"
+            min="0"
+            max="100"
+            prepend-icon="mdi-volume-high"
+            step="5"
+          ></v-slider>
+        </v-col>
       </v-row>
 
       <v-row align="center">
@@ -317,6 +332,14 @@
       </v-row>
 
       <v-row>
+        <v-btn
+          class="ml-1 mb-8"
+          color="primary"
+          @click="dialog.help = true"
+          text
+        >
+          <v-icon left>mdi-help-circle</v-icon> 使い方
+        </v-btn>
         <v-btn class="ml-1 mb-8" color="primary" @click="analyze" text>
           <v-icon left>mdi-chart-timeline-variant</v-icon> 譜面分析
         </v-btn>
@@ -325,6 +348,19 @@
         </v-btn>
       </v-row>
     </v-container>
+
+    <v-dialog v-model="dialog.help" width="800">
+      <v-card>
+        <v-card-title class="headline">
+          エディタの使い方
+        </v-card-title>
+        <v-card-text>
+          <a target="_blank" rel="noopener noreferrer">
+            エディタの使い方
+          </a>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
 
     <v-dialog v-model="dialog.analyzer" width="800">
       <v-card>
@@ -411,6 +447,7 @@ export default {
       isLoaded: false,
       reader: new FileReader(),
       previewAudio: new Audio(),
+      audioVolume: 100,
       fileName: "default-song.json",
       difficulties: ["raku", "easy", "normal", "hard", "extra"],
       currentDifficulty: "easy",
@@ -428,7 +465,8 @@ export default {
       },
       dialog: {
         selectionDelete: false,
-        analyzer: false
+        analyzer: false,
+        help: false
       },
       analysisData: {
         notesCount: 0,
@@ -458,7 +496,8 @@ export default {
       snackbar: false, // 通知表示管理
       snackbarText: "メッセージ", // 通知内容
 
-      beatHeight: 100 // 一拍あたりの高さ(px)
+      // 一拍あたりの高さ(px)
+      beatHeight: localStorage.getItem("chart-editor__beat-height") || 100
     };
   },
   beforeCreate: Bury.init,
@@ -552,10 +591,15 @@ export default {
           );
           return false;
         }
+        // 配置ノートのindexは、currentChart内の最大index+1
+        const index =
+          this.currentChart.size === 0
+            ? 1
+            : this.currentChart.max_by(n => n.index).index + 1;
         this.currentChart?.append({
           isSelected: false,
           ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
-          index: this.currentChart.size,
+          index,
           option: this.getValidatedOptions(note)
         });
       });
@@ -571,9 +615,14 @@ export default {
           );
           return false;
         }
+        // 仮配置のindexは、preAppendNotes内の最大index+1
+        const index =
+          this.preAppendNotes.size === 0
+            ? 1
+            : this.preAppendNotes.max_by(n => n.index).index + 1;
         this.preAppendNotes.append({
           isSelected: false,
-          index: this.preAppendNotes.size,
+          index,
           ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
           option: this.getValidatedOptions(note)
         });
@@ -713,6 +762,11 @@ export default {
       });
       this.dialog.analyzer = true;
     }
+  },
+  // localStorageにコンフィグを書き込む
+  watch: {
+    beatHeight: value =>
+      localStorage.setItem("chart-editor__beat-height", value)
   },
   computed: {
     // 選択中の難易度の譜面データ配列
