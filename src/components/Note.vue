@@ -173,6 +173,7 @@ import noteCheck from "../mixins/noteCheck";
 
 export default {
   mixins: [noteTypes, noteCheck],
+  inject: ["deleteNotes", "showSnackbar"],
   data() {
     return {
       menu: false
@@ -195,15 +196,11 @@ export default {
   },
   methods: {
     deleteThisNote() {
-      // FIXME: なんとかする
-      this.$root.$children.first.deleteNote(this.note.index);
+      this.deleteNotes(this.note.index);
       this.menu = false;
     },
     showNoteInfo() {
-      // FIXME: なんとかする
-      this.$root.$children.first.showSnackbar(
-        JSON.stringify(this.note, null, 2)
-      );
+      this.showSnackbar(JSON.stringify(this.note, null, 2));
     }
   },
   computed: {

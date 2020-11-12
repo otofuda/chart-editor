@@ -19,13 +19,13 @@
         v-for="measure in measureData"
         :key="`measure_${measure.measure}`"
         :measure="measure"
-        :notes="currentChart.filter(note => note.measure === measure.measure)"
+        :notes="getMeasureNotes(measure.measure)"
       />
 
       <!-- ロングノーツ -->
       <!-- FIXME: 多分負荷でかい -->
       <LongNote
-        v-for="(note, i) in currentChart.filter(note => note.type === 2)"
+        v-for="(note, i) in longNotes"
         :key="`longnote_${i}`"
         :note="note"
         :measureData="measureData"
@@ -233,6 +233,10 @@ export default {
         document.querySelector(".panel").appendChild(canvas);
       });
     },
+    // 特定小節内のノーツを取得
+    getMeasureNotes(measureNumber) {
+      return this.currentChart.filter(note => note.measure === measureNumber);
+    },
     playFromMeasure() {
       const startOffset = this.startOffset;
 
@@ -343,6 +347,10 @@ export default {
     }
   },
   computed: {
+    // 全体からロングノーツだけを取得
+    longNotes() {
+      return this.currentChart.filter(note => note.type === 2);
+    },
     entireHeight() {
       return (
         this.measureData.last?.measurePositionBottom +
@@ -375,8 +383,8 @@ export default {
 .control {
   position: fixed;
   top: 0;
-  right: 0;
-  padding: 16px 36px;
+  right: 420px;
+  padding: 0;
   z-index: 111;
 }
 .led {
