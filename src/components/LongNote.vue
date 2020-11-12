@@ -19,7 +19,13 @@
           bottom: `${getBottom(note)}px`,
           width: `${getWidth(note)}px`
         }"
-        >{{ note.position }}/{{ note.split }}</span
+      >
+        <input
+          type="checkbox"
+          v-model="note.isSelected"
+          :id="note.index"
+          @click.stop
+        />{{ note.position }}/{{ note.split }}</span
       >
 
       <div v-for="(end, i) in note.end" :key="i">
@@ -56,6 +62,26 @@
             <v-icon>mdi-close</v-icon>
           </v-btn>
         </v-list-item>
+        <v-list-item>
+          始点
+          <v-spacer></v-spacer>
+          <v-radio-group v-model="note.lane" row hide-details>
+            <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
+          </v-radio-group>
+        </v-list-item>
+        <!-- 終点のレーン(浅い一覧) -->
+        <div
+          v-for="(end, i) in note.end"
+          :key="`longnote_end_${note.index}_${i}`"
+        >
+          <v-list-item>
+            終点{{ i }}
+            <v-spacer></v-spacer>
+            <v-radio-group v-model="end.lane" row hide-details>
+              <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
+            </v-radio-group>
+          </v-list-item>
+        </div>
       </v-list>
       <v-card-actions>
         <v-btn color="error" text @click="deleteThisNote">
@@ -68,6 +94,7 @@
 
 <script>
 export default {
+  inject: ["deleteNotes"],
   data() {
     return {
       menu: false
@@ -98,7 +125,7 @@ export default {
       return 60;
     },
     deleteThisNote() {
-      this.$root.$children.first.deleteNote(this.note.index);
+      this.deleteNotes(this.note.index);
       this.menu = false;
     }
   }
@@ -110,6 +137,12 @@ export default {
   &__text {
     padding: 0;
     text-align: left;
+  }
+  .v-input {
+    margin-top: 0;
+    &--radio-group__input .v-radio {
+      margin: 0;
+    }
   }
 }
 </style>

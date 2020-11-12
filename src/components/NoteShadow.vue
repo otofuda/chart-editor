@@ -55,6 +55,7 @@
 
 <script>
 export default {
+  inject: ["cancelNote"],
   props: {
     note: {
       type: Object,
@@ -131,10 +132,7 @@ export default {
       } else return 300;
     },
     calcelThisNote() {
-      if (this.isPreAppend) {
-        // FIXME: なんとかする
-        this.$root.$children.first.cancelNote(this.note.index);
-      }
+      if (this.isPreAppend) this.cancelNote(this.note.index);
     }
   }
 };

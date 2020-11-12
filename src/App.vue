@@ -500,6 +500,15 @@ export default {
       beatHeight: localStorage.getItem("chart-editor__beat-height") || 100
     };
   },
+  // 依存性注入(DI)
+  provide() {
+    return {
+      showSnackbar: this.showSnackbar,
+      deleteNotes: this.deleteNotes,
+      cancelNote: this.cancelNote,
+      appendNotes: this.appendNotes
+    };
+  },
   beforeCreate: Bury.init,
   mounted() {
     this.reader.onload = event => {
@@ -587,7 +596,7 @@ export default {
         });
         if (dup) {
           this.showSnackbar(
-            `${dup}個のノーツと重複しているため、挿入できないノーツがあります`
+            `${dup}個のノーツと重複しているため、挿入できないノーツがありました`
           );
           return false;
         }
@@ -699,10 +708,12 @@ export default {
         if (this.isAutoFollow) this.scrollToMeasure(note.measure);
       } else note.position--;
     },
-    deleteNote(index) {
-      this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
-        note => note.index === index
-      );
+    deleteNotes(...index) {
+      index.each(i => {
+        this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
+          note => note.index === i
+        );
+      });
     },
     cancelNote(index) {
       this.preAppendNotes = this.preAppendNotes?.delete_if(
