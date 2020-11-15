@@ -86,8 +86,14 @@
           </v-expansion-panel-header>
           <v-expansion-panel-content>
             <v-checkbox
+              class="mt-0"
               v-model="isPlayGuide"
               label="小節ガイド音を再生"
+            ></v-checkbox>
+            <v-checkbox
+              class="mt-0"
+              v-model="isPlayKeySound"
+              label="打鍵音を再生(beta)"
             ></v-checkbox>
             <v-text-field
               class="mb-4"
@@ -213,6 +219,8 @@ export default {
       currentBpm: 0,
       currentBeat: 0,
       isPlayGuide: false,
+      soundIds: [],
+      isPlayKeySound: false,
       guideAudio: new Audio("/chart-editor/guide.mp3"),
       ledColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)",
       lift: localStorage.getItem("chart-editor__lift") || 0, // LIFTオプション
@@ -295,6 +303,7 @@ export default {
           );
         }
       });
+      if (this.isPlayKeySound) this.setKeySounds(startOffset);
     },
     playFromZero() {
       // 拍子木分オフセット
@@ -316,11 +325,26 @@ export default {
             this.$refs.preview.style.bottom = `-${this.currentPosition}px`;
             // 小節ガイド音再生
             if (this.isPlayGuide) {
-              this.guideAudio.currentTime = 0;
+              this.guideAudio.currentTime = 0.1;
               this.guideAudio.play();
             }
           }, measure.measureReachTime)
         );
+      });
+      if (this.isPlayKeySound) this.setKeySounds(0);
+    },
+    // 打鍵音のTimeoutをセットする
+    setKeySounds(offset) {
+      this.keyTimings.each(timing => {
+        const time = timing - offset;
+        if (time > 0)
+          this.soundIds.push(
+            setTimeout(() => {
+              const keySound = new Audio("/chart-editor/guide.mp3");
+              keySound.currentTime = 0.1;
+              keySound.play();
+            }, time)
+          );
       });
     },
     previewStart() {
@@ -342,6 +366,9 @@ export default {
       this.$refs.preview.style.transition = "0ms all linear";
       this.$refs.preview.style.bottom = "0px";
       this.timeoutIds.each(id => clearInterval(id));
+      this.timeoutIds = [];
+      this.soundIds.each(id => clearInterval(id));
+      this.soundIds = [];
       if (this.returnPosition >= 0) this.$vuetify.goTo(this.returnPosition);
       this.returnPosition = -1;
     }
@@ -350,6 +377,19 @@ export default {
     // 全体からロングノーツだけを取得
     longNotes() {
       return this.currentChart.filter(note => note.type === 2);
+    },
+    keyTimings() {
+      return this.isPlayKeySound
+        ? this.currentChart.map(note => {
+            if ([1, 2, 3, 4, 5].includes(note.type)) {
+              const md = this.measureData[note.measure];
+              return (
+                md.measureReachTime +
+                (note.position / note.split) * md.measureLength
+              );
+            } else return -1;
+          }).uniq
+        : [];
     },
     entireHeight() {
       return (
