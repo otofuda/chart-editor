@@ -805,26 +805,29 @@ export default {
       let measureReachTime = this.musicOffset;
       let measurePositionBottom =
         (this.musicOffset / ((60 / measureBpm) * 1000)) * this.beatHeight;
+      // 小節データを生成
       (this.maxMeasure + 1).times(measure => {
         // type 97, 98 をfindして求める
-        let beatChangeNote = this.currentChart.find(
+        const beatChangeNote = this.currentChart.find(
           n => n.type === 97 && n.measure === measure
         );
-        let bpmChangeNote = this.currentChart.find(
+        const bpmChangeNote = this.currentChart.find(
           n => n.type === 98 && n.measure === measure
         );
         if (beatChangeNote) measureBeat = beatChangeNote.option[0];
         if (bpmChangeNote) measureBpm = bpmChangeNote.option[0];
-        let measureHeight = this.beatHeight * measureBeat;
+        const measureHeight = this.beatHeight * measureBeat;
+        const measureLength = (60 / measureBpm) * measureBeat * 1000;
         measureData.push({
           measure,
           measureBpm,
           measureBeat,
           measureReachTime,
           measurePositionBottom,
-          measureHeight
+          measureHeight,
+          measureLength
         });
-        measureReachTime += (60 / measureBpm) * measureBeat * 1000;
+        measureReachTime += measureLength;
         measurePositionBottom += this.beatHeight * measureBeat;
       });
       return measureData;
