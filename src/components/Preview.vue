@@ -20,6 +20,7 @@
         :key="`measure_${measure.measure}`"
         :measure="measure"
         :notes="getMeasureNotes(measure.measure)"
+        :currentDifficulty="currentDifficulty"
       />
 
       <!-- ロングノーツ -->
@@ -172,6 +173,10 @@ export default {
     currentChart: {
       type: Array,
       default: () => []
+    },
+    currentDifficulty: {
+      type: String,
+      default: "easy"
     },
     measureData: {
       type: Array,

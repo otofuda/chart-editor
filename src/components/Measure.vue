@@ -11,7 +11,16 @@
   >
     <v-menu offset-y :close-on-content-click="false">
       <template v-slot:activator="{ on, attrs }">
-        <v-btn dark icon v-bind="attrs" v-on="on">
+        <v-btn
+          dark
+          icon
+          v-bind="attrs"
+          v-on="on"
+          @click="
+            copyToDifficulty = currentDifficulty;
+            copyToMeasure = measure.measure;
+          "
+        >
           <v-icon>mdi-dots-vertical</v-icon>
         </v-btn>
       </template>
@@ -35,6 +44,17 @@
           <v-btn color="warning" text dense @click="clearAll">
             <v-icon left>mdi-select-off</v-icon> 全て選択解除
           </v-btn>
+        </v-list-item>
+        <v-list-item class="px-0 mx-2">
+          <v-select
+            :items="difficulties"
+            label="複製先難易度"
+            v-model="copyToDifficulty"
+            align="left"
+            hide-details
+            outlined
+            dense
+          ></v-select>
         </v-list-item>
         <v-list-item class="px-0 mx-2">
           <v-text-field
@@ -84,7 +104,13 @@
 import Note from "./Note.vue";
 
 export default {
-  inject: ["deleteNotes", "appendNotes", "showSnackbar"],
+  inject: [
+    "deleteNotes",
+    "appendNotes",
+    "showSnackbar",
+    "getMovedNote",
+    "copyNotesToDifficulty"
+  ],
   props: {
     notes: {
       type: Array,
@@ -97,10 +123,16 @@ export default {
     measureData: {
       type: Array,
       default: () => []
+    },
+    currentDifficulty: {
+      type: String,
+      default: "easy"
     }
   },
   data() {
     return {
+      difficulties: ["raku", "easy", "normal", "hard", "extra"],
+      copyToDifficulty: this.currentDifficulty,
       copyToMeasure: 0
     };
   },
@@ -119,37 +151,51 @@ export default {
     },
     // 小節内のノーツをすべて複製
     copyAll() {
-      this.appendNotes(
-        ...this.notes.map(note =>
-          this.getMovedNote({ ...note }, this.copyToMeasure)
-        )
-      );
-      this.showSnackbar(
-        `${this.measure.measure}小節から${this.copyToMeasure}小節へ複製処理を行いました`
-      );
+      const targets = this.notes.filter(note => note.type !== 2);
+      // const idx = targets.map(note => note.index);
+      if (this.currentDifficulty === this.copyToDifficulty) {
+        this.appendNotes(
+          ...targets.map(note =>
+            this.getMovedNote({ ...note }, this.copyToMeasure)
+          )
+        );
+        this.showSnackbar(
+          `${this.measure.measure}小節から${this.copyToMeasure}小節へ複製処理を行いました（ロングノーツを除く）`
+        );
+      } else {
+        // 各movedNoteを取得して対象難易度に複製
+        this.copyNotesToDifficulty(
+          this.copyToDifficulty,
+          ...targets.map(note =>
+            this.getMovedNote({ ...note }, this.copyToMeasure)
+          )
+        );
+      }
     },
     // 小節内のノーツをすべて移動
     moveAll() {
-      const idx = this.notes.map(note => note.index);
-      this.appendNotes(
-        ...this.notes.map(note =>
-          this.getMovedNote({ ...note }, this.copyToMeasure)
-        )
-      );
-      this.deleteNotes(...idx);
-      this.showSnackbar(
-        `${this.measure.measure}小節から${this.copyToMeasure}小節へ移動処理を行いました`
-      );
-    },
-    getMovedNote(oldNote, newMeasure) {
-      const diff = newMeasure - oldNote.measure;
-      return {
-        ...oldNote,
-        measure: newMeasure,
-        end: oldNote.end.map(end => {
-          this.getMovedNote({ ...end }, (newMeasure = diff));
-        })
-      };
+      const targets = this.notes.filter(note => note.type !== 2);
+      const idx = targets.map(note => note.index);
+      if (this.currentDifficulty === this.copyToDifficulty) {
+        this.appendNotes(
+          ...targets.map(note =>
+            this.getMovedNote({ ...note }, this.copyToMeasure)
+          )
+        );
+        this.deleteNotes(...idx);
+        this.showSnackbar(
+          `${this.measure.measure}小節から${this.copyToMeasure}小節へ移動処理を行いました（ロングノーツを除く）`
+        );
+      } else {
+        // 各movedNoteを取得して対象難易度に複製
+        this.copyNotesToDifficulty(
+          this.copyToDifficulty,
+          ...targets.map(note =>
+            this.getMovedNote({ ...note }, this.copyToMeasure)
+          )
+        );
+        this.deleteNotes(...idx);
+      }
     }
   },
   components: {

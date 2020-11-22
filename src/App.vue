@@ -2,6 +2,7 @@
   <v-app id="app">
     <Preview
       :currentChart="currentChart"
+      :currentDifficulty="currentDifficulty"
       :infoObject="chartObject.info"
       :measureData="measureData"
       :audioVolume="audioVolume"
@@ -347,6 +348,21 @@
           <v-icon left>mdi-content-save</v-icon> 名前をつけて保存
         </v-btn>
       </v-row>
+
+      <v-card elevation="16" max-width="400" class="mx-auto">
+        <v-card-title>メッセージログ</v-card-title>
+        <v-virtual-scroll
+          :bench="0"
+          :items="logs"
+          height="300"
+          item-height="64"
+        >
+          <template v-slot:default="{ item }">
+            <v-list-item :key="item" v-text="item" class="my-2" />
+            <v-divider></v-divider>
+          </template>
+        </v-virtual-scroll>
+      </v-card>
     </v-container>
 
     <v-dialog v-model="dialog.help" width="800">
@@ -369,6 +385,8 @@
         </v-card-title>
         <v-card-text>
           ノーツ数：{{ analysisData.notesCount }}
+          <br />
+          オブジェクト数：{{ currentChart.size }}
           <br />
           平均密度：{{
             (analysisData.notesCount / measureData.last.measureReachTime) *
@@ -495,6 +513,7 @@ export default {
 
       snackbar: false, // 通知表示管理
       snackbarText: "メッセージ", // 通知内容
+      logs: [], // メッセージログ
 
       // 一拍あたりの高さ(px)
       beatHeight: localStorage.getItem("chart-editor__beat-height") || 100
@@ -506,7 +525,9 @@ export default {
       showSnackbar: this.showSnackbar,
       deleteNotes: this.deleteNotes,
       cancelNote: this.cancelNote,
-      appendNotes: this.appendNotes
+      appendNotes: this.appendNotes,
+      getMovedNote: this.getMovedNote,
+      copyNotesToDifficulty: this.copyNotesToDifficulty
     };
   },
   beforeCreate: Bury.init,
@@ -612,6 +633,7 @@ export default {
           option: this.getValidatedOptions(note)
         });
       });
+      this.showSnackbar(`${notes.size}個のノートの挿入を試行しました`);
       this.preAppendNotes = [];
     },
     // ノーツを仮配置
@@ -720,6 +742,27 @@ export default {
         note => note.index === index
       );
     },
+    // 対象難易度とノーツオブジェクトからノーツを複製 (現在の難易度=>対象難易度)
+    copyNotesToDifficulty(
+      targetDifficulty = this.currentDifficulty,
+      ...targets
+    ) {
+      const currentDifficulty = this.currentDifficulty;
+      this.currentDifficulty = targetDifficulty;
+      this.appendNotes(...targets);
+      this.currentDifficulty = currentDifficulty;
+    },
+    // oldNoteがnewMeasure小節に移動した時のノートオブジェクトを返す
+    getMovedNote(oldNote, newMeasure) {
+      const diff = newMeasure - oldNote.measure;
+      return {
+        ...oldNote,
+        measure: newMeasure,
+        end: oldNote.end.map(end => {
+          this.getMovedNote({ ...end }, newMeasure + diff);
+        })
+      };
+    },
     // すべて選択解除
     selectionClear() {
       this.chartObject[this.currentDifficulty] = this.currentChart?.map(
@@ -743,6 +786,7 @@ export default {
       this.snackbar = false;
       this.snackbarText = message;
       setTimeout(() => (this.snackbar = true), 100);
+      this.logs.append(`通知バー：${message}`);
     },
     // 譜面分析
     analyze() {
