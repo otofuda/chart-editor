@@ -298,6 +298,11 @@
             </v-card-actions>
           </v-card>
         </v-dialog>
+
+        <v-btn color="green" text @click="dialog.checked = true">
+          <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
+          その他の操作
+        </v-btn>
       </v-row>
 
       <h3>譜面情報</h3>
@@ -341,6 +346,14 @@
         >
           <v-icon left>mdi-help-circle</v-icon> 使い方
         </v-btn>
+        <v-btn
+          class="ml-1 mb-8"
+          color="primary"
+          @click="dialog.logs = true"
+          text
+        >
+          <v-icon left>mdi-message-outline</v-icon> メッセージログ
+        </v-btn>
         <v-btn class="ml-1 mb-8" color="primary" @click="analyze" text>
           <v-icon left>mdi-chart-timeline-variant</v-icon> 譜面分析
         </v-btn>
@@ -349,11 +362,16 @@
         </v-btn>
       </v-row>
 
-      <v-card elevation="16" max-width="400" class="mx-auto">
-        <v-card-title>メッセージログ</v-card-title>
+      <v-card v-if="dialog.logs" class="mx-auto message-log">
+        <v-card-title>
+          <v-btn icon class="mr-4" @click="dialog.logs = false">
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+          メッセージログ
+        </v-card-title>
         <v-virtual-scroll
           :bench="0"
-          :items="logs"
+          :items="logs.slice().reverse()"
           height="300"
           item-height="64"
         >
@@ -438,6 +456,99 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="dialog.checked" width="800">
+      <v-card>
+        <v-card-title>
+          <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
+          選択ノーツへの一括操作
+          <v-spacer></v-spacer>
+          <v-btn icon @click="dialog.checked = false" right>
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
+        <v-divider></v-divider>
+        <v-card-title>
+          種別の変更
+        </v-card-title>
+        <v-card-text>
+          <p>
+            選択したノーツ(ロングノーツと音札ノーツを除く)を特定の種別に一括で変更します。
+          </p>
+          <v-row align="center" class="mx-1">
+            <v-text-field
+              type="number"
+              v-model.number="selectionTypeTo"
+              min="1"
+              prefix="Type:"
+              outlined
+              dense
+              hide-details
+            ></v-text-field>
+            <v-btn
+              class="ml-4"
+              color="primary"
+              @click="selectionChangeType(selectionTypeTo)"
+            >
+              <v-icon left>mdi-arrow-right</v-icon> 選択ノーツを全て種別変更
+            </v-btn>
+          </v-row>
+        </v-card-text>
+        <v-divider></v-divider>
+        <v-card-title>
+          レーンの変更
+        </v-card-title>
+        <v-card-text>
+          <p>
+            選択したノーツ(ロングノーツと音札ノーツを除く)を特定のレーンに一括で移動します。(選択範囲、または対象レーンに対して)同時押しを含む範囲に対して実行すると重複が発生します。
+          </p>
+          <v-row align="center" class="mx-1">
+            <v-text-field
+              type="number"
+              v-model.number="selectionLaneTo"
+              min="1"
+              max="5"
+              prefix="Lane:"
+              outlined
+              dense
+              hide-details
+            ></v-text-field>
+            <v-btn
+              class="ml-4"
+              color="primary"
+              @click="selectionChangeLane(selectionLaneTo)"
+            >
+              <v-icon left>mdi-arrow-right</v-icon> 選択ノーツを全てレーン移動
+            </v-btn>
+          </v-row>
+        </v-card-text>
+        <v-card-text>
+          <p>
+            選択したノーツ(ロングノーツと音札ノーツを除く)のそれぞれのレーンを1～5の範囲内で加算または減算します。入力は「－4」～「＋4」の範囲。
+          </p>
+          <v-row align="center" class="mx-1">
+            <v-text-field
+              type="number"
+              v-model.number="selectionLaneAddition"
+              min="-4"
+              max="4"
+              prefix="値:"
+              outlined
+              dense
+              hide-details
+            ></v-text-field>
+            <v-btn
+              class="ml-4"
+              color="primary"
+              @click="selectionAddLane(selectionLaneAddition)"
+            >
+              <v-icon left>mdi-arrow-right</v-icon>
+              各選択ノーツのレーンを加算または減算
+            </v-btn>
+          </v-row>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar" vertical>
       {{ snackbarText }}
       <template v-slot:action="{ attrs }">
@@ -482,9 +593,11 @@ export default {
         }
       },
       dialog: {
-        selectionDelete: false,
-        analyzer: false,
-        help: false
+        selectionDelete: false, // 選択ノーツ削除確認
+        analyzer: false, // 譜面分析
+        help: false, // 使い方
+        logs: false, // メッセージログ
+        checked: false // 選択ノーツへの操作
       },
       analysisData: {
         notesCount: 0,
@@ -510,6 +623,11 @@ export default {
       isShowDetail: false,
       isShowCheckbox: false,
       isCaptureMode: false,
+
+      // 選択ノーツへの操作
+      selectionLaneTo: 1,
+      selectionLaneAddition: 1,
+      selectionTypeTo: 1,
 
       snackbar: false, // 通知表示管理
       snackbarText: "メッセージ", // 通知内容
@@ -781,6 +899,57 @@ export default {
       );
       this.dialog.selectionDelete = false;
     },
+    // 選択ノーツのTypeを変更
+    selectionChangeType(type) {
+      const t = Number(type);
+      if ([2, 5].includes(t)) {
+        this.showSnackbar(`Typeを${t}に一括変更することはできません`);
+        return false;
+      }
+      const targets = this.chartObject[this.currentDifficulty].filter(
+        note => note.isSelected && ![2, 5].includes(note.type)
+      );
+      if (targets.size === 0) {
+        this.showSnackbar("対象ノーツがありません(Type一括変更)");
+        return false;
+      }
+      targets.each(note => (note.type = t));
+      this.showSnackbar(`Type:${t}への一括変更を実行しました`);
+      this.dialog.checked = false;
+    },
+    // 選択ノーツのレーンを変更
+    selectionChangeLane(lane) {
+      const l = Number(lane);
+      const targets = this.chartObject[this.currentDifficulty].filter(
+        note => note.isSelected && ![2, 5].includes(note.type)
+      );
+      if (targets.size === 0) {
+        this.showSnackbar("対象ノーツがありません(Lane一括変更)");
+        return false;
+      }
+      targets.each(note => (note.lane = l));
+      this.showSnackbar(`Lane:${l}への一括変更を実行しました`);
+      this.dialog.checked = false;
+    },
+    // 選択ノーツのレーンを加算または減算
+    selectionAddLane(diff) {
+      const d = Number(diff);
+      const targets = this.chartObject[this.currentDifficulty].filter(
+        note => note.isSelected && ![2, 5].includes(note.type)
+      );
+      if (targets.size === 0) {
+        this.showSnackbar("対象ノーツがありません(Lane一括加算)");
+        return false;
+      }
+      if (d < 0) {
+        targets.each(note => (note.lane = Math.max(note.lane + d, 1)));
+        this.showSnackbar(`${d} 一括減算処理を実行しました`);
+      } else {
+        targets.each(note => (note.lane = Math.min(note.lane + d, 5)));
+        this.showSnackbar(`+${d} 一括加算処理を実行しました`);
+      }
+      this.dialog.checked = false;
+    },
     // 通知を表示
     showSnackbar(message) {
       this.snackbar = false;
@@ -1041,5 +1210,12 @@ export default {
   border-left: 4px solid #6ecc6e;
   border-right: 4px solid #6ecc6e;
   transition: 0.1s all ease;
+}
+
+.message-log {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: 400px;
 }
 </style>

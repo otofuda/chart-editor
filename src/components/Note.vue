@@ -78,8 +78,6 @@
                 suffix="小節"
                 outlined
                 dense
-                min="1"
-                max="5"
               ></v-text-field>
             </v-col>
           </v-row>
