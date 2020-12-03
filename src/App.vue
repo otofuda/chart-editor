@@ -256,7 +256,7 @@
         ></v-checkbox>
       </v-row>
 
-      <h3>選択ノーツ</h3>
+      <h3>選択ノーツ（{{ selectionNumber }}個）</h3>
 
       <v-row align="center">
         <v-btn color="primary" text @click="selectionClear">
@@ -664,6 +664,10 @@ export default {
       });
       this.isLoaded = true;
     };
+    window.addEventListener("beforeunload", e => {
+      e.preventDefault();
+      e.returnValue = "移動してもよろしいですか？";
+    });
   },
   methods: {
     readFile(e) {
@@ -697,7 +701,7 @@ export default {
             position: Number(note.position),
             split: Number(note.split),
             option: this.getValidatedOptions(note),
-            end: note.end
+            end: note.end || []
           };
         });
       });
@@ -1044,6 +1048,10 @@ export default {
         measurePositionBottom += this.beatHeight * measureBeat;
       });
       return measureData;
+    },
+    // 選択中のノーツ個数
+    selectionNumber() {
+      return this.currentChart.filter(note => note.isSelected).size;
     },
     getAppendNote() {
       return this.isAppendMode ? this.appendNote : null;
