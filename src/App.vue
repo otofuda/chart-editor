@@ -259,7 +259,12 @@
       <h3>選択ノーツ（{{ selectionNumber }}個）</h3>
 
       <v-row align="center">
-        <v-btn color="primary" text @click="selectionClear">
+        <v-btn color="primary" text @click="dialog.batchcheck = true">
+          <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
+          ノーツの一括選択
+        </v-btn>
+
+        <v-btn color="warning" text @click="selectionClear">
           <v-icon left>mdi-select-off</v-icon>
           すべて選択解除
         </v-btn>
@@ -280,7 +285,7 @@
           <v-card>
             <v-card-title class="headline">確認</v-card-title>
             <v-card-text>
-              本当に選択したノーツをすべて削除しますか？
+              本当に選択したノーツ{{ selectionNumber }}個をすべて削除しますか？
             </v-card-text>
             <v-divider></v-divider>
             <v-card-actions>
@@ -299,9 +304,9 @@
           </v-card>
         </v-dialog>
 
-        <v-btn color="green" text @click="dialog.checked = true">
-          <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
-          その他の操作
+        <v-btn color="primary" text @click="dialog.checked = true">
+          <v-icon left>mdi-auto-fix</v-icon>
+          ノーツの一括操作
         </v-btn>
       </v-row>
 
@@ -362,7 +367,7 @@
         </v-btn>
       </v-row>
 
-      <v-card v-if="dialog.logs" class="mx-auto message-log">
+      <v-card v-if="dialog.logs" class="mx-auto message-log" elevation="8">
         <v-card-title>
           <v-btn icon class="mr-4" @click="dialog.logs = false">
             <v-icon>mdi-close</v-icon>
@@ -459,7 +464,7 @@
     <v-dialog v-model="dialog.checked" width="800">
       <v-card>
         <v-card-title>
-          <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
+          <v-icon left>mdi-auto-fix</v-icon>
           選択ノーツへの一括操作
           <v-spacer></v-spacer>
           <v-btn icon @click="dialog.checked = false" right>
@@ -479,6 +484,7 @@
               type="number"
               v-model.number="selectionTypeTo"
               min="1"
+              max="99"
               prefix="Type:"
               outlined
               dense
@@ -489,7 +495,7 @@
               color="primary"
               @click="selectionChangeType(selectionTypeTo)"
             >
-              <v-icon left>mdi-arrow-right</v-icon> 選択ノーツを全て種別変更
+              <v-icon left>mdi-auto-fix</v-icon> 選択ノーツを全て種別変更
             </v-btn>
           </v-row>
         </v-card-text>
@@ -517,7 +523,7 @@
               color="primary"
               @click="selectionChangeLane(selectionLaneTo)"
             >
-              <v-icon left>mdi-arrow-right</v-icon> 選択ノーツを全てレーン移動
+              <v-icon left>mdi-auto-fix</v-icon> 選択ノーツを全てレーン移動
             </v-btn>
           </v-row>
         </v-card-text>
@@ -541,11 +547,89 @@
               color="primary"
               @click="selectionAddLane(selectionLaneAddition)"
             >
-              <v-icon left>mdi-arrow-right</v-icon>
+              <v-icon left>mdi-auto-fix</v-icon>
               各選択ノーツのレーンを加算または減算
             </v-btn>
           </v-row>
         </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="dialog.batchcheck" width="800">
+      <v-card>
+        <v-card-title>
+          <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
+          ノーツの一括選択
+          <v-spacer></v-spacer>
+          <v-btn icon @click="dialog.batchcheck = false" right>
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
+        <v-divider></v-divider>
+        <v-card-title>
+          対象Type
+        </v-card-title>
+        <v-card-text>
+          <p>
+            対象Typeに合致するノーツを選択対象に加えます。
+            <a @click="batchSelectTypes = noteTypes.map(t => t.value)">
+              すべて選択
+            </a>
+            ・
+            <a @click="batchSelectTypes = []">すべて解除</a>
+          </p>
+          <v-checkbox
+            class="d-inline-block mr-4"
+            v-for="type in noteTypes"
+            v-model="batchSelectTypes"
+            :label="type.text"
+            :value="type.value"
+            :key="`batch-select-type_${type.value}`"
+            hide-details
+          ></v-checkbox>
+        </v-card-text>
+        <v-divider></v-divider>
+        <v-card-title>
+          対象小節
+        </v-card-title>
+        <v-card-text>
+          <p>
+            対象小節の範囲内のノーツを選択対象に加えます。終了小節を0にすると譜面の最後までを対象とします。
+          </p>
+          <v-row align="center" class="mx-1">
+            <v-text-field
+              class="mr-4"
+              v-model.number="batchSelectStart"
+              type="number"
+              min="0"
+              prefix="開始："
+              suffix="小節"
+              outlined
+              dense
+              hide-details
+            ></v-text-field>
+            <v-text-field
+              v-model.number="batchSelectEnd"
+              type="number"
+              min="0"
+              prefix="終了："
+              suffix="小節"
+              outlined
+              dense
+              hide-details
+            ></v-text-field>
+          </v-row>
+        </v-card-text>
+        <v-card-text>
+          <p>予測される選択個数：{{ batchSelectTarget.size }}</p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" @click="batchSelect">
+            <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
+            すべて選択する
+          </v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
 
@@ -597,7 +681,8 @@ export default {
         analyzer: false, // 譜面分析
         help: false, // 使い方
         logs: false, // メッセージログ
-        checked: false // 選択ノーツへの操作
+        checked: false, // 選択ノーツへの操作
+        batchcheck: false // ノーツの一括選択
       },
       analysisData: {
         notesCount: 0,
@@ -623,6 +708,11 @@ export default {
       isShowDetail: false,
       isShowCheckbox: false,
       isCaptureMode: false,
+
+      // 一括選択の対象
+      batchSelectTypes: [],
+      batchSelectStart: 0,
+      batchSelectEnd: 0,
 
       // 選択ノーツへの操作
       selectionLaneTo: 1,
@@ -898,10 +988,12 @@ export default {
     },
     // 選択ノーツを削除
     selectionDelete() {
+      const num = this.selectionNumber;
       this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
         note => note.isSelected
       );
       this.dialog.selectionDelete = false;
+      this.showSnackbar(`${num}個のノーツを削除しました`);
     },
     // 選択ノーツのTypeを変更
     selectionChangeType(type) {
@@ -953,6 +1045,13 @@ export default {
         this.showSnackbar(`+${d} 一括加算処理を実行しました`);
       }
       this.dialog.checked = false;
+    },
+    // 対象ノーツを一括選択
+    batchSelect() {
+      const num = this.batchSelectTarget.size;
+      this.batchSelectTarget.each(target => (target.isSelected = true));
+      this.dialog.batchcheck = false;
+      this.showSnackbar(`${num}個のノーツを一括選択しました`);
     },
     // 通知を表示
     showSnackbar(message) {
@@ -1048,6 +1147,17 @@ export default {
         measurePositionBottom += this.beatHeight * measureBeat;
       });
       return measureData;
+    },
+    // 一括選択の対象ノーツ
+    batchSelectTarget() {
+      const min = this.batchSelectStart;
+      const max = this.batchSelectEnd === 0 ? Infinity : this.batchSelectEnd;
+      return this.currentChart.filter(
+        note =>
+          this.batchSelectTypes.includes(note.type) &&
+          note.measure >= min &&
+          note.measure <= max
+      );
     },
     // 選択中のノーツ個数
     selectionNumber() {
