@@ -24,8 +24,7 @@ export default {
         },
         {
           text: "テクスチャ",
-          value: 94,
-          disabled: true
+          value: 94
         },
         {
           text: "区切り線",
@@ -57,36 +56,70 @@ export default {
         return [
           {
             label: "width",
-            type: "number"
+            type: "number",
+            desc: "Float型｜中心を基点とした横幅(単位：1レーンの幅)"
           },
           {
             label: "offsetNumer",
-            type: "number"
+            type: "number",
+            desc: "Integer型｜右側へのオフセット分数の分子"
           },
           {
             label: "offsetDenom",
-            type: "number"
+            type: "number",
+            desc: "Integer型｜右側へのオフセット分数の分母"
+          }
+        ];
+      else if (note.type === 94)
+        return [
+          {
+            label: "source",
+            type: "text",
+            desc: "String型｜画像のソース(httpまたはhttpsプロトコル)"
+          },
+          {
+            label: "width",
+            type: "number",
+            desc: "Float型｜中心を基点とした横幅(単位：1レーンの幅)"
+          },
+          {
+            label: "height",
+            type: "number",
+            desc: "Float型｜下面を基点とした高さ(単位：1小節の高さ)"
+          },
+          {
+            label: "offsetNumer",
+            type: "number",
+            desc: "Integer型｜右側へのオフセット分数の分子"
+          },
+          {
+            label: "offsetDenom",
+            type: "number",
+            desc: "Integer型｜右側へのオフセット分数の分母"
           }
         ];
       else if (note.type === 95)
         return [
           {
             label: "length",
-            type: "number"
+            type: "number",
+            desc: "Integer型｜左面を基点とした横幅(単位：1レーンの幅)"
           }
         ];
       else if (note.type === 97)
         return [
           {
             label: "beat",
-            type: "number"
+            type: "number",
+            desc: "Integer型｜変化後の[n/4拍子]の分子の値"
           }
         ];
       else if (note.type === 98)
         return [
           {
             label: "bpm",
-            type: "number"
+            type: "number",
+            desc: "Float型｜変化後のBPMの値"
           }
         ];
       else return [];

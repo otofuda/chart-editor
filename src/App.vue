@@ -126,7 +126,9 @@
             append-outer-icon="mdi-help"
             outlined
             dense
-            @click:append-outer="scrollTo"
+            @click:append-outer="
+              showSnackbar(`${opt.label}の説明：${opt.desc}`)
+            "
           ></v-text-field>
         </div>
 
@@ -777,11 +779,10 @@ export default {
         extra: [],
         info: { ...this.chartObject.info }
       };
-      // TODO: Validationとオプション類の整形
+      // TODO: Validation
       // type: 5 は lane: 3
       // type: 96, 97, 98, 99は lane: -1
       // type: 2 以外は end: []
-      // + optionキーのvalidation
       this.difficulties.each(d => {
         saveObject[d] = this.chartObject[d].map(note => {
           return {
@@ -916,6 +917,13 @@ export default {
     changeAppendNoteType() {
       if (this.appendNote.type === 2) this.addEndToAppendNote();
       else this.appendNote.end = [];
+
+      if (this.appendNote.type === 94)
+        this.appendNote.option = [
+          "https://via.placeholder.com/50x100",
+          1,
+          0.25
+        ];
     },
     appendNoteToLeft() {
       this.appendNote.lane = Math.max(this.appendNote.lane - 1, 1);
@@ -998,7 +1006,7 @@ export default {
     // 選択ノーツのTypeを変更
     selectionChangeType(type) {
       const t = Number(type);
-      if ([2, 5].includes(t)) {
+      if ([2, 5, 94].includes(t)) {
         this.showSnackbar(`Typeを${t}に一括変更することはできません`);
         return false;
       }
@@ -1223,6 +1231,9 @@ export default {
     top: -20px;
     display: none;
   }
+  > img {
+    width: 100%;
+  }
   &.menu {
     box-shadow: 0 0 4px 4px rgba(125, 255, 125, 0.5);
   }
@@ -1277,6 +1288,15 @@ export default {
     height: 8px;
     background: linear-gradient(to right, gold, #fde08d, gold);
   }
+  &.type94 {
+    z-index: 1;
+    height: auto;
+    background: rgba(255, 255, 255, 0.25);
+    line-height: 0;
+    > i {
+      position: absolute;
+    }
+  }
   &.type95 {
     z-index: 98;
     height: 1px;
@@ -1312,6 +1332,7 @@ export default {
   .note {
     color: #a0a0a0;
   }
+  .note.type94,
   .note.type95 {
     color: transparent;
     text-shadow: none;

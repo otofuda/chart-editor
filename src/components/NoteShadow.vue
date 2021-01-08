@@ -16,6 +16,14 @@
       }"
       @click="calcelThisNote"
     >
+      <img
+        v-if="note.type === 94"
+        :src="note.option[0]"
+        :style="{
+          height: `${this.measureData.last.measureHeight * note.option[2]}px`
+        }"
+        alt="texture"
+      />
       {{ note.position }}/{{ note.split }}
       <span v-if="isPreAppend" class="preappend__index">#{{ note.index }}</span>
     </span>
@@ -34,8 +42,9 @@
           bottom: `${getAbsoluteBottom(end)}px`,
           width: `${getWidth(end)}px`
         }"
-        >{{ end.position }}/{{ end.split }}</span
       >
+        {{ end.position }}/{{ end.split }}
+      </span>
       <!-- 帯 -->
       <i
         class="note-hold"
@@ -73,9 +82,12 @@ export default {
   },
   methods: {
     getLeft(note) {
+      // TAP, ロング, 区切り線
       if ([1, 2, 95].includes(note.type)) {
         return (note.lane - 1) * 60;
-      } else if ([3, 4].includes(note.type)) {
+      }
+      // フリック
+      else if ([3, 4].includes(note.type)) {
         let _width = note.option[0] || 3;
         if (_width === -1) _width = 3;
         let _left = (note.lane - 1) * 60 + 30;
@@ -84,7 +96,19 @@ export default {
           _offset = (note.option[1] / note.option[2]) * 60;
         }
         return _left - (_width / 2) * 60 + _offset;
-      } else {
+      }
+      // テクスチャ
+      else if (note.type === 94) {
+        let _width = note.option[1] || 1;
+        let _left = (note.lane - 1) * 60 + 30;
+        let _offset = 0;
+        if (note.option[3] && note.option[4]) {
+          _offset = (note.option[3] / note.option[4]) * 60;
+        }
+        return _left - (_width / 2) * 60 + _offset;
+      }
+      // 音札, その他特殊ノーツ
+      else {
         return 0;
       }
     },
@@ -123,6 +147,11 @@ export default {
         if (_width === -1) _width = 3;
         return 60 * _width;
       }
+      // テクスチャ
+      else if (note.type === 94) {
+        let _width = note.option[1] || 1;
+        return 60 * _width;
+      }
       // 区切り線
       else if (note.type === 95) {
         let _width = note.option[0] || 1;
@@ -157,6 +186,11 @@ export default {
     color: limegreen;
     line-height: 10px;
   }
+}
+.type94 .preappend__index {
+  position: absolute;
+  right: 0;
+  top: 0;
 }
 
 @keyframes blink {
