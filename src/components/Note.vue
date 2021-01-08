@@ -25,6 +25,15 @@
         v-bind="attrs"
         v-on="on"
       >
+        <img
+          v-if="note.type === 94"
+          :src="note.option[0]"
+          :style="{
+            height: `${measure.measureHeight * note.option[2]}px`
+          }"
+          alt="texture"
+        />
+
         <input
           type="checkbox"
           v-model="note.isSelected"
@@ -203,9 +212,12 @@ export default {
   },
   computed: {
     positionLeft() {
+      // TAP, ロング, 区切り線
       if ([1, 2, 95].includes(this.note.type)) {
         return (this.note.lane - 1) * 60;
-      } else if ([3, 4].includes(this.note.type)) {
+      }
+      // フリック
+      else if ([3, 4].includes(this.note.type)) {
         let _width = this.note.option[0] || 3;
         if (_width === -1) _width = 3;
         let _left = (this.note.lane - 1) * 60 + 30;
@@ -214,7 +226,19 @@ export default {
           _offset = (this.note.option[1] / this.note.option[2]) * 60;
         }
         return _left - (_width / 2) * 60 + _offset;
-      } else {
+      }
+      // テクスチャ
+      else if (this.note.type === 94) {
+        let _width = this.note.option[1] || 1;
+        let _left = (this.note.lane - 1) * 60 + 30;
+        let _offset = 0;
+        if (this.note.option[3] && this.note.option[4]) {
+          _offset = (this.note.option[3] / this.note.option[4]) * 60;
+        }
+        return _left - (_width / 2) * 60 + _offset;
+      }
+      // 音札, その他特殊ノーツ
+      else {
         return 0;
       }
     },
@@ -231,6 +255,11 @@ export default {
         let _width = this.note.option[0] || 3;
         if (_width === -1) _width = 3;
         return 60 * _width;
+      }
+      // テクスチャ
+      else if (this.note.type === 94) {
+        let _width = this.note.option[1] || 1;
+        return 60 * _width - 1;
       }
       // 区切り線
       else if (this.note.type === 95) {

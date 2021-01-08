@@ -18,10 +18,10 @@ export default {
             target.lane === note.lane &&
             target.position / target.split === posValue
           ) {
-            // 両方がフリック、区切り線でなければ重複として加算
+            // 両方がフリック、テクスチャ、区切り線でなければ重複として加算
             if (
-              ![3, 4, 95].includes(target.type) &&
-              ![3, 4, 95].includes(note.type)
+              ![3, 4, 94, 95].includes(target.type) &&
+              ![3, 4, 94, 95].includes(note.type)
             )
               if (target.index !== note.index) {
                 // 対象自身は除外
@@ -53,7 +53,7 @@ export default {
         return "positionの値はsplitの値未満である必要があります。";
       else if (![-1, 1, 2, 3, 4, 5].includes(note.lane))
         return "不正なノートのレーン位置です。";
-      else if (![1, 2, 3, 4, 5, 95, 96, 97, 98, 99].includes(note.type))
+      else if (![1, 2, 3, 4, 5, 94, 95, 96, 97, 98, 99].includes(note.type))
         return "不正なノートタイプです。";
       else return false;
     },
@@ -69,6 +69,21 @@ export default {
           option.append(
             Number(note.option[1]).floor,
             Number(note.option[2]).floor
+          );
+        }
+        return option;
+      }
+      // option: [source: String, width: Float, height: Float(, offsetNumer: Integer, offsetDenom: Integer)]
+      else if ([94].includes(note.type)) {
+        option.append(note.option[0] || "https://via.placeholder.com/50x100");
+        // type94 テクスチャのデフォルト幅は 1
+        option.append(note.option[1] ? Number(note.option[1]) : 1);
+        // type94 テクスチャのデフォルト高さは 0.25
+        option.append(note.option[2] ? Number(note.option[2]) : 0.25);
+        if (note.option[3] && note.option[4]) {
+          option.append(
+            Number(note.option[3]).floor,
+            Number(note.option[4]).floor
           );
         }
         return option;
