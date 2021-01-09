@@ -1291,10 +1291,13 @@ export default {
   &.type94 {
     z-index: 1;
     height: auto;
-    background: rgba(255, 255, 255, 0.25);
+    background: transparent;
     line-height: 0;
     > i {
       position: absolute;
+    }
+    &:hover {
+      background: rgba(255, 255, 255, 0.25);
     }
   }
   &.type95 {
