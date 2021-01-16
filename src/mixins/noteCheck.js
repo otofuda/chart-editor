@@ -12,33 +12,65 @@ export default {
         const posValue = note.position / note.split;
         let cnt = 0;
         comparators.each(target => {
-          // TODO: 音札ノーツとLN始点の重複は許容
+          // 同じ音符位置かつ同じレーンのノーツを検査
           if (
             target.measure === note.measure &&
             target.lane === note.lane &&
             target.position / target.split === posValue
           ) {
-            // 両方がフリック、テクスチャ、区切り線でなければ重複として加算
+            // テクスチャと[any]の重複は許容
+            if (target.type === 94 || note.type === 94) return;
+
+            // [フリック|区切り線]と[フリック|区切り線]
+            // (ただし同じTypeでない)の重複は許容
             if (
-              ![3, 4, 94, 95].includes(target.type) &&
-              ![3, 4, 94, 95].includes(note.type)
-            )
-              if (target.index !== note.index) {
-                // 対象自身は除外
-                cnt++;
-              }
+              [3, 4, 94, 95].includes(target.type) &&
+              [3, 4, 94, 95].includes(note.type) &&
+              target.type !== note.type
+            ) {
+              return;
+            }
+            // 音札ノーツとLN始点の重複は許容
+            if (
+              (target.type === 5 && note.type === 2) ||
+              (target.type === 2 && note.type === 5)
+            ) {
+              return;
+            }
+            // 対象自身は除外
+            if (target.index === note.index) return;
+
+            // 重複を発見 カウンターを1増やす
+            cnt++;
           }
         });
         if (option.checkPreAppend && this.preAppendNotes) {
           this.preAppendNotes.each(target => {
+            // 同じ音符位置かつ同じレーンのノーツを検査
             if (
               target.measure === note.measure &&
               target.lane === note.lane &&
               target.position / target.split === posValue
             ) {
-              // 両方がフリックでなければ重複として加算
-              if (![3, 4].includes(target.type) && ![3, 4].includes(note.type))
-                cnt++;
+              // [フリック|テクスチャ|区切り線]と[フリック|テクスチャ|区切り線]
+              // (ただし同じTypeでない)の重複は許容
+              if (
+                [3, 4, 94, 95].includes(target.type) &&
+                [3, 4, 94, 95].includes(note.type) &&
+                target.type !== note.type
+              ) {
+                return;
+              }
+              // 音札ノーツとLN始点の重複は許容
+              if (
+                (target.type === 5 && note.type === 2) ||
+                (target.type === 2 && note.type === 5)
+              ) {
+                return;
+              }
+
+              // 重複を発見 カウンターを1増やす
+              cnt++;
             }
           });
         }

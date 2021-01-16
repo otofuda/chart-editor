@@ -400,6 +400,15 @@
             エディタの使い方
           </a>
         </v-card-text>
+        <v-card-text>
+          <a
+            href="https://github.com/mtsgi/fumenedit/blob/master/format.md"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            譜面フォーマットについて
+          </a>
+        </v-card-text>
       </v-card>
     </v-dialog>
 
@@ -913,7 +922,7 @@ export default {
     deleteEndOfAppendNote(index) {
       this.appendNote.end.delete_at(index);
     },
-    // ノーツ種別変更時に終点を制御
+    // ノーツ種別変更時にend, optionを制御
     changeAppendNoteType() {
       if (this.appendNote.type === 2) this.addEndToAppendNote();
       else this.appendNote.end = [];
@@ -924,6 +933,9 @@ export default {
           1,
           0.25
         ];
+
+      if (this.appendNote.type === 3 || this.appendNote.type === 4)
+        this.appendNote.option = [-1, null, null];
     },
     appendNoteToLeft() {
       this.appendNote.lane = Math.max(this.appendNote.lane - 1, 1);
