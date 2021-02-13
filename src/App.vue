@@ -467,12 +467,26 @@
               <th class="text-left">
                 数
               </th>
+              <th class="text-left">
+                割合
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="type in noteTypes" :key="`note_count_${type.value}`">
               <td>{{ type.text }}</td>
               <td>{{ analysisData.typeCount[type.value] }}</td>
+              <td>
+                {{
+                  [1, 2, 3, 4, 5].includes(type.value)
+                    ? `${Math.floor(
+                        (analysisData.typeCount[type.value] /
+                          analysisData.notesCount) *
+                          10000
+                      ) / 100}％`
+                    : "－"
+                }}
+              </td>
             </tr>
           </tbody>
         </v-simple-table>
@@ -1108,6 +1122,7 @@ export default {
       });
       // 分析
       this.currentChart.each(note => {
+        // 判定オブジェクト => ノーツ数を加算
         if ([1, 2, 3, 4, 5].includes(note.type)) {
           this.analysisData.trendValues[note.measure] += 1;
           this.analysisData.notesCount += 1;
