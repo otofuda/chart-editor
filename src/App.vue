@@ -11,6 +11,7 @@
       :preAppendNotes="preAppendNotes"
       :isShowDetail="isShowDetail"
       :isCaptureMode="isCaptureMode"
+      :isPreviewMode="isPreviewMode"
       :isShowCheckbox="isShowCheckbox"
     />
 
@@ -255,6 +256,12 @@
           class="ml-4"
           v-model="isCaptureMode"
           label="キャプチャ用モード"
+        ></v-checkbox>
+        <v-checkbox
+          class="ml-4"
+          :disabled="!isCaptureMode"
+          v-model="isPreviewMode"
+          label="譜面プレビュー用"
         ></v-checkbox>
       </v-row>
 
@@ -719,6 +726,7 @@ export default {
       isShowDetail: false,
       isShowCheckbox: false,
       isCaptureMode: false,
+      isPreviewMode: false,
 
       // 一括選択の対象
       batchSelectTypes: [],
@@ -1343,7 +1351,9 @@ export default {
 .preview.checkbox .note input[type="checkbox"] {
   display: block;
 }
-.preview.detail.capture {
+
+// キャプチャーモード, プレビューモード
+.preview.detail.capture_mode {
   .note {
     color: #a0a0a0;
   }
@@ -1351,6 +1361,23 @@ export default {
   .note.type95 {
     color: transparent;
     text-shadow: none;
+  }
+  &.preview_mode {
+    .measure > .v-btn {
+      opacity: 0;
+    }
+    .measure__number {
+      visibility: hidden;
+    }
+    .note {
+      color: transparent;
+      text-shadow: none;
+    }
+    .note.type97,
+    .note.type98,
+    .note.type99 {
+      visibility: hidden;
+    }
   }
 }
 

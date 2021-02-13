@@ -10,7 +10,8 @@
       }"
       :class="{
         detail: isShowDetail,
-        capture: isCaptureMode,
+        capture_mode: isCaptureMode,
+        preview_mode: isPreviewMode,
         checkbox: isShowCheckbox
       }"
     >
@@ -208,6 +209,10 @@ export default {
       default: false
     },
     isCaptureMode: {
+      type: Boolean,
+      default: false
+    },
+    isPreviewMode: {
       type: Boolean,
       default: false
     }
