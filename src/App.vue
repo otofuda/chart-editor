@@ -12,7 +12,6 @@
       :isShowDetail="isShowDetail"
       :isCaptureMode="isCaptureMode"
       :isPreviewMode="isPreviewMode"
-      :isShowCheckbox="isShowCheckbox"
     />
 
     <v-container fluid class="panel">
@@ -41,7 +40,7 @@
         </v-col>
       </v-row>
 
-      <h3>ノートの挿入</h3>
+      <h3>ノートの挿入（仮配置：{{ preAppendNotes.size }}個）</h3>
 
       <v-checkbox v-model="isAppendMode" label="ノート挿入モード"></v-checkbox>
 
@@ -150,14 +149,21 @@
               ノートを仮配置
               <v-icon right>mdi-keyboard-return</v-icon>
             </v-btn>
-            <v-btn
-              class="ml-4 white--text"
+            <v-badge
+              overlap
               color="orange darken-4"
-              @click="appendNotes(...preAppendNotes)"
+              :value="preAppendNotes.size"
+              :content="preAppendNotes.size"
             >
-              挿入する
-              <v-icon right>mdi-plus-circle-outline</v-icon>
-            </v-btn>
+              <v-btn
+                class="ml-4 white--text"
+                color="orange darken-4"
+                @click="appendNotes(...preAppendNotes)"
+              >
+                挿入する
+                <v-icon right>mdi-plus-circle-outline</v-icon>
+              </v-btn>
+            </v-badge>
           </div>
         </v-row>
 
@@ -190,7 +196,7 @@
         </div>
       </div>
 
-      <h3>プレビュー設定</h3>
+      <h3>プレビュー領域の設定</h3>
 
       <v-slider
         v-model="beatHeight"
@@ -242,30 +248,28 @@
         </v-btn>
       </v-row>
 
-      <v-row align="center">
+      <v-row>
+        <v-icon>mdi-eye</v-icon>
         <v-checkbox
+          class="ml-4"
           v-model="isShowDetail"
           label="ノーツ詳細を表示"
         ></v-checkbox>
         <v-checkbox
           class="ml-4"
-          v-model="isShowCheckbox"
-          label="チェックボックスを表示"
-        ></v-checkbox>
-        <v-checkbox
-          class="ml-4"
+          :disabled="!isShowDetail"
           v-model="isCaptureMode"
           label="キャプチャ用モード"
         ></v-checkbox>
         <v-checkbox
           class="ml-4"
-          :disabled="!isCaptureMode"
+          :disabled="!isShowDetail || !isCaptureMode"
           v-model="isPreviewMode"
           label="譜面プレビュー用"
         ></v-checkbox>
       </v-row>
 
-      <h3>選択ノーツ（{{ selectionNumber }}個）</h3>
+      <h3>選択ノーツ（選択中：{{ selectionNumber }}個）</h3>
 
       <v-row align="center">
         <v-btn color="primary" text @click="dialog.batchcheck = true">
@@ -738,7 +742,6 @@ export default {
       isAutoFollow: true,
       scrollTo: 0,
       isShowDetail: false,
-      isShowCheckbox: false,
       isCaptureMode: false,
       isPreviewMode: false,
 
@@ -1371,6 +1374,9 @@ export default {
 .preview.detail.capture_mode {
   .note {
     color: #a0a0a0;
+    > .v-icon {
+      display: none;
+    }
   }
   .note.type94,
   .note.type95 {
