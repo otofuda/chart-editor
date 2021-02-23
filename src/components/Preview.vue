@@ -53,13 +53,13 @@
       <div
         class="led left"
         :style="{
-          background: ledColor
+          background: LEDColor || defaultLEDColor
         }"
       ></div>
       <div
         class="led right"
         :style="{
-          background: ledColor
+          background: LEDColor || defaultLEDColor
         }"
       ></div>
     </div>
@@ -113,6 +113,12 @@
               class="mt-0"
               v-model="isPlayKeySound"
               label="打鍵音を再生 (β)"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox
+              class="mt-0"
+              v-model="isPlayKeySoundEnd"
+              label="終点打音を再生 (α)"
               hide-details
             ></v-checkbox>
             <v-checkbox
@@ -228,7 +234,7 @@
 
     <div
       class="combo"
-      v-show="isShowKeybeam"
+      v-show="isPreviewing && isShowKeybeam"
       :style="{
         opacity: String(Number(comboOpacity) / 100),
         bottom: `${Number(lift) + Number(comboOffset)}px`
@@ -317,10 +323,12 @@ export default {
       isShowCheckbox: false,
       isShowKeybeam: false,
       isPlayGuide: false,
-      soundIds: [],
+      eventIds: [],
       isPlayKeySound: false,
+      isPlayKeySoundEnd: false,
       guideAudio: new Audio("/chart-editor/guide.mp3"),
-      ledColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)",
+      LEDColor: null,
+      defaultLEDColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)",
       lift: localStorage.getItem("chart-editor__lift") || 0, // LIFTオプション
       sudden: localStorage.getItem("chart-editor__sudden") || 0, // SUDDENオプション
       hidden: localStorage.getItem("chart-editor__hidden") || 0, // HIDDENオプション
@@ -438,32 +446,52 @@ export default {
     setNoteEvents(offset) {
       Object.entries(this.previewEvents).each(([timing, event]) => {
         const time = timing - offset;
-        event;
+        const keybeamDOMs = this.$refs.keybeams.querySelectorAll("div");
         if (time > 0)
-          this.soundIds.push(
+          this.eventIds.push(
             setTimeout(() => {
               // 打鍵音を再生
-              if (event.sound) {
+              if (event.sound && this.isPlayKeySound) {
                 const keySound = new Audio("/chart-editor/guide.mp3");
                 keySound.currentTime = 0.1;
                 keySound.play();
               }
               // キービームを出す
-              // TODO: LNの時終点イベントをセットする
               if (this.isShowKeybeam) {
+                // 単押し
                 event.lane.each(num => {
-                  this.$refs.keybeams
-                    .querySelectorAll("div")
-                    [num].classList.add("-on");
+                  keybeamDOMs[num].classList.add("-on");
                 });
                 setTimeout(() => {
                   event.lane.each(num => {
-                    this.$refs.keybeams
-                      .querySelectorAll("div")
-                      [num].classList.remove("-on");
+                    keybeamDOMs[num].classList.remove("-on");
                   });
                 }, 25);
-                console.warn(event.lane);
+                // LN(ホールド)
+                event.hold.each(([num, delay]) => {
+                  keybeamDOMs[num].classList.add("-hold");
+                  this.eventIds.push(
+                    setTimeout(() => {
+                      keybeamDOMs[num].classList.remove("-hold");
+                      // hold配列の分、終点時にコンボ増加
+                      this.currentCombo += 1;
+                      this.$refs.currentCombo.textContent = String(
+                        this.currentCombo
+                      );
+                      // 終点音を再生
+                      if (
+                        event.sound &&
+                        this.isPlayKeySound &&
+                        this.isPlayKeySoundEnd
+                      ) {
+                        const keySound = new Audio("/chart-editor/guide.mp3");
+                        keySound.currentTime = 0.1;
+                        keySound.play();
+                      }
+                    }, delay)
+                  );
+                });
+                console.warn(event.hold);
               }
               this.currentCombo += event.count;
               this.$refs.currentCombo.textContent = String(this.currentCombo);
@@ -495,8 +523,8 @@ export default {
       this.$refs.preview.style.bottom = "0px";
       this.timeoutIds.each(id => clearInterval(id));
       this.timeoutIds = [];
-      this.soundIds.each(id => clearInterval(id));
-      this.soundIds = [];
+      this.eventIds.each(id => clearInterval(id));
+      this.eventIds = [];
       if (this.returnPosition >= 0) this.$vuetify.goTo(this.returnPosition);
       this.returnPosition = -1;
     }
@@ -516,32 +544,45 @@ export default {
             measure.measureReachTime +
             (note.position / note.split) * measure.measureLength;
           // タイミングをkeyにイベント情報をセット
-          if (!events[String(timing)] && [1, 2, 3, 4, 5].includes(note.type))
-            events[String(timing)] = {
+          if (!events[timing] && [1, 2, 3, 4, 5].includes(note.type))
+            events[timing] = {
               timing, // 到達時間(ms)
               lane: [], // キービームを出すレーン番号
+              hold: [], // キービームを出し続けるレーン番号
+              holdEnd: [], // キービームを止めるレーン番号
               count: 0, // 増加するコンボ数
               sound: false // 再生するタップ音
             };
-          // TODO: LNの時始点・終点情報を入れる
-          if ([1, 2, 3, 4, 5].includes(note.type)) {
-            events[String(timing)].sound = true;
-            events[String(timing)].count += 1;
+          // 通常
+          if (note.type === 1) {
+            events[timing].sound = true;
+            events[timing].count += 1;
+            events[timing].lane = events[timing].lane.append(note.lane).uniq;
           }
-          if ([1, 2].includes(note.type)) {
-            events[String(timing)].lane = events[String(timing)].lane.append(
-              note.lane
-            ).uniq;
+          // LN(始点と終点が同レーンの前提)
+          else if (note.type === 2) {
+            events[timing].sound = true;
+            note.end.each(end => {
+              const endMeasure = this.measureData[end.measure];
+              const endTiming =
+                endMeasure.measureReachTime +
+                (end.position / end.split) * endMeasure.measureLength;
+              events[timing].hold = events[timing].hold.append([
+                note.lane, // キービームをホールドするレーン
+                endTiming - timing // ホールドする時間(ms)
+              ]);
+            });
           }
-          if ([1, 2].includes(note.type)) {
-            events[String(timing)].lane = events[String(timing)].lane.append(
-              note.lane
-            ).uniq;
+          // フリック
+          else if (note.type === 3 || note.type === 4) {
+            events[timing].sound = true;
+            events[timing].count += 1;
           }
-          if (note.type === 5) {
-            events[String(timing)].lane = events[String(timing)].lane.append(
-              0
-            ).uniq;
+          // 音札
+          else if (note.type === 5) {
+            events[timing].sound = true;
+            events[timing].count += 1;
+            events[timing].lane = events[timing].lane.append(0).uniq;
           }
         });
       }
@@ -628,6 +669,7 @@ export default {
   text-align: center;
   color: #f0f0f0;
   font-size: 20px;
+  z-index: 110;
   > strong {
     display: block;
     font-size: 50px;
@@ -651,6 +693,10 @@ export default {
       background: linear-gradient(#f7d51600 0%, #f7d51690 100%);
     }
     &.-on {
+      opacity: 1;
+      transition: none;
+    }
+    &.-hold {
       opacity: 1;
       transition: none;
     }
