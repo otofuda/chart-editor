@@ -131,6 +131,10 @@ export default {
       }
       // 不明なtypeの時はそのまま返す
       else return [...note.option];
+    },
+    // lane: -1 固定ノートであるか
+    isLanelessNote(note) {
+      return [5, 96, 97, 98, 99].includes(note.type);
     }
   }
 };

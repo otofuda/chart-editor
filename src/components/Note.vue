@@ -20,7 +20,8 @@
         :style="{
           left: `${positionLeft}px`,
           bottom: `${positionBottom}px`,
-          width: `${noteWidth}px`
+          width: `${noteWidth}px`,
+          background: dispColor
         }"
         v-bind="attrs"
         v-on="on"
@@ -120,7 +121,11 @@
         <v-list-item>
           LANE
           <v-spacer></v-spacer>
-          <v-radio-group v-model="note.lane" row>
+          <v-radio-group
+            v-model="note.lane"
+            row
+            :disabled="isLanelessNote(note)"
+          >
             <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
           </v-radio-group>
         </v-list-item>
@@ -237,6 +242,10 @@ export default {
         }
         return _left - (_width / 2) * 60 + _offset;
       }
+      // LED制御
+      else if (this.note.type === 96) {
+        return -50;
+      }
       // 音札, その他特殊ノーツ
       else {
         return 0;
@@ -267,13 +276,24 @@ export default {
         if (_width === -1) _width = 1;
         if (this.note.position === 0) _width = 5;
         return 60 * _width;
-      } else return 300;
+      }
+      // LED制御
+      else if (this.note.type === 96) {
+        return 40;
+      }
+      // その他
+      else return 300;
     },
     isHiddenControl() {
       return this.note.type === 95 && this.note.position === 0;
     },
     noteTypeName() {
       return this.noteTypes.find(t => t.value === this.note.type)?.text;
+    },
+    dispColor() {
+      return this.note.type === 96
+        ? `rgb(${this.note.option[0]},${this.note.option[1]},${this.note.option[2]})`
+        : null;
     }
   }
 };

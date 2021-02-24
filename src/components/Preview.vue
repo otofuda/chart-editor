@@ -50,22 +50,12 @@
       />
 
       <!-- LED -->
-      <div
-        class="led left"
-        :style="{
-          background: LEDColor || defaultLEDColor
-        }"
-      ></div>
-      <div
-        class="led right"
-        :style="{
-          background: LEDColor || defaultLEDColor
-        }"
-      ></div>
+      <div class="led left" ref="LEDLeft"></div>
+      <div class="led right" ref="LEDRight"></div>
     </div>
 
     <div class="control">
-      <v-expansion-panels accordion>
+      <v-expansion-panels accordionn>
         <v-expansion-panel>
           <v-expansion-panel-header>
             <v-btn
@@ -118,13 +108,19 @@
             <v-checkbox
               class="mt-0"
               v-model="isPlayKeySoundEnd"
-              label="終点打音を再生 (α)"
+              label="LN終点音を再生 (α)"
               hide-details
             ></v-checkbox>
             <v-checkbox
               class="mt-0"
               v-model="isShowKeybeam"
               label="キービームとコンボを表示 (β)"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox
+              class="mt-0"
+              v-model="isSimulateLED"
+              label="LED制御をシミュレート (β)"
               hide-details
             ></v-checkbox>
             <v-checkbox
@@ -218,6 +214,7 @@
 
     <div
       class="sudden"
+      v-show="isPreviewing"
       :style="{
         height: `${sudden}px`
       }"
@@ -322,12 +319,12 @@ export default {
       currentCombo: 0, // プレビューするコンボ数
       isShowCheckbox: false,
       isShowKeybeam: false,
+      isSimulateLED: false,
       isPlayGuide: false,
       eventIds: [],
       isPlayKeySound: false,
       isPlayKeySoundEnd: false,
       guideAudio: new Audio("/chart-editor/guide.mp3"),
-      LEDColor: null,
       defaultLEDColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)",
       lift: localStorage.getItem("chart-editor__lift") || 0, // LIFTオプション
       sudden: localStorage.getItem("chart-editor__sudden") || 0, // SUDDENオプション
@@ -446,7 +443,8 @@ export default {
     setNoteEvents(offset) {
       Object.entries(this.previewEvents).each(([timing, event]) => {
         const time = timing - offset;
-        const keybeamDOMs = this.$refs.keybeams.querySelectorAll("div");
+        const keybeamDOMs = this.$refs.keybeams?.querySelectorAll("div");
+        const comboDOM = this.$refs.currentCombo;
         if (time > 0)
           this.eventIds.push(
             setTimeout(() => {
@@ -475,9 +473,7 @@ export default {
                       keybeamDOMs[num].classList.remove("-hold");
                       // hold配列の分、終点時にコンボ増加
                       this.currentCombo += 1;
-                      this.$refs.currentCombo.textContent = String(
-                        this.currentCombo
-                      );
+                      comboDOM.textContent = String(this.currentCombo);
                       // 終点音を再生
                       if (
                         event.sound &&
@@ -491,13 +487,18 @@ export default {
                     }, delay)
                   );
                 });
-                console.warn(event.hold);
+                this.currentCombo += event.count;
+                comboDOM.textContent = String(this.currentCombo);
               }
-              this.currentCombo += event.count;
-              this.$refs.currentCombo.textContent = String(this.currentCombo);
+              if (this.isSimulateLED && event.color) {
+                this.setLEDColor(event.color);
+              }
             }, time)
           );
-        else this.currentCombo += event.count;
+        else {
+          this.currentCombo += event.count;
+          if (this.isSimulateLED && event.color) this.setLEDColor(event.color);
+        }
       });
     },
     previewStart() {
@@ -519,6 +520,10 @@ export default {
       this.currentBpm = 0;
       this.currentBeat = 0;
       this.currentCombo = 0;
+      this.setLEDColor();
+      this.$refs.keybeams
+        ?.querySelectorAll("div")
+        .forEach(dom => dom.classList.remove("-hold"));
       this.$refs.preview.style.transition = "0ms all linear";
       this.$refs.preview.style.bottom = "0px";
       this.timeoutIds.each(id => clearInterval(id));
@@ -527,6 +532,10 @@ export default {
       this.eventIds = [];
       if (this.returnPosition >= 0) this.$vuetify.goTo(this.returnPosition);
       this.returnPosition = -1;
+    },
+    setLEDColor(color) {
+      this.$refs.LEDLeft.style.background = color || this.defaultLEDColor;
+      this.$refs.LEDRight.style.background = color || this.defaultLEDColor;
     }
   },
   computed: {
@@ -537,19 +546,20 @@ export default {
     // ノートの到達イベント情報を生成
     previewEvents() {
       const events = {};
-      if (this.isPlayKeySound || this.isShowKeybeam) {
+      if (this.isPlayKeySound || this.isShowKeybeam || this.isSimulateLED) {
         this.currentChart.each(note => {
           const measure = this.measureData[note.measure];
           const timing =
             measure.measureReachTime +
             (note.position / note.split) * measure.measureLength;
           // タイミングをkeyにイベント情報をセット
-          if (!events[timing] && [1, 2, 3, 4, 5].includes(note.type))
+          if (!events[timing] && [1, 2, 3, 4, 5, 96].includes(note.type))
             events[timing] = {
               timing, // 到達時間(ms)
               lane: [], // キービームを出すレーン番号
               hold: [], // キービームを出し続けるレーン番号
               holdEnd: [], // キービームを止めるレーン番号
+              color: null, // LED変化の色
               count: 0, // 増加するコンボ数
               sound: false // 再生するタップ音
             };
@@ -583,6 +593,12 @@ export default {
             events[timing].sound = true;
             events[timing].count += 1;
             events[timing].lane = events[timing].lane.append(0).uniq;
+          }
+          // LED制御
+          else if (note.type === 96) {
+            events[
+              timing
+            ].color = `rgb(${note.option[0]},${note.option[1]},${note.option[2]})`;
           }
         });
       }
@@ -629,6 +645,7 @@ export default {
   top: 0;
   width: 20px;
   height: 100%;
+  background: linear-gradient(0deg, #ff5151 30%, #44a5ff 70%);
   &.left {
     right: 400px;
   }

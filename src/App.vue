@@ -113,6 +113,7 @@
           </v-col>
         </v-row>
 
+        <!-- オプション入力欄(汎用) -->
         <div
           v-for="(opt, i) in noteOptions(appendNote)"
           :key="`option_${i}`"
@@ -132,11 +133,22 @@
           ></v-text-field>
         </div>
 
+        <!-- Type96 カラーピッカー -->
+        <v-color-picker
+          v-if="appendNote.type === 96"
+          v-model="appendNoteColorOption"
+          :swatches="colorSwatches"
+          show-swatches
+          elevation="2"
+          hide-inputs
+        ></v-color-picker>
+
         <v-row align="center" justify="space-between">
           <v-radio-group
             v-model="appendNote.lane"
             row
             prepend-icon="mdi-view-column-outline"
+            :disabled="isLanelessNote(appendNote)"
           >
             <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
           </v-radio-group>
@@ -738,6 +750,13 @@ export default {
         end: []
       },
       preAppendNotes: [], // 保管する配置ノーツ
+      colorSwatches: [
+        ["#ff5151", "#000000"],
+        ["#44a5ff", "#202020"],
+        ["#ff0000", "#505050"],
+        ["#00ff00", "#a0a0a0"],
+        ["#0000ff", "#ffffff"]
+      ],
       isAppendMode: true,
       isAutoFollow: true,
       scrollTo: 0,
@@ -840,6 +859,7 @@ export default {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      this.showSnackbar(`ファイル「${this.fileName}」を保存しました`);
     },
     readAudioFile(e) {
       this.previewAudio.src = window.URL.createObjectURL(e);
@@ -947,20 +967,27 @@ export default {
     deleteEndOfAppendNote(index) {
       this.appendNote.end.delete_at(index);
     },
-    // ノーツ種別変更時にend, optionを制御
+    // ノーツ種別変更時制御
     changeAppendNoteType() {
+      // endを自動生成／削除
       if (this.appendNote.type === 2) this.addEndToAppendNote();
       else this.appendNote.end = [];
 
+      // optionを自動生成
       if (this.appendNote.type === 94)
         this.appendNote.option = [
           "https://via.placeholder.com/50x100",
           1,
           0.25
         ];
-
-      if (this.appendNote.type === 3 || this.appendNote.type === 4)
+      else if (this.appendNote.type === 96) {
+        this.appendNote.option = [255, 81, 81];
+      } else if (this.appendNote.type === 3 || this.appendNote.type === 4)
         this.appendNote.option = [-1, null, null];
+
+      // laneを自動変更
+      if (this.isLanelessNote(this.appendNote)) this.appendNote.lane = -1;
+      else if (this.appendNote.lane === -1) this.appendNote.lane = 1;
     },
     appendNoteToLeft() {
       this.appendNote.lane = Math.max(this.appendNote.lane - 1, 1);
@@ -1103,7 +1130,11 @@ export default {
       this.snackbar = false;
       this.snackbarText = message;
       setTimeout(() => (this.snackbar = true), 100);
-      this.logs.append(`通知バー：${message}`);
+      this.logs.append({
+        message,
+        type: "通知バー",
+        date: new Date()
+      });
     },
     // 譜面分析
     analyze() {
@@ -1211,6 +1242,26 @@ export default {
     },
     getAppendNote() {
       return this.isAppendMode ? this.appendNote : null;
+    },
+    // 色オブジェクト⇔option配列のためのgetterとsetter
+    appendNoteColorOption: {
+      get: function() {
+        return this.appendNote.type === 96
+          ? {
+              r: this.appendNote.option[0],
+              g: this.appendNote.option[1],
+              b: this.appendNote.option[2],
+              a: 1
+            }
+          : null;
+      },
+      set: function(value) {
+        if (this.appendNote.type === 96) {
+          this.$set(this.appendNote.option, 0, value.r);
+          this.$set(this.appendNote.option, 1, value.g);
+          this.$set(this.appendNote.option, 2, value.b);
+        }
+      }
     }
   },
   components: {
@@ -1346,6 +1397,13 @@ export default {
       background: transparent;
     }
   }
+  &.type96 {
+    z-index: 98;
+    height: 40px;
+    background: gray;
+    border: 3px solid rgba(255, 255, 255, 0.5);
+    border-radius: 6px;
+  }
   &.type97 {
     z-index: 98;
     height: 1px;
@@ -1382,6 +1440,9 @@ export default {
   .note.type95 {
     color: transparent;
     text-shadow: none;
+  }
+  .note.type96 {
+    display: none;
   }
   &.preview_mode {
     .measure > .v-btn {
