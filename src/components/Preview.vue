@@ -496,7 +496,7 @@ export default {
             }, time)
           );
         else {
-          this.currentCombo += event.count;
+          this.currentCombo += event.count + event.hold.size;
           if (this.isSimulateLED && event.color) this.setLEDColor(event.color);
         }
       });
