@@ -11,7 +11,7 @@
       :preAppendNotes="preAppendNotes"
       :isShowDetail="isShowDetail"
       :isCaptureMode="isCaptureMode"
-      :isShowCheckbox="isShowCheckbox"
+      :isPreviewMode="isPreviewMode"
     />
 
     <v-container fluid class="panel">
@@ -40,7 +40,7 @@
         </v-col>
       </v-row>
 
-      <h3>ノートの挿入</h3>
+      <h3>ノートの挿入（仮配置：{{ preAppendNotes.size }}個）</h3>
 
       <v-checkbox v-model="isAppendMode" label="ノート挿入モード"></v-checkbox>
 
@@ -113,6 +113,7 @@
           </v-col>
         </v-row>
 
+        <!-- オプション入力欄(汎用) -->
         <div
           v-for="(opt, i) in noteOptions(appendNote)"
           :key="`option_${i}`"
@@ -132,11 +133,22 @@
           ></v-text-field>
         </div>
 
+        <!-- Type96 カラーピッカー -->
+        <v-color-picker
+          v-if="appendNote.type === 96"
+          v-model="appendNoteColorOption"
+          :swatches="colorSwatches"
+          show-swatches
+          elevation="2"
+          hide-inputs
+        ></v-color-picker>
+
         <v-row align="center" justify="space-between">
           <v-radio-group
             v-model="appendNote.lane"
             row
             prepend-icon="mdi-view-column-outline"
+            :disabled="isLanelessNote(appendNote)"
           >
             <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
           </v-radio-group>
@@ -149,14 +161,21 @@
               ノートを仮配置
               <v-icon right>mdi-keyboard-return</v-icon>
             </v-btn>
-            <v-btn
-              class="ml-4 white--text"
+            <v-badge
+              overlap
               color="orange darken-4"
-              @click="appendNotes(...preAppendNotes)"
+              :value="preAppendNotes.size"
+              :content="preAppendNotes.size"
             >
-              挿入する
-              <v-icon right>mdi-plus-circle-outline</v-icon>
-            </v-btn>
+              <v-btn
+                class="ml-4 white--text"
+                color="orange darken-4"
+                @click="appendNotes(...preAppendNotes)"
+              >
+                挿入する
+                <v-icon right>mdi-plus-circle-outline</v-icon>
+              </v-btn>
+            </v-badge>
           </div>
         </v-row>
 
@@ -189,7 +208,7 @@
         </div>
       </div>
 
-      <h3>プレビュー設定</h3>
+      <h3>プレビュー領域の設定</h3>
 
       <v-slider
         v-model="beatHeight"
@@ -241,24 +260,28 @@
         </v-btn>
       </v-row>
 
-      <v-row align="center">
+      <v-row>
+        <v-icon>mdi-eye</v-icon>
         <v-checkbox
+          class="ml-4"
           v-model="isShowDetail"
           label="ノーツ詳細を表示"
         ></v-checkbox>
         <v-checkbox
           class="ml-4"
-          v-model="isShowCheckbox"
-          label="チェックボックスを表示"
-        ></v-checkbox>
-        <v-checkbox
-          class="ml-4"
+          :disabled="!isShowDetail"
           v-model="isCaptureMode"
           label="キャプチャ用モード"
         ></v-checkbox>
+        <v-checkbox
+          class="ml-4"
+          :disabled="!isShowDetail || !isCaptureMode"
+          v-model="isPreviewMode"
+          label="譜面プレビュー用"
+        ></v-checkbox>
       </v-row>
 
-      <h3>選択ノーツ（{{ selectionNumber }}個）</h3>
+      <h3>選択ノーツ（選択中：{{ selectionNumber }}個）</h3>
 
       <v-row align="center">
         <v-btn color="primary" text @click="dialog.batchcheck = true">
@@ -460,12 +483,26 @@
               <th class="text-left">
                 数
               </th>
+              <th class="text-left">
+                割合
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="type in noteTypes" :key="`note_count_${type.value}`">
               <td>{{ type.text }}</td>
               <td>{{ analysisData.typeCount[type.value] }}</td>
+              <td>
+                {{
+                  [1, 2, 3, 4, 5].includes(type.value)
+                    ? `${Math.floor(
+                        (analysisData.typeCount[type.value] /
+                          analysisData.notesCount) *
+                          10000
+                      ) / 100}％`
+                    : "－"
+                }}
+              </td>
             </tr>
           </tbody>
         </v-simple-table>
@@ -713,12 +750,19 @@ export default {
         end: []
       },
       preAppendNotes: [], // 保管する配置ノーツ
+      colorSwatches: [
+        ["#ff5151", "#000000"],
+        ["#44a5ff", "#202020"],
+        ["#ff0000", "#505050"],
+        ["#00ff00", "#a0a0a0"],
+        ["#0000ff", "#ffffff"]
+      ],
       isAppendMode: true,
       isAutoFollow: true,
       scrollTo: 0,
       isShowDetail: false,
-      isShowCheckbox: false,
       isCaptureMode: false,
+      isPreviewMode: false,
 
       // 一括選択の対象
       batchSelectTypes: [],
@@ -815,6 +859,7 @@ export default {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      this.showSnackbar(`ファイル「${this.fileName}」を保存しました`);
     },
     readAudioFile(e) {
       this.previewAudio.src = window.URL.createObjectURL(e);
@@ -922,20 +967,27 @@ export default {
     deleteEndOfAppendNote(index) {
       this.appendNote.end.delete_at(index);
     },
-    // ノーツ種別変更時にend, optionを制御
+    // ノーツ種別変更時制御
     changeAppendNoteType() {
+      // endを自動生成／削除
       if (this.appendNote.type === 2) this.addEndToAppendNote();
       else this.appendNote.end = [];
 
+      // optionを自動生成
       if (this.appendNote.type === 94)
         this.appendNote.option = [
           "https://via.placeholder.com/50x100",
           1,
           0.25
         ];
-
-      if (this.appendNote.type === 3 || this.appendNote.type === 4)
+      else if (this.appendNote.type === 96) {
+        this.appendNote.option = [255, 81, 81];
+      } else if (this.appendNote.type === 3 || this.appendNote.type === 4)
         this.appendNote.option = [-1, null, null];
+
+      // laneを自動変更
+      if (this.isLanelessNote(this.appendNote)) this.appendNote.lane = -1;
+      else if (this.appendNote.lane === -1) this.appendNote.lane = 1;
     },
     appendNoteToLeft() {
       this.appendNote.lane = Math.max(this.appendNote.lane - 1, 1);
@@ -1078,7 +1130,11 @@ export default {
       this.snackbar = false;
       this.snackbarText = message;
       setTimeout(() => (this.snackbar = true), 100);
-      this.logs.append(`通知バー：${message}`);
+      this.logs.append({
+        message,
+        type: "通知バー",
+        date: new Date()
+      });
     },
     // 譜面分析
     analyze() {
@@ -1100,6 +1156,7 @@ export default {
       });
       // 分析
       this.currentChart.each(note => {
+        // 判定オブジェクト => ノーツ数を加算
         if ([1, 2, 3, 4, 5].includes(note.type)) {
           this.analysisData.trendValues[note.measure] += 1;
           this.analysisData.notesCount += 1;
@@ -1185,6 +1242,26 @@ export default {
     },
     getAppendNote() {
       return this.isAppendMode ? this.appendNote : null;
+    },
+    // 色オブジェクト⇔option配列のためのgetterとsetter
+    appendNoteColorOption: {
+      get: function() {
+        return this.appendNote.type === 96
+          ? {
+              r: this.appendNote.option[0],
+              g: this.appendNote.option[1],
+              b: this.appendNote.option[2],
+              a: 1
+            }
+          : null;
+      },
+      set: function(value) {
+        if (this.appendNote.type === 96) {
+          this.$set(this.appendNote.option, 0, value.r);
+          this.$set(this.appendNote.option, 1, value.g);
+          this.$set(this.appendNote.option, 2, value.b);
+        }
+      }
     }
   },
   components: {
@@ -1320,6 +1397,13 @@ export default {
       background: transparent;
     }
   }
+  &.type96 {
+    z-index: 98;
+    height: 40px;
+    background: gray;
+    border: 3px solid rgba(255, 255, 255, 0.5);
+    border-radius: 6px;
+  }
   &.type97 {
     z-index: 98;
     height: 1px;
@@ -1343,14 +1427,39 @@ export default {
 .preview.checkbox .note input[type="checkbox"] {
   display: block;
 }
-.preview.detail.capture {
+
+// キャプチャーモード, プレビューモード
+.preview.detail.capture_mode {
   .note {
     color: #a0a0a0;
+    > .v-icon {
+      display: none;
+    }
   }
   .note.type94,
   .note.type95 {
     color: transparent;
     text-shadow: none;
+  }
+  .note.type96 {
+    display: none;
+  }
+  &.preview_mode {
+    .measure > .v-btn {
+      opacity: 0;
+    }
+    .measure__number {
+      visibility: hidden;
+    }
+    .note {
+      color: transparent;
+      text-shadow: none;
+    }
+    .note.type97,
+    .note.type98,
+    .note.type99 {
+      visibility: hidden;
+    }
   }
 }
 

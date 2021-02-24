@@ -12,7 +12,8 @@
       :style="{
         left: `${getAbsoluteLeft(note)}px`,
         bottom: `${getAbsoluteBottom(note)}px`,
-        width: `${getWidth(note)}px`
+        width: `${getWidth(note)}px`,
+        background: dispColor
       }"
       @click="calcelThisNote"
     >
@@ -107,6 +108,10 @@ export default {
         }
         return _left - (_width / 2) * 60 + _offset;
       }
+      // LED制御
+      else if (this.note.type === 96) {
+        return -50;
+      }
       // 音札, その他特殊ノーツ
       else {
         return 0;
@@ -158,10 +163,23 @@ export default {
         if (_width === -1) _width = 1;
         if (note.position === 0) _width = 5;
         return 60 * _width;
-      } else return 300;
+      }
+      // LED制御
+      else if (this.note.type === 96) {
+        return 40;
+      }
+      // その他
+      else return 300;
     },
     calcelThisNote() {
       if (this.isPreAppend) this.cancelNote(this.note.index);
+    }
+  },
+  computed: {
+    dispColor() {
+      return this.note.type === 96
+        ? `rgb(${this.note.option[0]},${this.note.option[1]},${this.note.option[2]})`
+        : null;
     }
   }
 };

@@ -32,8 +32,7 @@ export default {
         },
         {
           text: "LED制御",
-          value: 96,
-          disabled: true
+          value: 96
         },
         {
           text: "拍子変化",
@@ -104,6 +103,24 @@ export default {
             label: "length",
             type: "number",
             desc: "Integer型｜左面を基点とした横幅(単位：1レーンの幅)"
+          }
+        ];
+      else if (note.type === 96)
+        return [
+          {
+            label: "red",
+            type: "number",
+            desc: "Integer型｜0-255の整数"
+          },
+          {
+            label: "green",
+            type: "number",
+            desc: "Integer型｜0-255の整数"
+          },
+          {
+            label: "blue",
+            type: "number",
+            desc: "Integer型｜0-255の整数"
           }
         ];
       else if (note.type === 97)

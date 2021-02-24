@@ -10,7 +10,8 @@
       }"
       :class="{
         detail: isShowDetail,
-        capture: isCaptureMode,
+        capture_mode: isCaptureMode,
+        preview_mode: isPreviewMode,
         checkbox: isShowCheckbox
       }"
     >
@@ -49,22 +50,12 @@
       />
 
       <!-- LED -->
-      <div
-        class="led left"
-        :style="{
-          background: ledColor
-        }"
-      ></div>
-      <div
-        class="led right"
-        :style="{
-          background: ledColor
-        }"
-      ></div>
+      <div class="led left" ref="LEDLeft"></div>
+      <div class="led right" ref="LEDRight"></div>
     </div>
 
     <div class="control">
-      <v-expansion-panels accordion>
+      <v-expansion-panels accordionn>
         <v-expansion-panel>
           <v-expansion-panel-header>
             <v-btn
@@ -85,52 +76,129 @@
               <v-icon left>mdi-stop</v-icon> 停止
             </v-btn>
           </v-expansion-panel-header>
+
           <v-expansion-panel-content>
-            <v-checkbox
-              class="mt-0"
-              v-model="isPlayGuide"
-              label="小節ガイド音を再生"
-            ></v-checkbox>
-            <v-checkbox
-              class="mt-0"
-              v-model="isPlayKeySound"
-              label="打鍵音を再生(beta)"
-            ></v-checkbox>
             <v-text-field
               class="mb-4"
-              v-model.number="lift"
-              hide-details
-              label="LIFT"
-              suffix="px"
-              outlined
-              dense
-            ></v-text-field>
-            <v-text-field
-              class="mb-4"
-              v-model.number="sudden"
-              hide-details
-              label="SUDDEN"
-              suffix="px"
-              outlined
-              dense
-            ></v-text-field>
-            <v-text-field
-              class="mb-4"
-              v-model.number="hidden"
-              hide-details
-              label="HIDDEN"
-              suffix="px"
-              outlined
-              dense
-            ></v-text-field>
-            <v-text-field
               v-model.number="startFrom"
               hide-details
+              prepend-icon="mdi-numeric-0-box-multiple-outline"
               label="再生開始小節"
               suffix="小節から"
               outlined
               dense
             ></v-text-field>
+
+            <h4 class="my-2">
+              <v-icon>mdi-music-note</v-icon>
+              表示とサウンド
+            </h4>
+            <v-checkbox
+              class="mt-0"
+              v-model="isShowCheckbox"
+              label="チェックボックスを表示"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox
+              class="mt-0"
+              v-model="isPlayKeySound"
+              label="打鍵音を再生 (β)"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox
+              class="mt-0"
+              v-model="isPlayKeySoundEnd"
+              label="LN終点音を再生 (α)"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox
+              class="mt-0"
+              v-model="isShowKeybeam"
+              label="キービームとコンボを表示 (β)"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox
+              class="mt-0"
+              v-model="isSimulateLED"
+              label="LED制御をシミュレート (β)"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox
+              class="mt-0"
+              v-model="isPlayGuide"
+              label="小節ガイド音を再生"
+              hide-details
+            ></v-checkbox>
+
+            <h4 class="my-4">
+              <v-icon>mdi-tune</v-icon>
+              再生オプション
+            </h4>
+            <v-text-field
+              class="my-2"
+              v-model.number="lift"
+              hide-details
+              hint="判定ラインを上に押し上げます"
+              persistent-hint
+              append-icon="mdi-arrow-collapse-up"
+              label="LIFT"
+              outlined
+              dense
+            ></v-text-field>
+            <v-text-field
+              class="mb-2"
+              v-model.number="sudden"
+              hide-details
+              hint="譜面領域上部を隠します"
+              persistent-hint
+              append-icon="mdi-arrow-collapse-down"
+              label="SUDDEN"
+              outlined
+              dense
+            ></v-text-field>
+            <v-text-field
+              v-model.number="hidden"
+              hide-details
+              hint="譜面領域下部を隠します"
+              persistent-hint
+              append-icon="mdi-eye-off"
+              label="HIDDEN"
+              outlined
+              dense
+            ></v-text-field>
+
+            <h4 class="my-4">
+              <v-icon>mdi-tune</v-icon>
+              詳細設定
+            </h4>
+
+            <v-text-field
+              class="mb-2"
+              v-model.number="comboOffset"
+              hint="判定ラインの上側に移動します"
+              persistent-hint
+              append-icon="mdi-arrow-up"
+              label="コンボ表示位置"
+              outlined
+              dense
+            ></v-text-field>
+            <v-text-field
+              v-model.number="keybeamLength"
+              append-icon="mdi-arrow-expand-vertical"
+              label="キービームの長さ"
+              suffix="px"
+              outlined
+              hide-details
+              dense
+            ></v-text-field>
+            <v-subheader>コンボ数の透明度</v-subheader>
+            <v-slider
+              v-model.number="comboOpacity"
+              hide-details
+              max="100"
+              min="0"
+              thumb-label
+            ></v-slider>
           </v-expansion-panel-content>
         </v-expansion-panel>
       </v-expansion-panels>
@@ -146,6 +214,7 @@
 
     <div
       class="sudden"
+      v-show="isPreviewing"
       :style="{
         height: `${sudden}px`
       }"
@@ -159,6 +228,30 @@
         bottom: `${lift - 2}px`
       }"
     ></div>
+
+    <div
+      class="combo"
+      v-show="isPreviewing && isShowKeybeam"
+      :style="{
+        opacity: String(Number(comboOpacity) / 100),
+        bottom: `${Number(lift) + Number(comboOffset)}px`
+      }"
+    >
+      <strong ref="currentCombo">0</strong>
+      COMBO
+    </div>
+
+    <div
+      class="keybeams"
+      ref="keybeams"
+      v-show="isShowKeybeam"
+      :style="{
+        bottom: `${lift - 2}px`,
+        height: `${keybeamLength}px`
+      }"
+    >
+      <div v-for="i in 6" :key="`keybeam${i}`"></div>
+    </div>
   </div>
 </template>
 
@@ -203,11 +296,11 @@ export default {
       type: Boolean,
       default: false
     },
-    isShowCheckbox: {
+    isCaptureMode: {
       type: Boolean,
       default: false
     },
-    isCaptureMode: {
+    isPreviewMode: {
       type: Boolean,
       default: false
     }
@@ -223,14 +316,22 @@ export default {
       currentMeasure: 0,
       currentBpm: 0,
       currentBeat: 0,
+      currentCombo: 0, // プレビューするコンボ数
+      isShowCheckbox: false,
+      isShowKeybeam: false,
+      isSimulateLED: false,
       isPlayGuide: false,
-      soundIds: [],
+      eventIds: [],
       isPlayKeySound: false,
+      isPlayKeySoundEnd: false,
       guideAudio: new Audio("/chart-editor/guide.mp3"),
-      ledColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)",
+      defaultLEDColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)",
       lift: localStorage.getItem("chart-editor__lift") || 0, // LIFTオプション
       sudden: localStorage.getItem("chart-editor__sudden") || 0, // SUDDENオプション
-      hidden: localStorage.getItem("chart-editor__hidden") || 0 // HIDDENオプション
+      hidden: localStorage.getItem("chart-editor__hidden") || 0, // HIDDENオプション
+      comboOffset: 60,
+      keybeamLength: 100,
+      comboOpacity: 30
     };
   },
   watch: {
@@ -308,7 +409,7 @@ export default {
           );
         }
       });
-      if (this.isPlayKeySound) this.setKeySounds(startOffset);
+      this.setNoteEvents(startOffset);
     },
     playFromZero() {
       // 拍子木分オフセット
@@ -336,25 +437,75 @@ export default {
           }, measure.measureReachTime)
         );
       });
-      if (this.isPlayKeySound) this.setKeySounds(0);
+      this.setNoteEvents(0);
     },
-    // 打鍵音のTimeoutをセットする
-    setKeySounds(offset) {
-      this.keyTimings.each(timing => {
+    // NoteEvents(ノート到達時イベント)をセットする
+    setNoteEvents(offset) {
+      Object.entries(this.previewEvents).each(([timing, event]) => {
         const time = timing - offset;
+        const keybeamDOMs = this.$refs.keybeams?.querySelectorAll("div");
+        const comboDOM = this.$refs.currentCombo;
         if (time > 0)
-          this.soundIds.push(
+          this.eventIds.push(
             setTimeout(() => {
-              const keySound = new Audio("/chart-editor/guide.mp3");
-              keySound.currentTime = 0.1;
-              keySound.play();
+              // 打鍵音を再生
+              if (event.sound && this.isPlayKeySound) {
+                const keySound = new Audio("/chart-editor/guide.mp3");
+                keySound.currentTime = 0.1;
+                keySound.play();
+              }
+              // キービームを出す
+              if (this.isShowKeybeam) {
+                // 単押し
+                event.lane.each(num => {
+                  keybeamDOMs[num].classList.add("-on");
+                });
+                setTimeout(() => {
+                  event.lane.each(num => {
+                    keybeamDOMs[num].classList.remove("-on");
+                  });
+                }, 25);
+                // LN(ホールド)
+                event.hold.each(([num, delay]) => {
+                  keybeamDOMs[num].classList.add("-hold");
+                  this.eventIds.push(
+                    setTimeout(() => {
+                      keybeamDOMs[num].classList.remove("-hold");
+                      // hold配列の分、終点時にコンボ増加
+                      this.currentCombo += 1;
+                      comboDOM.textContent = String(this.currentCombo);
+                      // 終点音を再生
+                      if (
+                        event.sound &&
+                        this.isPlayKeySound &&
+                        this.isPlayKeySoundEnd
+                      ) {
+                        const keySound = new Audio("/chart-editor/guide.mp3");
+                        keySound.currentTime = 0.1;
+                        keySound.play();
+                      }
+                    }, delay)
+                  );
+                });
+                this.currentCombo += event.count;
+                comboDOM.textContent = String(this.currentCombo);
+              }
+              if (this.isSimulateLED && event.color) {
+                this.setLEDColor(event.color);
+              }
             }, time)
           );
+        else {
+          this.currentCombo += event.count + event.hold.size;
+          if (this.isSimulateLED && event.color) this.setLEDColor(event.color);
+        }
       });
     },
     previewStart() {
       this.returnPosition = window.scrollY; // 停止後に戻る座標
       this.isPreviewing = true;
+      this.currentCombo = 0;
+      this.$refs.currentCombo.textContent = String(this.currentCombo);
       this.$refs.preview.style.transition = "0ms all linear";
       // this.$refs.preview.style.bottom = "0px";
       // this.$refs.preview.style.transition = `${this.measureData.first.measureReachTime}ms all linear`;
@@ -368,14 +519,23 @@ export default {
       this.currentPosition = 0;
       this.currentBpm = 0;
       this.currentBeat = 0;
+      this.currentCombo = 0;
+      this.setLEDColor();
+      this.$refs.keybeams
+        ?.querySelectorAll("div")
+        .forEach(dom => dom.classList.remove("-hold"));
       this.$refs.preview.style.transition = "0ms all linear";
       this.$refs.preview.style.bottom = "0px";
       this.timeoutIds.each(id => clearInterval(id));
       this.timeoutIds = [];
-      this.soundIds.each(id => clearInterval(id));
-      this.soundIds = [];
+      this.eventIds.each(id => clearInterval(id));
+      this.eventIds = [];
       if (this.returnPosition >= 0) this.$vuetify.goTo(this.returnPosition);
       this.returnPosition = -1;
+    },
+    setLEDColor(color) {
+      this.$refs.LEDLeft.style.background = color || this.defaultLEDColor;
+      this.$refs.LEDRight.style.background = color || this.defaultLEDColor;
     }
   },
   computed: {
@@ -383,18 +543,66 @@ export default {
     longNotes() {
       return this.currentChart.filter(note => note.type === 2);
     },
-    keyTimings() {
-      return this.isPlayKeySound
-        ? this.currentChart.map(note => {
-            if ([1, 2, 3, 4, 5].includes(note.type)) {
-              const md = this.measureData[note.measure];
-              return (
-                md.measureReachTime +
-                (note.position / note.split) * md.measureLength
-              );
-            } else return -1;
-          }).uniq
-        : [];
+    // ノートの到達イベント情報を生成
+    previewEvents() {
+      const events = {};
+      if (this.isPlayKeySound || this.isShowKeybeam || this.isSimulateLED) {
+        this.currentChart.each(note => {
+          const measure = this.measureData[note.measure];
+          const timing =
+            measure.measureReachTime +
+            (note.position / note.split) * measure.measureLength;
+          // タイミングをkeyにイベント情報をセット
+          if (!events[timing] && [1, 2, 3, 4, 5, 96].includes(note.type))
+            events[timing] = {
+              timing, // 到達時間(ms)
+              lane: [], // キービームを出すレーン番号
+              hold: [], // キービームを出し続けるレーン番号
+              holdEnd: [], // キービームを止めるレーン番号
+              color: null, // LED変化の色
+              count: 0, // 増加するコンボ数
+              sound: false // 再生するタップ音
+            };
+          // 通常
+          if (note.type === 1) {
+            events[timing].sound = true;
+            events[timing].count += 1;
+            events[timing].lane = events[timing].lane.append(note.lane).uniq;
+          }
+          // LN(始点と終点が同レーンの前提)
+          else if (note.type === 2) {
+            events[timing].sound = true;
+            note.end.each(end => {
+              const endMeasure = this.measureData[end.measure];
+              const endTiming =
+                endMeasure.measureReachTime +
+                (end.position / end.split) * endMeasure.measureLength;
+              events[timing].hold = events[timing].hold.append([
+                note.lane, // キービームをホールドするレーン
+                endTiming - timing // ホールドする時間(ms)
+              ]);
+            });
+          }
+          // フリック
+          else if (note.type === 3 || note.type === 4) {
+            events[timing].sound = true;
+            events[timing].count += 1;
+          }
+          // 音札
+          else if (note.type === 5) {
+            events[timing].sound = true;
+            events[timing].count += 1;
+            events[timing].lane = events[timing].lane.append(0).uniq;
+          }
+          // LED制御
+          else if (note.type === 96) {
+            events[
+              timing
+            ].color = `rgb(${note.option[0]},${note.option[1]},${note.option[2]})`;
+          }
+        });
+      }
+      return events;
     },
     entireHeight() {
       return (
@@ -437,6 +645,7 @@ export default {
   top: 0;
   width: 20px;
   height: 100%;
+  background: linear-gradient(0deg, #ff5151 30%, #44a5ff 70%);
   &.left {
     right: 400px;
   }
@@ -468,5 +677,46 @@ export default {
   width: 380px;
   background: #505050;
   z-index: 110;
+}
+.combo {
+  position: fixed;
+  bottom: 50px;
+  right: 20px;
+  width: 380px;
+  text-align: center;
+  color: #f0f0f0;
+  font-size: 20px;
+  z-index: 110;
+  > strong {
+    display: block;
+    font-size: 50px;
+  }
+}
+.keybeams {
+  position: fixed;
+  bottom: 0px;
+  right: 60px;
+  width: 300px;
+  display: flex;
+  > div {
+    flex-grow: 1;
+    opacity: 0;
+    transition: 0.1s all linear;
+    background: linear-gradient(#16d5f700 0%, #16d5f790 100%);
+    &:first-child {
+      position: absolute;
+      height: 100%;
+      width: 300px;
+      background: linear-gradient(#f7d51600 0%, #f7d51690 100%);
+    }
+    &.-on {
+      opacity: 1;
+      transition: none;
+    }
+    &.-hold {
+      opacity: 1;
+      transition: none;
+    }
+  }
 }
 </style>
