@@ -133,6 +133,69 @@
           ></v-text-field>
         </div>
 
+        <!-- Type94 テクスチャ選択 -->
+        <v-menu
+          v-if="appendNote.type === 94"
+          v-model="dialog.texture"
+          :close-on-content-click="false"
+          max-width="600"
+          offset-y
+        >
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn color="indigo" dark v-bind="attrs" v-on="on">
+              テクスチャをデータベースから探す
+            </v-btn>
+          </template>
+
+          <v-card>
+            <v-tabs v-model="textureCurrentTab" show-arrows>
+              <v-tabs-slider color="indigo"></v-tabs-slider>
+              <v-tab v-for="tabName in textureTabs" :key="tabName">
+                {{ tabName }}
+              </v-tab>
+            </v-tabs>
+
+            <v-tabs-items v-model="textureCurrentTab">
+              <v-tab-item
+                v-for="tabName in textureTabs"
+                :key="tabName"
+                class="px-6"
+              >
+                <v-row>
+                  <v-col
+                    v-for="texture in texturePayload.contents.filter(tx =>
+                      tx.tab.includes(tabName)
+                    )"
+                    :key="texture.id"
+                    cols="12"
+                    sm="6"
+                    md="4"
+                  >
+                    <v-card class="texture-card" elevation="2">
+                      <v-img :src="texture.url" height="100px">
+                        <span class="texture-card__name">
+                          {{ texture.name }}
+                        </span>
+                      </v-img>
+
+                      <v-card-actions class="justify-end">
+                        <v-btn
+                          small
+                          depressed
+                          color="primary"
+                          @click="setTexture(texture)"
+                        >
+                          これにする
+                        </v-btn>
+                      </v-card-actions>
+                    </v-card>
+                  </v-col>
+                </v-row>
+              </v-tab-item>
+            </v-tabs-items>
+          </v-card>
+        </v-menu>
+
         <!-- Type96 カラーピッカー -->
         <v-color-picker
           v-if="appendNote.type === 96"
@@ -694,6 +757,7 @@
 
 <script>
 import Bury from "buryjs";
+
 import Preview from "./components/Preview.vue";
 import EndForm from "./components/EndForm.vue";
 
@@ -730,8 +794,12 @@ export default {
         help: false, // 使い方
         logs: false, // メッセージログ
         checked: false, // 選択ノーツへの操作
-        batchcheck: false // ノーツの一括選択
+        batchcheck: false, // ノーツの一括選択
+        texture: false // テクスチャセレクター
       },
+      texturePayload: {}, // テクスチャDBからの応答
+      textureTabs: [], // テクスチャの持つタブ
+      textureCurrentTab: null,
       analysisData: {
         notesCount: 0,
         trendValues: [],
@@ -813,6 +881,21 @@ export default {
       e.preventDefault();
       e.returnValue = "移動してもよろしいですか？";
     });
+    // テクスチャDB取得
+    fetch("https://otofuda.microcms.io/api/v1/textures?limit=1000", {
+      headers: {
+        "X-API-KEY": "91c69bf8-3df5-445f-81e7-30b54ab4a7d4"
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        this.texturePayload = data;
+        // タブ一覧を生成
+        const tabs = [];
+        this.texturePayload.contents.each(obj => tabs.append(...obj.tab));
+        this.textureTabs = tabs.uniq;
+        this.textureCurrentTab = tabs.first;
+      });
   },
   methods: {
     readFile(e) {
@@ -1165,6 +1248,15 @@ export default {
         this.analysisData.typeCount[note.type] += 1;
       });
       this.dialog.analyzer = true;
+    },
+    // テクスチャをセットする
+    setTexture(obj) {
+      const note = this.appendNote;
+      if (note.type === 94) {
+        this.$set(note.option, 0, obj.url);
+        this.$set(note.option, 1, obj.width || note.option[1]);
+        this.showSnackbar(`テクスチャ「${obj.name}をセットしました`);
+      } else this.showSnackbar("挿入中のノートがテクスチャではありません");
     }
   },
   // localStorageにコンフィグを書き込む
@@ -1460,6 +1552,21 @@ export default {
     .note.type99 {
       visibility: hidden;
     }
+  }
+}
+
+// テクスチャセレクター
+.texture-card {
+  width: 200px;
+  &__name {
+    display: inline-block;
+    font-size: 12px;
+    padding: 4px;
+    margin-left: 6px;
+    margin-top: 4px;
+    border-radius: 4px;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.5);
   }
 }
 
