@@ -858,7 +858,8 @@ export default {
       cancelNote: this.cancelNote,
       appendNotes: this.appendNotes,
       getMovedNote: this.getMovedNote,
-      copyNotesToDifficulty: this.copyNotesToDifficulty
+      copyNotesToDifficulty: this.copyNotesToDifficulty,
+      setAppendNoteInfo: this.setAppendNoteInfo
     };
   },
   beforeCreate: Bury.init,
@@ -1003,9 +1004,9 @@ export default {
             : this.preAppendNotes.max_by(n => n.index).index + 1;
         this.preAppendNotes.append({
           isSelected: false,
-          index,
           ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
-          option: this.getValidatedOptions(note)
+          option: this.getValidatedOptions(note),
+          index
         });
       });
     },
@@ -1020,7 +1021,7 @@ export default {
           });
           if (dup) {
             this.showSnackbar(
-              `${dup}個のノーツと重複しているため、挿入できないノーツがあります`
+              `${dup}個のノーツと重複しているため、${difficulty}に挿入できません`
             );
             return false;
           }
@@ -1103,6 +1104,14 @@ export default {
           note => note.index === i
         );
       });
+    },
+    // appendNoteに任意のデータをセット
+    setAppendNoteInfo(object) {
+      this.appendNote = {
+        ...this.appendNote,
+        ...object,
+        index: null
+      };
     },
     cancelNote(index) {
       this.preAppendNotes = this.preAppendNotes?.delete_if(

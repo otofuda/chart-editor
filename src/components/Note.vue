@@ -168,11 +168,15 @@
       </v-list>
 
       <v-card-actions>
+        <v-btn color="primary" text @click="cloneThisNote">
+          <v-icon>mdi-content-copy</v-icon>
+        </v-btn>
         <v-btn color="error" text @click="deleteThisNote">
-          ノートを削除
+          <v-icon left>mdi-delete</v-icon>
+          削除
         </v-btn>
         <v-btn color="secondary" text @click="showNoteInfo">
-          情報を見る
+          <v-icon>mdi-information</v-icon>
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -185,7 +189,7 @@ import noteCheck from "../mixins/noteCheck";
 
 export default {
   mixins: [noteTypes, noteCheck],
-  inject: ["deleteNotes", "showSnackbar"],
+  inject: ["deleteNotes", "setAppendNoteInfo", "showSnackbar"],
   data() {
     return {
       menu: false
@@ -210,6 +214,13 @@ export default {
     deleteThisNote() {
       this.deleteNotes(this.note.index);
       this.menu = false;
+    },
+    cloneThisNote() {
+      this.setAppendNoteInfo({
+        ...this.note
+      });
+      this.menu = false;
+      this.showSnackbar("挿入ノートに同じデータをセットしました");
     },
     showNoteInfo() {
       this.showSnackbar(JSON.stringify(this.note, null, 2));
