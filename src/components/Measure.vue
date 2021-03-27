@@ -45,6 +45,10 @@
             <v-icon left>mdi-select-off</v-icon> 全て選択解除
           </v-btn>
         </v-list-item>
+        <v-divider></v-divider>
+        <v-list-item>
+          <strong>{{ measure.measure }}小節内のノーツを対象に</strong>
+        </v-list-item>
         <v-list-item class="px-0 mx-2">
           <v-select
             :items="difficulties"
@@ -74,6 +78,13 @@
           <v-btn color="warning" text dense @click="moveAll">
             <v-icon left>mdi-content-cut</v-icon> 移動
           </v-btn>
+        </v-list-item>
+        <v-list-item class="px-0 mx-2 mb-2">
+          Option：
+          <v-radio-group v-model="copyOrMoveOnlySelected" hide-details="">
+            <v-radio label="すべてのノーツを対象" :value="false"></v-radio>
+            <v-radio label="チェック済みのみ対象" :value="true"></v-radio>
+          </v-radio-group>
         </v-list-item>
       </v-list>
     </v-menu>
@@ -133,7 +144,8 @@ export default {
     return {
       difficulties: ["raku", "easy", "normal", "hard", "extra"],
       copyToDifficulty: this.currentDifficulty,
-      copyToMeasure: 0
+      copyToMeasure: 0,
+      copyOrMoveOnlySelected: false // チェック済みのみ複製・移動するか
     };
   },
   methods: {
@@ -151,7 +163,11 @@ export default {
     },
     // 小節内のノーツをすべて複製
     copyAll() {
-      const targets = this.notes.filter(note => note.type !== 2);
+      let targets = this.notes.filter(note => note.type !== 2);
+      // チェック済みのみ複製する場合のフィルター
+      if (this.copyOrMoveOnlySelected) {
+        targets = targets.filter(note => note.isSelected);
+      }
       // const idx = targets.map(note => note.index);
       if (this.currentDifficulty === this.copyToDifficulty) {
         this.appendNotes(
@@ -160,7 +176,7 @@ export default {
           )
         );
         this.showSnackbar(
-          `${this.measure.measure}小節から${this.copyToMeasure}小節へ複製処理を行いました（ロングノーツを除く）`
+          `対象の${targets.size}ノーツに対して、${this.measure.measure}小節 => ${this.copyToMeasure}小節へ複製処理を行いました（ロングノーツを除く）`
         );
       } else {
         // 各movedNoteを取得して対象難易度に複製
@@ -174,7 +190,11 @@ export default {
     },
     // 小節内のノーツをすべて移動
     moveAll() {
-      const targets = this.notes.filter(note => note.type !== 2);
+      let targets = this.notes.filter(note => note.type !== 2);
+      // チェック済みのみ移動する場合のフィルター
+      if (this.copyOrMoveOnlySelected) {
+        targets = targets.filter(note => note.isSelected);
+      }
       const idx = targets.map(note => note.index);
       if (this.currentDifficulty === this.copyToDifficulty) {
         this.appendNotes(
@@ -184,7 +204,7 @@ export default {
         );
         this.deleteNotes(...idx);
         this.showSnackbar(
-          `${this.measure.measure}小節から${this.copyToMeasure}小節へ移動処理を行いました（ロングノーツを除く）`
+          `対象の${targets.size}ノーツに対して、${this.measure.measure}小節 => ${this.copyToMeasure}小節へ移動処理を行いました（ロングノーツを除く）`
         );
       } else {
         // 各movedNoteを取得して対象難易度に複製

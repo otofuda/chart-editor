@@ -118,6 +118,20 @@
               hide-details
             ></v-checkbox>
             <v-checkbox
+              class="mt-0 ml-6"
+              v-model="isShowFlickEffect"
+              :disabled="!isShowKeybeam"
+              label="フリックエフェクト (α)"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox
+              class="mt-0 ml-6"
+              v-model="isShowHandguide"
+              :disabled="!isShowKeybeam"
+              label="LeapMotion補助線をシミュレート (α)"
+              hide-details
+            ></v-checkbox>
+            <v-checkbox
               class="mt-0"
               v-model="isSimulateLED"
               label="LED制御をシミュレート (β)"
@@ -252,6 +266,15 @@
     >
       <div v-for="i in 6" :key="`keybeam${i}`"></div>
     </div>
+
+    <div
+      class="handguide"
+      v-show="isPreviewing && isShowHandguide"
+      ref="handguide"
+      :style="{
+        bottom: `${lift - 1}px`
+      }"
+    ></div>
   </div>
 </template>
 
@@ -319,6 +342,8 @@ export default {
       currentCombo: 0, // プレビューするコンボ数
       isShowCheckbox: false,
       isShowKeybeam: false,
+      isShowHandguide: true,
+      isShowFlickEffect: true,
       isSimulateLED: false,
       isPlayGuide: false,
       eventIds: [],
@@ -441,10 +466,13 @@ export default {
     },
     // NoteEvents(ノート到達時イベント)をセットする
     setNoteEvents(offset) {
+      let prevMoveTiming = -500;
+      let prevMoveTimer = null;
       Object.entries(this.previewEvents).each(([timing, event]) => {
         const time = timing - offset;
         const keybeamDOMs = this.$refs.keybeams?.querySelectorAll("div");
         const comboDOM = this.$refs.currentCombo;
+        const handguideDOM = this.$refs.handguide;
         if (time > 0)
           this.eventIds.push(
             setTimeout(() => {
@@ -490,6 +518,20 @@ export default {
                 this.currentCombo += event.count;
                 comboDOM.textContent = String(this.currentCombo);
               }
+              // ハンドガイド(手の動き)をシミュレート
+              if (this.isShowHandguide) {
+                if (event.handMove) {
+                  handguideDOM.classList.add(event.handMove);
+                  if (timing - prevMoveTiming > 200) {
+                    clearTimeout(prevMoveTimer);
+                  }
+                  prevMoveTimer = setTimeout(() => {
+                    handguideDOM.classList.remove(event.handMove);
+                  }, 200);
+                  prevMoveTiming = timing;
+                }
+              }
+              // LEDを指定色に変化
               if (this.isSimulateLED && event.color) {
                 this.setLEDColor(event.color);
               }
@@ -524,6 +566,7 @@ export default {
       this.$refs.keybeams
         ?.querySelectorAll("div")
         .forEach(dom => dom.classList.remove("-hold"));
+      this.$refs.handguide.classList.remove("-left", "-right");
       this.$refs.preview.style.transition = "0ms all linear";
       this.$refs.preview.style.bottom = "0px";
       this.timeoutIds.each(id => clearInterval(id));
@@ -561,7 +604,8 @@ export default {
               holdEnd: [], // キービームを止めるレーン番号
               color: null, // LED変化の色
               count: 0, // 増加するコンボ数
-              sound: false // 再生するタップ音
+              sound: false, // 再生するタップ音
+              handMove: null // 手の動き(LeapMotion)
             };
           // 通常
           if (note.type === 1) {
@@ -587,6 +631,9 @@ export default {
           else if (note.type === 3 || note.type === 4) {
             events[timing].sound = true;
             events[timing].count += 1;
+            // 手の動き LeapMotion補助線
+            if (note.type === 3) events[timing].handMove = "-left";
+            else events[timing].handMove = "-right";
           }
           // 音札
           else if (note.type === 5) {
@@ -686,10 +733,29 @@ export default {
   text-align: center;
   color: #f0f0f0;
   font-size: 20px;
-  z-index: 110;
+  z-index: 112;
   > strong {
     display: block;
     font-size: 50px;
+  }
+}
+.handguide {
+  position: fixed;
+  bottom: 0;
+  right: 209px;
+  width: 2px;
+  height: 100%;
+  text-align: center;
+  background: #ffc2df;
+  opacity: 0.75;
+  font-size: 20px;
+  z-index: 111;
+  transition: 0.2s all ease-out;
+  &.-left {
+    transform: skewX(5deg) translateX(-12vh);
+  }
+  &.-right {
+    transform: skewX(-5deg) translateX(12vh);
   }
 }
 .keybeams {
