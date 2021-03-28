@@ -55,7 +55,7 @@
     </div>
 
     <div class="control">
-      <v-expansion-panels accordionn>
+      <v-expansion-panels accordionn flat tile>
         <v-expansion-panel>
           <v-expansion-panel-header>
             <v-btn
@@ -114,14 +114,15 @@
             <v-checkbox
               class="mt-0"
               v-model="isShowKeybeam"
-              label="キービームとコンボを表示 (β)"
-              hide-details
+              label="キービームとコンボを表示"
+              persistent-hint
+              hint="以下2つはこの機能が有効でない場合効果がありません"
             ></v-checkbox>
             <v-checkbox
               class="mt-0 ml-6"
               v-model="isShowFlickEffect"
               :disabled="!isShowKeybeam"
-              label="フリックエフェクト (α)"
+              label="フリックエフェクト (β)"
               hide-details
             ></v-checkbox>
             <v-checkbox
@@ -342,8 +343,8 @@ export default {
       currentCombo: 0, // プレビューするコンボ数
       isShowCheckbox: false,
       isShowKeybeam: false,
-      isShowHandguide: true,
-      isShowFlickEffect: true,
+      isShowHandguide: false,
+      isShowFlickEffect: false,
       isSimulateLED: false,
       isPlayGuide: false,
       eventIds: [],
@@ -356,7 +357,7 @@ export default {
       hidden: localStorage.getItem("chart-editor__hidden") || 0, // HIDDENオプション
       comboOffset: 60,
       keybeamLength: 100,
-      comboOpacity: 30
+      comboOpacity: 50
     };
   },
   watch: {
@@ -468,6 +469,8 @@ export default {
     setNoteEvents(offset) {
       let prevMoveTiming = -500;
       let prevMoveTimer = null;
+      const isShowFlickEffect = this.isShowFlickEffect;
+      const isShowHandguide = this.isShowHandguide;
       Object.entries(this.previewEvents).each(([timing, event]) => {
         const time = timing - offset;
         const keybeamDOMs = this.$refs.keybeams?.querySelectorAll("div");
@@ -515,11 +518,35 @@ export default {
                     }, delay)
                   );
                 });
+                // フリックエフェクト
+                if (event.handMove && isShowFlickEffect) {
+                  const effectDOM = document.createElement("div");
+                  effectDOM.classList.add("flick-effect", event.handMove);
+                  this.$refs.keybeams.appendChild(effectDOM);
+                  // 座標計算
+                  let _left = (event.noteObject.lane - 1) * 60 + 30;
+                  let _offset = 0;
+                  let _width = event.noteObject.option[0] || 3;
+                  if (event.noteObject.option[1] && event.noteObject.option[2])
+                    _offset =
+                      (event.noteObject.option[1] /
+                        event.noteObject.option[2]) *
+                      60;
+                  effectDOM.style.left = `${_left -
+                    (_width / 2) * 60 +
+                    _offset}px`;
+                  effectDOM.style.width = `${60 * _width}px`;
+                  // 消えるタイマーのセット
+                  setTimeout(() => {
+                    this.$refs.keybeams.removeChild(effectDOM);
+                  }, 250);
+                }
+                // コンボ数
                 this.currentCombo += event.count;
                 comboDOM.textContent = String(this.currentCombo);
               }
               // ハンドガイド(手の動き)をシミュレート
-              if (this.isShowHandguide) {
+              if (isShowHandguide) {
                 if (event.handMove) {
                   handguideDOM.classList.add(event.handMove);
                   if (timing - prevMoveTiming > 200) {
@@ -605,7 +632,8 @@ export default {
               color: null, // LED変化の色
               count: 0, // 増加するコンボ数
               sound: false, // 再生するタップ音
-              handMove: null // 手の動き(LeapMotion)
+              handMove: null, // 手の動き(LeapMotion)
+              noteObject: {} // ノートのオブジェクト(Type: 3, 4のみ)
             };
           // 通常
           if (note.type === 1) {
@@ -631,6 +659,7 @@ export default {
           else if (note.type === 3 || note.type === 4) {
             events[timing].sound = true;
             events[timing].count += 1;
+            events[timing].noteObject = note;
             // 手の動き LeapMotion補助線
             if (note.type === 3) events[timing].handMove = "-left";
             else events[timing].handMove = "-right";
@@ -686,6 +715,11 @@ export default {
   right: 420px;
   padding: 0;
   z-index: 111;
+  border-left: 2px solid #a0a0a0;
+  border-bottom: 2px solid #a0a0a0;
+  max-height: 100vh;
+  overflow: scroll;
+  scrollbar-width: thin;
 }
 .led {
   position: fixed;
@@ -747,7 +781,8 @@ export default {
   height: 100%;
   text-align: center;
   background: #ffc2df;
-  opacity: 0.75;
+  background: linear-gradient(0deg, #ffc2dfff 0%, #ffc2df00 100%);
+  opacity: 0.7;
   font-size: 20px;
   z-index: 111;
   transition: 0.2s all ease-out;

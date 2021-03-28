@@ -15,6 +15,8 @@
     />
 
     <v-container fluid class="panel">
+      <img src="/logo.png" alt="Otofuda Chart Editor V2" class="logo" />
+
       <h3>譜面ファイル</h3>
 
       <v-row align="center">
@@ -1388,6 +1390,11 @@ export default {
     height: 100vh;
     overflow-y: auto;
     padding: 12px 32px;
+    .logo {
+      margin-left: -12px;
+      max-height: 96px;
+      max-width: calc(100vw - 720px);
+    }
     h3 {
       margin: 8px -12px;
     }
@@ -1561,6 +1568,55 @@ export default {
     .note.type99 {
       visibility: hidden;
     }
+  }
+}
+
+.flick-effect {
+  position: absolute;
+  bottom: 0px;
+  width: 120px;
+  height: 64px;
+  left: 0px;
+  &.-left {
+    background: radial-gradient(
+      at 50% 100%,
+      #87cefaf0 0%,
+      #87cefaa0 5%,
+      #87cefa00 60%
+    );
+    animation: 250ms flickLeft ease;
+    animation-iteration-count: 1;
+  }
+  &.-right {
+    background: radial-gradient(
+      at 50% 100%,
+      #f08080f0 0%,
+      #f08080a0 5%,
+      #f0808000 60%
+    );
+    animation: 250ms flickRight ease;
+    animation-iteration-count: 1;
+  }
+}
+
+@keyframes flickLeft {
+  from {
+    opacity: 1;
+    transform: scaleX(1.25) translateX(0px);
+  }
+  to {
+    opacity: 0;
+    transform: scaleX(2.5) translateX(-64px);
+  }
+}
+@keyframes flickRight {
+  from {
+    opacity: 1;
+    transform: scaleX(1.25) translateX(0px);
+  }
+  to {
+    opacity: 0;
+    transform: scaleX(2.5) translateX(64px);
   }
 }
 
