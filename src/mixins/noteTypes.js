@@ -45,6 +45,10 @@ export default {
         {
           text: "EOF",
           value: 99
+        },
+        {
+          text: "コメント",
+          value: 100
         }
       ]
     };
@@ -137,6 +141,14 @@ export default {
             label: "bpm",
             type: "number",
             desc: "Float型｜変化後のBPMの値"
+          }
+        ];
+      else if (note.type === 100)
+        return [
+          {
+            label: "comment",
+            type: "text",
+            desc: "String型｜コメント"
           }
         ];
       else return [];

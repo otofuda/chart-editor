@@ -1,6 +1,25 @@
 <template>
   <div>
+    <!-- プレビュー(オブジェクト表示) -->
     <div
+      v-if="isObjectBasedPreview"
+      class="object-based-preview"
+      :style="{
+        position: 'relative'
+      }"
+    >
+      <!-- 各小節 -->
+      <ObjectBasedMeasure
+        v-for="measure in measureData"
+        :key="`measure_${measure.measure}`"
+        :measure="measure"
+        :notes="getMeasureNotes(measure.measure)"
+        :currentDifficulty="currentDifficulty"
+      />
+    </div>
+    <!-- プレビュー(通常) -->
+    <div
+      v-else
       class="preview"
       ref="preview"
       :style="{
@@ -63,7 +82,7 @@
               outlined
               color="success"
               @click.stop="previewStart"
-              :disabled="isPreviewing"
+              :disabled="isPreviewing || isObjectBasedPreview"
             >
               <v-icon left>mdi-play</v-icon> 再生
             </v-btn>
@@ -144,6 +163,11 @@
               label="小節ガイド音を再生"
               hide-details
             ></v-checkbox>
+
+            <v-switch
+              v-model="isObjectBasedPreview"
+              label="Object表示モード"
+            ></v-switch>
 
             <h4 class="my-4">
               <v-icon>mdi-tune</v-icon>
@@ -281,6 +305,7 @@
 
 <script>
 import Measure from "./Measure.vue";
+import ObjectBasedMeasure from "./ObjectBasedMeasure.vue";
 import LongNote from "./LongNote.vue";
 import NoteShadow from "./NoteShadow.vue";
 import html2canvas from "html2canvas";
@@ -357,7 +382,8 @@ export default {
       hidden: localStorage.getItem("chart-editor__hidden") || 0, // HIDDENオプション
       comboOffset: 60,
       keybeamLength: 100,
-      comboOpacity: 50
+      comboOpacity: 50,
+      isObjectBasedPreview: false // オブジェクト表示モード
     };
   },
   watch: {
@@ -695,6 +721,7 @@ export default {
   },
   components: {
     Measure,
+    ObjectBasedMeasure,
     LongNote,
     NoteShadow
   }
@@ -708,6 +735,9 @@ export default {
   width: 420px;
   right: 0;
   margin-left: calc(100% - 420px);
+}
+.object-based-preview {
+  bottom: unset !important;
 }
 .control {
   position: fixed;

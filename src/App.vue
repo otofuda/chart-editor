@@ -15,7 +15,11 @@
     />
 
     <v-container fluid class="panel">
-      <img src="/logo.png" alt="Otofuda Chart Editor V2" class="logo" />
+      <img
+        src="https://otofuda.github.io/chart-editor/logo.png"
+        alt="Otofuda Chart Editor V2"
+        class="logo"
+      />
 
       <h3>譜面ファイル</h3>
 
@@ -1527,6 +1531,20 @@ export default {
     height: 0;
     border-top: 2px dashed #ff5050;
   }
+  &.type100 {
+    background: transparent;
+    height: 20px;
+    > .v-input {
+      display: none;
+      position: absolute;
+      bottom: 20px;
+      right: 0;
+      min-width: 180px;
+    }
+    &:hover > .v-input {
+      display: block;
+    }
+  }
 }
 .preview.detail .note {
   color: #f0f0f0;
@@ -1549,7 +1567,8 @@ export default {
     color: transparent;
     text-shadow: none;
   }
-  .note.type96 {
+  .note.type96,
+  .note.type100 {
     display: none;
   }
   &.preview_mode {

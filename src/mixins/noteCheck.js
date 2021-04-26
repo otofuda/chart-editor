@@ -85,7 +85,9 @@ export default {
         return "positionの値はsplitの値未満である必要があります。";
       else if (![-1, 1, 2, 3, 4, 5].includes(note.lane))
         return "不正なノートのレーン位置です。";
-      else if (![1, 2, 3, 4, 5, 94, 95, 96, 97, 98, 99].includes(note.type))
+      else if (
+        ![1, 2, 3, 4, 5, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
+      )
         return "不正なノートタイプです。";
       else return false;
     },
@@ -127,6 +129,13 @@ export default {
         // type95 小節線非表示制御の時は option: [-1]
         if (note.type === 95 && note.position === 0) return [-1];
         option.append(note.option[0] ? Number(note.option[0]) : -1);
+        return option;
+      }
+      // option: [comment: String]
+      else if ([100].includes(note.type)) {
+        option.append(
+          note.option && note.option[0] ? String(note.option[0]) : ""
+        );
         return option;
       }
       // 不明なtypeの時はそのまま返す
