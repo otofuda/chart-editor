@@ -26,6 +26,7 @@
         v-bind="attrs"
         v-on="on"
       >
+        <!-- テクスチャの時 -->
         <img
           v-if="note.type === 94"
           :src="note.option[0]"
@@ -34,6 +35,20 @@
           }"
           alt="texture"
         />
+
+        <!-- コメントの時 -->
+        <v-icon v-if="note.type === 100" color="warning" class="mt-2">
+          mdi-comment
+        </v-icon>
+        <v-textarea
+          outlined
+          background-color="amber lighten-4"
+          v-if="note.type === 100"
+          v-model="note.option[0]"
+          class="elevation-4"
+          hide-details
+          @click.stop
+        ></v-textarea>
 
         <input
           type="checkbox"
@@ -228,8 +243,8 @@ export default {
   },
   computed: {
     positionLeft() {
-      // TAP, ロング, 区切り線
-      if ([1, 2, 95].includes(this.note.type)) {
+      // TAP, ロング, 区切り線, コメント
+      if ([1, 2, 95, 100].includes(this.note.type)) {
         return (this.note.lane - 1) * 60;
       }
       // フリック
@@ -268,8 +283,8 @@ export default {
       );
     },
     noteWidth() {
-      // TAP, ロング
-      if ([1, 2].includes(this.note.type)) return 60;
+      // TAP, ロング, コメント
+      if ([1, 2, 100].includes(this.note.type)) return 60;
       // 左右フリック
       else if ([3, 4].includes(this.note.type)) {
         let _width = this.note.option[0] || 3;
