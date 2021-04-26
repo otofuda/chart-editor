@@ -112,7 +112,7 @@
           <v-row>
             <v-col cols="12" sm="6">
               <v-text-field
-                v-model="note.position"
+                v-model.number="note.position"
                 label="position"
                 outlined
                 dense
@@ -122,7 +122,7 @@
             </v-col>
             <v-col cols="12" sm="6">
               <v-text-field
-                v-model="note.split"
+                v-model.number="note.split"
                 label="split"
                 outlined
                 dense
@@ -137,7 +137,7 @@
           LANE
           <v-spacer></v-spacer>
           <v-radio-group
-            v-model="note.lane"
+            v-model.number="note.lane"
             row
             :disabled="isLanelessNote(note)"
           >
