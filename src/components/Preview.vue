@@ -3,7 +3,7 @@
     <!-- プレビュー(オブジェクト表示) -->
     <div
       v-if="isObjectBasedPreview"
-      class="preview-object-based"
+      class="object-based-preview"
       :style="{
         position: 'relative'
       }"
@@ -82,7 +82,7 @@
               outlined
               color="success"
               @click.stop="previewStart"
-              :disabled="isPreviewing"
+              :disabled="isPreviewing || isObjectBasedPreview"
             >
               <v-icon left>mdi-play</v-icon> 再生
             </v-btn>
@@ -735,6 +735,9 @@ export default {
   width: 420px;
   right: 0;
   margin-left: calc(100% - 420px);
+}
+.object-based-preview {
+  bottom: unset !important;
 }
 .control {
   position: fixed;
