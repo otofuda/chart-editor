@@ -459,6 +459,9 @@
         <v-btn class="ml-1 mb-8" color="success" @click="saveFile">
           <v-icon left>mdi-content-save</v-icon> 名前をつけて保存
         </v-btn>
+        <v-btn class="ml-1 mb-8" color="primary" @click="restoreBackup" text>
+          <v-icon left>mdi-file-restore</v-icon> 復元
+        </v-btn>
       </v-row>
 
       <v-card v-if="dialog.logs" class="mx-auto message-log" elevation="8">
@@ -869,6 +872,9 @@ export default {
     };
   },
   beforeCreate: Bury.init,
+  created: function() {
+    document.addEventListener("keydown", this.onPressKey);
+  },
   mounted() {
     this.reader.onload = event => {
       this.chartObject = JSON.parse(event.target.result);
@@ -1272,6 +1278,29 @@ export default {
         this.$set(note.option, 1, obj.width || note.option[1]);
         this.showSnackbar(`テクスチャ「${obj.name}をセットしました`);
       } else this.showSnackbar("挿入中のノートがテクスチャではありません");
+    },
+    // バックアップから復元
+    restoreBackup() {
+      const dialog = window.confirm(
+        "バックアップからデータを復元しますか？(現在の譜面データは失われます)"
+      );
+      if (dialog) {
+        const backupData = localStorage.getItem("chart-editor__backup");
+        this.chartObject = JSON.parse(backupData);
+        this.showSnackbar("バックアップから復元しました");
+      }
+    },
+    onPressKey(e) {
+      // localStorageに譜面バックアップを保存
+      if (e.ctrlKey && e.key === "s") {
+        e.preventDefault();
+        console.log(JSON.stringify(this.chartObject));
+        localStorage.setItem(
+          "chart-editor__backup",
+          JSON.stringify(this.chartObject)
+        );
+        this.showSnackbar("譜面バックアップを保存しました");
+      }
     }
   },
   // localStorageにコンフィグを書き込む
