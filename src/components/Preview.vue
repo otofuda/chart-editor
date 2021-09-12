@@ -25,7 +25,8 @@
       :style="{
         position: isPreviewing ? 'fixed' : 'relative',
         height: `${entireHeight}px`,
-        marginBottom: `${lift}px`
+        marginBottom: `${lift}px`,
+        transform: drawOffset === 0 ? null : `translateY(${drawOffset}px)`
       }"
       :class="{
         detail: isShowDetail,
@@ -176,7 +177,6 @@
             <v-text-field
               class="my-2"
               v-model.number="lift"
-              hide-details
               hint="判定ラインを上に押し上げます"
               persistent-hint
               append-icon="mdi-arrow-collapse-up"
@@ -187,7 +187,6 @@
             <v-text-field
               class="mb-2"
               v-model.number="sudden"
-              hide-details
               hint="譜面領域上部を隠します"
               persistent-hint
               append-icon="mdi-arrow-collapse-down"
@@ -197,7 +196,6 @@
             ></v-text-field>
             <v-text-field
               v-model.number="hidden"
-              hide-details
               hint="譜面領域下部を隠します"
               persistent-hint
               append-icon="mdi-eye-off"
@@ -218,6 +216,16 @@
               persistent-hint
               append-icon="mdi-arrow-up"
               label="コンボ表示位置"
+              outlined
+              dense
+            ></v-text-field>
+            <v-text-field
+              class="mb-2"
+              v-model.number="drawOffset"
+              hint="描画のみ位置をずらします"
+              persistent-hint
+              append-icon="mdi-arrow-expand-up"
+              label="判定位置調整(β)"
               outlined
               dense
             ></v-text-field>
@@ -380,9 +388,10 @@ export default {
       lift: localStorage.getItem("chart-editor__lift") || 0, // LIFTオプション
       sudden: localStorage.getItem("chart-editor__sudden") || 0, // SUDDENオプション
       hidden: localStorage.getItem("chart-editor__hidden") || 0, // HIDDENオプション
-      comboOffset: 60,
-      keybeamLength: 100,
-      comboOpacity: 50,
+      comboOffset: 60, // コンボ表示位置
+      drawOffset: 0, // 描画オフセット
+      keybeamLength: 100, // キービームの長さ
+      comboOpacity: 50, // コンボ数の透明度
       isObjectBasedPreview: false // オブジェクト表示モード
     };
   },
@@ -756,6 +765,7 @@ export default {
   top: 0;
   width: 20px;
   height: 100%;
+  // FIXME: 描画オフセット適用時に高さが大きくなる
   background: linear-gradient(0deg, #ff5151 30%, #44a5ff 70%);
   &.left {
     right: 400px;

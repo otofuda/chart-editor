@@ -99,6 +99,7 @@
               <v-text-field
                 :value="note.measure"
                 @change="value => (note.measure = Number(value))"
+                @keydown.enter.stop="menu = false"
                 hide-details
                 suffix="小節"
                 outlined

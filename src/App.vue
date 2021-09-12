@@ -279,6 +279,8 @@
 
       <h3>プレビュー領域の設定</h3>
 
+      <h5>現在のハイスピードの速度値:{{ (musicBpm * beatHeight) / 100 }}</h5>
+
       <v-slider
         v-model="beatHeight"
         :thumb-size="24"
@@ -1428,7 +1430,8 @@ export default {
       max-height: 96px;
       max-width: calc(100vw - 720px);
     }
-    h3 {
+    h3,
+    h5 {
       margin: 8px -12px;
     }
   }
