@@ -20,10 +20,22 @@
             </v-icon>
           </template>
         </v-expansion-panel-header>
+
         <v-expansion-panel-content>
           <v-alert type="error" v-if="hasError(note)">
             {{ hasError(note) }}
           </v-alert>
+
+          <v-text-field
+            :value="note.measure"
+            @change="value => (note.measure = Number(value))"
+            @keydown.enter.stop="menu = false"
+            label="小節"
+            outlined
+            dense
+            hide-details
+            type="number"
+          ></v-text-field>
           <v-row>
             <v-col cols="12" sm="6">
               <v-select
