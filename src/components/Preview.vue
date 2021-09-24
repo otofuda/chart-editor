@@ -319,6 +319,7 @@ import NoteShadow from "./NoteShadow.vue";
 import html2canvas from "html2canvas";
 
 export default {
+  inject: ["showSnackbar"],
   props: {
     currentChart: {
       type: Array,
@@ -606,14 +607,17 @@ export default {
       });
     },
     previewStart() {
+      if (!this.measureData[this.startFrom]) {
+        this.showSnackbar(`${this.startFrom}小節はありません`);
+        return false;
+      }
       this.returnPosition = window.scrollY; // 停止後に戻る座標
       this.isPreviewing = true;
       this.currentCombo = 0;
       this.$refs.currentCombo.textContent = String(this.currentCombo);
-      this.$refs.preview.style.transition = "0ms all linear";
-      // this.$refs.preview.style.bottom = "0px";
       // this.$refs.preview.style.transition = `${this.measureData.first.measureReachTime}ms all linear`;
       this.$refs.preview.style.bottom = `-${this.measureData.first.measurePositionBottom}px`;
+      this.$refs.preview.style.transition = "none";
       if (this.startFrom === 0) this.playFromZero();
       else this.playFromMeasure();
     },

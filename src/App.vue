@@ -450,7 +450,7 @@
         <v-btn
           class="ml-1 mb-8"
           color="primary"
-          @click="dialog.logs = true"
+          @click="dialog.logs = !dialog.logs"
           text
         >
           <v-icon left>mdi-message-outline</v-icon> メッセージログ
@@ -466,24 +466,34 @@
         </v-btn>
       </v-row>
 
-      <v-card v-if="dialog.logs" class="mx-auto message-log" elevation="8">
+      <v-card
+        v-if="dialog.logs"
+        class="mx-auto message-log"
+        elevation="4"
+        rounded="lg"
+      >
         <v-card-title>
           <v-btn icon class="mr-4" @click="dialog.logs = false">
             <v-icon>mdi-close</v-icon>
           </v-btn>
           メッセージログ
         </v-card-title>
-        <v-virtual-scroll
-          :bench="0"
-          :items="logs.slice().reverse()"
-          height="300"
-          item-height="64"
-        >
-          <template v-slot:default="{ item }">
-            <v-list-item :key="item" v-text="item" class="my-2" />
-            <v-divider></v-divider>
-          </template>
-        </v-virtual-scroll>
+
+        <v-list subheader>
+          <v-list-item v-for="item in logs.slice().reverse()" :key="item.date">
+            <v-list-item-content>
+              <p class="mb-2 d-flex">
+                <v-chip class="flex-shrink-0 mr-2" label>
+                  {{ item.type }}
+                </v-chip>
+                {{ item.message }}
+              </p>
+              <v-list-item-subtitle>
+                {{ item.date.toLocaleString("ja-JP") }}
+              </v-list-item-subtitle>
+            </v-list-item-content>
+          </v-list-item>
+        </v-list>
       </v-card>
     </v-container>
 
@@ -670,7 +680,7 @@
               @click="selectionAddLane(selectionLaneAddition)"
             >
               <v-icon left>mdi-auto-fix</v-icon>
-              各選択ノーツのレーンを加算または減算
+              各選択ノーツのレーンを加算／減算
             </v-btn>
           </v-row>
         </v-card-text>
@@ -969,6 +979,10 @@ export default {
       this.beatHeight = this.beatHeight + 10 || 100;
     },
     scrollToMeasure(measureNumber) {
+      if (!this.measureData[measureNumber]) {
+        this.showSnackbar(`${measureNumber}小節はありません`);
+        return false;
+      }
       const measurePositionTop =
         this.measureData.last?.measurePositionBottom -
         this.measureData[measureNumber].measurePositionBottom;
@@ -1703,5 +1717,10 @@ export default {
   top: 20px;
   left: 20px;
   width: 400px;
+
+  > .v-list {
+    height: 300px;
+    overflow-y: scroll;
+  }
 }
 </style>
