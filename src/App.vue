@@ -42,6 +42,9 @@
             hide-details
             outlined
             dense
+            :menu-props="{
+              rounded: 'lg'
+            }"
           ></v-select>
         </v-col>
       </v-row>
@@ -60,7 +63,7 @@
           <v-btn
             class="ml-4 white--text"
             color="orange darken-4"
-            text
+            outlined
             @click="appendSimultaneously(appendNote)"
           >
             このノートのみを全難易度に同時挿入
@@ -77,6 +80,9 @@
               v-model="appendNote.type"
               outlined
               dense
+              :menu-props="{
+                rounded: 'lg'
+              }"
             ></v-select>
           </v-col>
           <v-col cols="12" sm="3">
@@ -115,6 +121,9 @@
               outlined
               hide-details
               dense
+              :menu-props="{
+                rounded: 'lg'
+              }"
             ></v-combobox>
           </v-col>
         </v-row>
@@ -148,12 +157,12 @@
           offset-y
         >
           <template v-slot:activator="{ on, attrs }">
-            <v-btn color="indigo" dark v-bind="attrs" v-on="on">
+            <v-btn color="indigo" dark outlined v-bind="attrs" v-on="on">
               テクスチャをデータベースから探す
             </v-btn>
           </template>
 
-          <v-card>
+          <v-card rounded="lg">
             <v-tabs v-model="textureCurrentTab" show-arrows>
               <v-tabs-slider color="indigo"></v-tabs-slider>
               <v-tab v-for="tabName in textureTabs" :key="tabName">
@@ -177,7 +186,7 @@
                     sm="6"
                     md="4"
                   >
-                    <v-card class="texture-card" elevation="2">
+                    <v-card rounded="lg" class="texture-card" elevation="2">
                       <v-img :src="texture.url" height="100px">
                         <span class="texture-card__name">
                           {{ texture.name }}
@@ -187,6 +196,8 @@
                       <v-card-actions class="justify-end">
                         <v-btn
                           small
+                          outlined
+                          rounded
                           depressed
                           color="primary"
                           @click="setTexture(texture)"
@@ -274,6 +285,16 @@
             @place-notes="placeNotes(appendNote)"
           >
           </EndForm>
+
+          <v-alert
+            v-if="appendNote.end.size === 0"
+            class="mt-2"
+            dense
+            type="warning"
+            rounded="lg"
+          >
+            終点が1つもありません
+          </v-alert>
         </div>
       </div>
 
@@ -438,57 +459,64 @@
         </v-col>
       </v-row>
 
-      <v-row>
-        <v-btn
-          class="ml-1 mb-8"
-          color="primary"
-          @click="dialog.help = true"
-          text
-        >
+      <v-row class="mb-8">
+        <v-btn color="primary" @click="dialog.help = true" text>
           <v-icon left>mdi-help-circle</v-icon> 使い方
         </v-btn>
         <v-btn
-          class="ml-1 mb-8"
+          class="ml-2"
           color="primary"
-          @click="dialog.logs = true"
+          @click="dialog.logs = !dialog.logs"
           text
         >
           <v-icon left>mdi-message-outline</v-icon> メッセージログ
         </v-btn>
-        <v-btn class="ml-1 mb-8" color="primary" @click="analyze" text>
+        <v-btn class="ml-2" color="primary" @click="analyze" text>
           <v-icon left>mdi-chart-timeline-variant</v-icon> 譜面分析
         </v-btn>
-        <v-btn class="ml-1 mb-8" color="success" @click="saveFile">
+      </v-row>
+      <v-row class="mb-8">
+        <v-btn color="success" @click="saveFile">
           <v-icon left>mdi-content-save</v-icon> 名前をつけて保存
         </v-btn>
-        <v-btn class="ml-1 mb-8" color="primary" @click="restoreBackup" text>
+        <v-btn class="ml-2" color="success" @click="restoreBackup" outlined>
           <v-icon left>mdi-file-restore</v-icon> 復元
         </v-btn>
       </v-row>
 
-      <v-card v-if="dialog.logs" class="mx-auto message-log" elevation="8">
+      <v-card
+        v-if="dialog.logs"
+        class="mx-auto message-log"
+        elevation="2"
+        rounded="lg"
+      >
         <v-card-title>
           <v-btn icon class="mr-4" @click="dialog.logs = false">
             <v-icon>mdi-close</v-icon>
           </v-btn>
           メッセージログ
         </v-card-title>
-        <v-virtual-scroll
-          :bench="0"
-          :items="logs.slice().reverse()"
-          height="300"
-          item-height="64"
-        >
-          <template v-slot:default="{ item }">
-            <v-list-item :key="item" v-text="item" class="my-2" />
-            <v-divider></v-divider>
-          </template>
-        </v-virtual-scroll>
+
+        <v-list subheader>
+          <v-list-item v-for="item in logs.slice().reverse()" :key="item.date">
+            <v-list-item-content>
+              <p class="mb-2 d-flex">
+                <v-chip class="flex-shrink-0 mr-2" label>
+                  {{ item.type }}
+                </v-chip>
+                {{ item.message }}
+              </p>
+              <v-list-item-subtitle>
+                {{ item.date.toLocaleString("ja-JP") }}
+              </v-list-item-subtitle>
+            </v-list-item-content>
+          </v-list-item>
+        </v-list>
       </v-card>
     </v-container>
 
     <v-dialog v-model="dialog.help" width="800">
-      <v-card>
+      <v-card rounded="lg">
         <v-card-title class="headline">
           エディタの使い方
         </v-card-title>
@@ -510,7 +538,7 @@
     </v-dialog>
 
     <v-dialog v-model="dialog.analyzer" width="800">
-      <v-card>
+      <v-card rounded="lg">
         <v-card-title class="headline">
           譜面分析 ({{ currentDifficulty }})
         </v-card-title>
@@ -584,7 +612,7 @@
     </v-dialog>
 
     <v-dialog v-model="dialog.checked" width="800">
-      <v-card>
+      <v-card rounded="lg">
         <v-card-title>
           <v-icon left>mdi-auto-fix</v-icon>
           選択ノーツへの一括操作
@@ -607,7 +635,7 @@
               v-model.number="selectionTypeTo"
               min="1"
               max="99"
-              prefix="Type:"
+              prefix="Type："
               outlined
               dense
               hide-details
@@ -635,7 +663,7 @@
               v-model.number="selectionLaneTo"
               min="1"
               max="5"
-              prefix="Lane:"
+              prefix="Lane："
               outlined
               dense
               hide-details
@@ -659,7 +687,7 @@
               v-model.number="selectionLaneAddition"
               min="-4"
               max="4"
-              prefix="値:"
+              prefix="値："
               outlined
               dense
               hide-details
@@ -670,7 +698,36 @@
               @click="selectionAddLane(selectionLaneAddition)"
             >
               <v-icon left>mdi-auto-fix</v-icon>
-              各選択ノーツのレーンを加算または減算
+              各選択ノーツのレーンを加算／減算
+            </v-btn>
+          </v-row>
+        </v-card-text>
+        <v-divider></v-divider>
+        <v-card-title>
+          小節移動
+        </v-card-title>
+        <v-card-text>
+          <p>
+            選択したノーツの配置小節位置を加算または減算します。入力は正または負の整数。
+          </p>
+          <v-row align="center" class="mx-1">
+            <v-text-field
+              type="number"
+              v-model.number="selectionMeasureAddition"
+              min="-4"
+              max="4"
+              prefix="値："
+              outlined
+              dense
+              hide-details
+            ></v-text-field>
+            <v-btn
+              class="ml-4"
+              color="primary"
+              @click="selectionAddMeasure(selectionMeasureAddition)"
+            >
+              <v-icon left>mdi-auto-fix</v-icon>
+              選択ノーツの小節を加算／減算
             </v-btn>
           </v-row>
         </v-card-text>
@@ -678,7 +735,7 @@
     </v-dialog>
 
     <v-dialog v-model="dialog.batchcheck" width="800">
-      <v-card>
+      <v-card rounded="lg">
         <v-card-title>
           <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
           ノーツの一括選択
@@ -755,7 +812,7 @@
       </v-card>
     </v-dialog>
 
-    <v-snackbar v-model="snackbar" vertical>
+    <v-snackbar v-model="snackbar" rounded="lg" vertical>
       {{ snackbarText }}
       <template v-slot:action="{ attrs }">
         <v-btn color="error" text v-bind="attrs" @click="snackbar = false">
@@ -852,6 +909,7 @@ export default {
       selectionLaneTo: 1,
       selectionLaneAddition: 1,
       selectionTypeTo: 1,
+      selectionMeasureAddition: 0,
 
       snackbar: false, // 通知表示管理
       snackbarText: "メッセージ", // 通知内容
@@ -969,6 +1027,10 @@ export default {
       this.beatHeight = this.beatHeight + 10 || 100;
     },
     scrollToMeasure(measureNumber) {
+      if (!this.measureData[measureNumber]) {
+        this.showSnackbar(`${measureNumber}小節はありません`);
+        return false;
+      }
       const measurePositionTop =
         this.measureData.last?.measurePositionBottom -
         this.measureData[measureNumber].measurePositionBottom;
@@ -1222,6 +1284,22 @@ export default {
         targets.each(note => (note.lane = Math.min(note.lane + d, 5)));
         this.showSnackbar(`+${d} 一括加算処理を実行しました`);
       }
+      this.dialog.checked = false;
+    },
+    // 選択ノーツの小節を加算または減算
+    selectionAddMeasure(diff) {
+      const d = Number(diff);
+      const targets = this.chartObject[this.currentDifficulty].filter(
+        note => note.isSelected
+      );
+      targets.each(note => {
+        note.measure = Math.max(note.measure + d, 0);
+        // TODO: ネスト終点に対応
+        note.end.each(end => {
+          end.measure = Math.max(end.measure + d, 0);
+        });
+      });
+      this.showSnackbar(`小節位置 ${d} 一括処理を実行しました`);
       this.dialog.checked = false;
     },
     // 対象ノーツを一括選択
@@ -1703,5 +1781,10 @@ export default {
   top: 20px;
   left: 20px;
   width: 400px;
+
+  > .v-list {
+    height: 300px;
+    overflow-y: scroll;
+  }
 }
 </style>

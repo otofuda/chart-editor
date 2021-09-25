@@ -83,7 +83,7 @@
     </template>
 
     <!-- ポップアップ編集 -->
-    <v-card v-if="menu">
+    <v-card v-if="menu" rounded="lg">
       <v-list>
         <v-list-item>
           <v-card-text>#{{ note.index }} {{ noteTypeName }}</v-card-text>
@@ -155,6 +155,7 @@
             align="left"
             outlined
             dense
+            :menu-props="{ rounded: 'lg' }"
           ></v-select>
         </v-list-item>
 

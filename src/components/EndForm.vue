@@ -22,6 +22,9 @@
           v-model="end.lane"
           outlined
           dense
+          :menu-props="{
+            rounded: 'lg'
+          }"
         ></v-select>
       </v-col>
       <v-col cols="12" sm="3">
@@ -60,6 +63,9 @@
           outlined
           hide-details
           dense
+          :menu-props="{
+            rounded: 'lg'
+          }"
         ></v-combobox>
       </v-col>
     </v-row>
@@ -67,10 +73,10 @@
     <!-- エラー表示 -->
     <v-alert
       dense
-      outlined
       type="error"
       v-for="error in errors"
       :key="`append_end_${index}_error${error}`"
+      rounded="lg"
     >
       {{ error }}
     </v-alert>
@@ -172,7 +178,7 @@ export default {
     errors() {
       const array = [];
       if (this.selfPosition <= this.parentPosition)
-        array.append("終点が親ノートよりも手前にあります。");
+        array.append("終点が親ノートよりも手前または同じ位置にあります。");
       if (this.end.lane !== this.parent.lane)
         array.append("終点と親ノートのレーン位置が異なります。");
       return array;

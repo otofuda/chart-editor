@@ -52,7 +52,7 @@
         ></i>
       </div>
     </template>
-    <v-card v-if="menu">
+    <v-card v-if="menu" rounded="lg">
       <v-list>
         <v-list-item>
           <v-card-text>#{{ note.index }} ロング</v-card-text>

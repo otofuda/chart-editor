@@ -9,7 +9,7 @@
       hiddenControl: notes.find(note => note.type === 95 && note.position === 0)
     }"
   >
-    <v-menu offset-y :close-on-content-click="false">
+    <v-menu offset-y :close-on-content-click="false" rounded="lg">
       <template v-slot:activator="{ on, attrs }">
         <v-btn
           dark
@@ -58,6 +58,7 @@
             hide-details
             outlined
             dense
+            :menu-props="{ rounded: 'lg' }"
           ></v-select>
         </v-list-item>
         <v-list-item class="px-0 mx-2">

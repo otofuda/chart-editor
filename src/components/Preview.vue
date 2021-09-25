@@ -75,7 +75,7 @@
     </div>
 
     <div class="control">
-      <v-expansion-panels accordionn flat tile>
+      <v-expansion-panels accordionn tile>
         <v-expansion-panel>
           <v-expansion-panel-header>
             <v-btn
@@ -114,52 +114,52 @@
               表示とサウンド
             </h4>
             <v-checkbox
-              class="mt-0"
+              class="mt-2"
               v-model="isShowCheckbox"
               label="チェックボックスを表示"
               hide-details
             ></v-checkbox>
             <v-checkbox
-              class="mt-0"
+              class="mt-2"
               v-model="isPlayKeySound"
               label="打鍵音を再生 (β)"
               hide-details
             ></v-checkbox>
             <v-checkbox
-              class="mt-0"
+              class="mt-2"
               v-model="isPlayKeySoundEnd"
               label="LN終点音を再生 (α)"
               hide-details
             ></v-checkbox>
             <v-checkbox
-              class="mt-0"
+              class="mt-2"
               v-model="isShowKeybeam"
               label="キービームとコンボを表示"
               persistent-hint
               hint="以下2つはこの機能が有効でない場合効果がありません"
             ></v-checkbox>
             <v-checkbox
-              class="mt-0 ml-6"
+              class="mt-2 ml-6"
               v-model="isShowFlickEffect"
               :disabled="!isShowKeybeam"
               label="フリックエフェクト (β)"
               hide-details
             ></v-checkbox>
             <v-checkbox
-              class="mt-0 ml-6"
+              class="mt-2 ml-6"
               v-model="isShowHandguide"
               :disabled="!isShowKeybeam"
               label="LeapMotion補助線をシミュレート (α)"
               hide-details
             ></v-checkbox>
             <v-checkbox
-              class="mt-0"
+              class="mt-2"
               v-model="isSimulateLED"
               label="LED制御をシミュレート (β)"
               hide-details
             ></v-checkbox>
             <v-checkbox
-              class="mt-0"
+              class="mt-2"
               v-model="isPlayGuide"
               label="小節ガイド音を再生"
               hide-details
@@ -244,7 +244,7 @@
               hide-details
               max="100"
               min="0"
-              thumb-label
+              thumb-label="always"
             ></v-slider>
           </v-expansion-panel-content>
         </v-expansion-panel>
@@ -319,6 +319,7 @@ import NoteShadow from "./NoteShadow.vue";
 import html2canvas from "html2canvas";
 
 export default {
+  inject: ["showSnackbar"],
   props: {
     currentChart: {
       type: Array,
@@ -606,14 +607,17 @@ export default {
       });
     },
     previewStart() {
+      if (!this.measureData[this.startFrom]) {
+        this.showSnackbar(`${this.startFrom}小節はありません`);
+        return false;
+      }
       this.returnPosition = window.scrollY; // 停止後に戻る座標
       this.isPreviewing = true;
       this.currentCombo = 0;
       this.$refs.currentCombo.textContent = String(this.currentCombo);
-      this.$refs.preview.style.transition = "0ms all linear";
-      // this.$refs.preview.style.bottom = "0px";
       // this.$refs.preview.style.transition = `${this.measureData.first.measureReachTime}ms all linear`;
       this.$refs.preview.style.bottom = `-${this.measureData.first.measurePositionBottom}px`;
+      this.$refs.preview.style.transition = "none";
       if (this.startFrom === 0) this.playFromZero();
       else this.playFromMeasure();
     },
