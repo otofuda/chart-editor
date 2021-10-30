@@ -75,8 +75,8 @@
           <span>{{ hasError(note) }}</span>
         </v-tooltip>
 
-        {{ note.position }}/{{ note.split }}
         <strong v-if="note.type === 97">BEAT {{ note.option[0] }}</strong>
+        {{ note.position }}/{{ note.split }}
         <strong v-if="note.type === 98">BPM {{ note.option[0] }}</strong>
         <strong v-if="note.type === 99">EOF</strong>
       </span>
@@ -234,7 +234,9 @@ export default {
     },
     cloneThisNote() {
       this.setAppendNoteInfo({
-        ...this.note
+        ...this.note,
+        option: [...this.note.option],
+        end: []
       });
       this.menu = false;
       this.showSnackbar("挿入ノートに同じデータをセットしました");

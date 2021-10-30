@@ -1630,6 +1630,7 @@ export default {
     z-index: 98;
     height: 1px;
     background: greenyellow;
+    text-align: left;
   }
   &.type98 {
     z-index: 98;
