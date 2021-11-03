@@ -12,6 +12,7 @@
       :isShowDetail="isShowDetail"
       :isCaptureMode="isCaptureMode"
       :isPreviewMode="isPreviewMode"
+      :isImageMode="isImageMode"
     />
 
     <v-container fluid class="panel">
@@ -345,31 +346,46 @@
           suffix="小節へ"
           outlined
           dense
-          hide-details
         ></v-text-field>
         <v-btn class="ml-4" color="primary" @click="scrollToMeasure(scrollTo)">
           <v-icon left>mdi-arrow-right</v-icon> 遷移
         </v-btn>
       </v-row>
 
+      <h3>プレビュー表示モード</h3>
+
       <v-row>
-        <v-icon>mdi-eye</v-icon>
         <v-checkbox
-          class="ml-4"
+          prepend-icon="mdi-format-align-justify"
           v-model="isShowDetail"
           label="ノーツ詳細を表示"
+          hide-details
         ></v-checkbox>
+      </v-row>
+      <v-row>
         <v-checkbox
-          class="ml-4"
+          prepend-icon="mdi-camera"
           :disabled="!isShowDetail"
           v-model="isCaptureMode"
           label="キャプチャ用モード"
+          hide-details
         ></v-checkbox>
+      </v-row>
+      <v-row>
         <v-checkbox
-          class="ml-4"
-          :disabled="!isShowDetail || !isCaptureMode"
+          prepend-icon="mdi-play-circle-outline"
+          :disabled="!isShowDetail || !isCaptureMode || isImageMode"
           v-model="isPreviewMode"
           label="譜面プレビュー用"
+          hide-details
+        ></v-checkbox>
+      </v-row>
+      <v-row>
+        <v-checkbox
+          prepend-icon="mdi-image"
+          :disabled="!isShowDetail || !isCaptureMode || isPreviewMode"
+          v-model="isImageMode"
+          label="譜面画像生成用"
         ></v-checkbox>
       </v-row>
 
@@ -899,6 +915,7 @@ export default {
       isShowDetail: false,
       isCaptureMode: false,
       isPreviewMode: false,
+      isImageMode: false,
 
       // 一括選択の対象
       batchSelectTypes: [],
@@ -1665,7 +1682,7 @@ export default {
   display: block;
 }
 
-// キャプチャーモード, プレビューモード
+// キャプチャ用モード
 .preview.detail.capture_mode {
   .note {
     color: #a0a0a0;
@@ -1680,8 +1697,9 @@ export default {
   }
   .note.type96,
   .note.type100 {
-    display: none;
+    visibility: hidden;
   }
+  // 譜面プレビュー用モード
   &.preview_mode {
     .measure > .v-btn {
       opacity: 0;
@@ -1696,6 +1714,31 @@ export default {
     .note.type97,
     .note.type98,
     .note.type99 {
+      visibility: hidden;
+    }
+  }
+  // 譜面画像生成用モード
+  &.image_mode {
+    margin-bottom: 0 !important;
+
+    .measure > .v-btn {
+      opacity: 0;
+    }
+    .note {
+      color: transparent;
+      text-shadow: none;
+      &.shadow,
+      &.type97,
+      &.type98,
+      &.type99 {
+        visibility: hidden;
+      }
+      &.type96,
+      &.type100 {
+        visibility: visible;
+      }
+    }
+    .led {
       visibility: hidden;
     }
   }

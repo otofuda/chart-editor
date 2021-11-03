@@ -32,6 +32,7 @@
         detail: isShowDetail,
         capture_mode: isCaptureMode,
         preview_mode: isPreviewMode,
+        image_mode: isImageMode,
         checkbox: isShowCheckbox
       }"
     >
@@ -359,6 +360,10 @@ export default {
       default: false
     },
     isPreviewMode: {
+      type: Boolean,
+      default: false
+    },
+    isImageMode: {
       type: Boolean,
       default: false
     }
