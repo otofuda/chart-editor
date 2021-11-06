@@ -1711,6 +1711,9 @@ export default {
       color: transparent;
       text-shadow: none;
     }
+    .note.type5 {
+      box-shadow: 0 0 16px 0 gold;
+    }
     .note.type97,
     .note.type98,
     .note.type99 {
@@ -1733,13 +1736,14 @@ export default {
       &.type99 {
         visibility: hidden;
       }
-      &.type96,
-      &.type100 {
+      &.type96 {
         visibility: visible;
+        height: 20px;
+        border-width: 2px;
+        border-radius: 4px;
+        width: 20px !important;
+        left: -40px !important;
       }
-    }
-    .led {
-      visibility: hidden;
     }
   }
 }
@@ -1748,8 +1752,11 @@ export default {
   position: absolute;
   bottom: 0px;
   width: 120px;
-  height: 64px;
+  height: 100px;
   left: 0px;
+  transform-origin: bottom center;
+  filter: blur(16px);
+  animation-iteration-count: 1;
   &.-left {
     background: radial-gradient(
       at 50% 100%,
@@ -1758,7 +1765,6 @@ export default {
       #87cefa00 60%
     );
     animation: 250ms flickLeft ease;
-    animation-iteration-count: 1;
   }
   &.-right {
     background: radial-gradient(
@@ -1768,28 +1774,23 @@ export default {
       #f0808000 60%
     );
     animation: 250ms flickRight ease;
-    animation-iteration-count: 1;
   }
 }
 
 @keyframes flickLeft {
   from {
-    opacity: 1;
-    transform: scaleX(1.25) translateX(0px);
+    transform: scaleX(2) scaleY(1);
   }
   to {
-    opacity: 0;
-    transform: scaleX(2.5) translateX(-64px);
+    transform: scaleX(0.5) scaleY(0) translateX(-100%);
   }
 }
 @keyframes flickRight {
   from {
-    opacity: 1;
-    transform: scaleX(1.25) translateX(0px);
+    transform: scaleX(2) scaleY(1);
   }
   to {
-    opacity: 0;
-    transform: scaleX(2.5) translateX(64px);
+    transform: scaleX(0.5) scaleY(0) translateX(100%);
   }
 }
 
