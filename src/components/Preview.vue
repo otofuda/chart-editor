@@ -744,9 +744,17 @@ export default {
           }
           // LED制御
           else if (note.type === 96) {
-            events[
-              timing
-            ].color = `rgb(${note.option[0]},${note.option[1]},${note.option[2]})`;
+            // (-1, -1, -1)の時はデフォルトに戻す
+            if (
+              note.option[0] === -1 &&
+              note.option[1] === -1 &&
+              note.option[2] === -1
+            ) {
+              events[timing].color = this.defaultLEDColor;
+            } else
+              events[
+                timing
+              ].color = `rgb(${note.option[0]},${note.option[1]},${note.option[2]})`;
           }
         });
       }

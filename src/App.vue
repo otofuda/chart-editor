@@ -215,14 +215,26 @@
         </v-menu>
 
         <!-- Type96 カラーピッカー -->
-        <v-color-picker
-          v-if="appendNote.type === 96"
-          v-model="appendNoteColorOption"
-          :swatches="colorSwatches"
-          show-swatches
-          elevation="2"
-          hide-inputs
-        ></v-color-picker>
+        <v-row v-if="appendNote.type === 96">
+          <v-color-picker
+            v-model="appendNoteColorOption"
+            :swatches="colorSwatches"
+            show-swatches
+            elevation="2"
+            class="mr-2 mb-2"
+            hide-inputs
+          ></v-color-picker>
+          <div>
+            <div class="mb-2">特殊な色を設定</div>
+            <v-btn
+              outlined
+              color="primary"
+              @click="appendNote.option = [-1, -1, -1]"
+            >
+              青赤(default)に戻す
+            </v-btn>
+          </div>
+        </v-row>
 
         <v-row align="center" justify="space-between">
           <v-radio-group
