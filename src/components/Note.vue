@@ -321,9 +321,17 @@ export default {
       return this.noteTypes.find(t => t.value === this.note.type)?.text;
     },
     dispColor() {
-      return this.note.type === 96
-        ? `rgb(${this.note.option[0]},${this.note.option[1]},${this.note.option[2]})`
-        : null;
+      if (this.note.type === 96) {
+        if (
+          this.note.option[0] === -1 &&
+          this.note.option[1] === -1 &&
+          this.note.option[2] === -1
+        ) {
+          return "linear-gradient(0deg, #ff5151 20%, #44a5ff 80%)";
+        } else
+          return `rgb(${this.note.option[0]},${this.note.option[1]},${this.note.option[2]})`;
+      }
+      return null;
     }
   }
 };

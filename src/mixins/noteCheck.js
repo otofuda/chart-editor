@@ -131,6 +131,15 @@ export default {
         option.append(note.option[0] ? Number(note.option[0]) : -1);
         return option;
       }
+      // option: [r: Integer, g: Integer, b: Integer]
+      else if ([96].includes(note.type)) {
+        option.append(
+          Number(note.option[0]),
+          Number(note.option[1]),
+          Number(note.option[2])
+        );
+        return option;
+      }
       // option: [comment: String]
       else if ([100].includes(note.type)) {
         option.append(

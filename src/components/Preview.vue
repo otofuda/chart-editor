@@ -69,11 +69,31 @@
         :measureData="measureData"
         :isPreAppend="true"
       />
-
-      <!-- LED -->
-      <div class="led left" ref="LEDLeft"></div>
-      <div class="led right" ref="LEDRight"></div>
     </div>
+
+    <!-- LED -->
+    <div
+      v-show="!isObjectBasedPreview && !isImageMode"
+      class="led left"
+      ref="LEDLeft"
+    ></div>
+    <div
+      v-show="!isObjectBasedPreview && !isImageMode"
+      class="led right"
+      ref="LEDRight"
+    ></div>
+
+    <!-- LED(プレビュー時シャドー) -->
+    <div
+      v-if="!isObjectBasedPreview && isPreviewMode"
+      class="led left -s"
+      ref="LEDLeftShadow"
+    ></div>
+    <div
+      v-if="!isObjectBasedPreview && isPreviewMode"
+      class="led right -s"
+      ref="LEDRightShadow"
+    ></div>
 
     <div class="control">
       <v-expansion-panels accordionn tile>
@@ -565,7 +585,7 @@ export default {
                   effectDOM.classList.add("flick-effect", event.handMove);
                   this.$refs.keybeams.appendChild(effectDOM);
                   // 座標計算
-                  let _left = (event.noteObject.lane - 1) * 60 + 30;
+                  const _left = (event.noteObject.lane - 1) * 60 + 30;
                   let _offset = 0;
                   let _width = event.noteObject.option[0] || 3;
                   if (event.noteObject.option[1] && event.noteObject.option[2])
@@ -573,6 +593,7 @@ export default {
                       (event.noteObject.option[1] /
                         event.noteObject.option[2]) *
                       60;
+                  if (_width === -1) _width = 3;
                   effectDOM.style.left = `${_left -
                     (_width / 2) * 60 +
                     _offset}px`;
@@ -650,6 +671,13 @@ export default {
     setLEDColor(color) {
       this.$refs.LEDLeft.style.background = color || this.defaultLEDColor;
       this.$refs.LEDRight.style.background = color || this.defaultLEDColor;
+
+      if (this.isPreviewMode) {
+        this.$refs.LEDLeftShadow.style.background =
+          color || this.defaultLEDColor;
+        this.$refs.LEDRightShadow.style.background =
+          color || this.defaultLEDColor;
+      }
     }
   },
   computed: {
@@ -716,9 +744,17 @@ export default {
           }
           // LED制御
           else if (note.type === 96) {
-            events[
-              timing
-            ].color = `rgb(${note.option[0]},${note.option[1]},${note.option[2]})`;
+            // (-1, -1, -1)の時はデフォルトに戻す
+            if (
+              note.option[0] === -1 &&
+              note.option[1] === -1 &&
+              note.option[2] === -1
+            ) {
+              events[timing].color = this.defaultLEDColor;
+            } else
+              events[
+                timing
+              ].color = `rgb(${note.option[0]},${note.option[1]},${note.option[2]})`;
           }
         });
       }
@@ -773,14 +809,16 @@ export default {
   position: fixed;
   top: 0;
   width: 20px;
-  height: 100%;
-  // FIXME: 描画オフセット適用時に高さが大きくなる
+  height: 100vh;
   background: linear-gradient(0deg, #ff5151 30%, #44a5ff 70%);
   &.left {
     right: 400px;
   }
   &.right {
     right: 0;
+  }
+  &.-s {
+    filter: blur(12px);
   }
 }
 /* 各種オプション表示用 */
@@ -827,19 +865,21 @@ export default {
   bottom: 0;
   right: 209px;
   width: 2px;
-  height: 100%;
+  height: 400px;
   text-align: center;
   background: #ffc2df;
-  background: linear-gradient(0deg, #ffc2dfff 0%, #ffc2df00 100%);
+  background: linear-gradient(0deg, #ffc2df88 0%, #ffc2df00 100%);
   opacity: 0.7;
   font-size: 20px;
   z-index: 111;
   transition: 0.2s all ease-out;
   &.-left {
-    transform: skewX(5deg) translateX(-12vh);
+    transform: skewX(4deg) translateX(-12vh);
+    transition: 0.2s all ease-out;
   }
   &.-right {
-    transform: skewX(-5deg) translateX(12vh);
+    transform: skewX(-4deg) translateX(12vh);
+    transition: 0.2s all ease-out;
   }
 }
 .keybeams {
@@ -855,9 +895,16 @@ export default {
     background: linear-gradient(#16d5f700 0%, #16d5f790 100%);
     &:first-child {
       position: absolute;
+      top: 0;
       height: 100%;
       width: 300px;
+      transition: 0.2s all linear;
       background: linear-gradient(#f7d51600 0%, #f7d51690 100%);
+      transform-origin: bottom center;
+      transform: scaleY(1.5);
+      &.-on {
+        transform: scaleY(1);
+      }
     }
     &.-on {
       opacity: 1;
