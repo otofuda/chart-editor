@@ -72,6 +72,7 @@
           </v-btn>
         </v-row>
         <v-row>
+          <!-- Type -->
           <v-col cols="12" sm="3">
             <v-select
               :items="noteTypes"
@@ -86,6 +87,7 @@
               }"
             ></v-select>
           </v-col>
+          <!-- Measure -->
           <v-col cols="12" sm="3">
             <v-text-field
               v-model.number="appendNote.measure"
@@ -97,6 +99,7 @@
               min="0"
             ></v-text-field>
           </v-col>
+          <!-- Position -->
           <v-col cols="12" sm="3">
             <v-text-field
               v-model.number="appendNote.position"
@@ -114,6 +117,7 @@
               @keydown.down="appendNoteToDown"
             ></v-text-field>
           </v-col>
+          <!-- Split -->
           <v-col cols="12" sm="3">
             <v-combobox
               v-model.number="appendNote.split"
@@ -1008,6 +1012,7 @@ export default {
       this.fileName = "default.json";
       this.isLoaded = true;
     },
+    /** JSONファイルを保存 */
     saveFile() {
       const saveObject = {
         raku: [],
@@ -1015,24 +1020,14 @@ export default {
         normal: [],
         hard: [],
         extra: [],
-        info: { ...this.chartObject.info }
+        info: {
+          version: 2,
+          ...this.chartObject.info
+        }
       };
-      // TODO: Validation
-      // type: 5 は lane: 3
-      // type: 96, 97, 98, 99は lane: -1
-      // type: 2 以外は end: []
+      // 各ノートにValidationを実行
       this.difficulties.each(d => {
-        saveObject[d] = this.chartObject[d].map(note => {
-          return {
-            type: Number(note.type),
-            measure: Number(note.measure),
-            lane: Number(note.lane),
-            position: Number(note.position),
-            split: Number(note.split),
-            option: this.getValidatedOptions(note),
-            end: note.end || []
-          };
-        });
+        saveObject[d] = this.chartObject[d].map(this.getValidatedNote);
       });
       console.log("saveObject", saveObject);
       const blob = new Blob([JSON.stringify(saveObject, null, 4)], {
