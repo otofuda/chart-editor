@@ -60,17 +60,17 @@ export default {
           {
             label: "width",
             type: "number",
-            desc: "Float型｜中心を基点とした横幅(単位：1レーンの幅)"
+            desc: "String型｜中心を基点とした横幅(単位：1レーンの幅)"
           },
           {
             label: "offsetNumer",
             type: "number",
-            desc: "Integer型｜右側へのオフセット分数の分子"
+            desc: "String型｜右側へのオフセット分数の分子"
           },
           {
             label: "offsetDenom",
             type: "number",
-            desc: "Integer型｜右側へのオフセット分数の分母"
+            desc: "String型｜右側へのオフセット分数の分母"
           }
         ];
       else if (note.type === 94)
@@ -83,22 +83,22 @@ export default {
           {
             label: "width",
             type: "number",
-            desc: "Float型｜中心を基点とした横幅(単位：1レーンの幅)"
+            desc: "String型｜中心を基点とした横幅(単位：1レーンの幅)"
           },
           {
             label: "height",
             type: "number",
-            desc: "Float型｜下面を基点とした高さ(単位：1小節の高さ)"
+            desc: "String型｜下面を基点とした高さ(単位：1小節の高さ)"
           },
           {
             label: "offsetNumer",
             type: "number",
-            desc: "Integer型｜右側へのオフセット分数の分子"
+            desc: "String型｜右側へのオフセット分数の分子"
           },
           {
             label: "offsetDenom",
             type: "number",
-            desc: "Integer型｜右側へのオフセット分数の分母"
+            desc: "String型｜右側へのオフセット分数の分母"
           }
         ];
       else if (note.type === 95)
@@ -106,7 +106,7 @@ export default {
           {
             label: "length",
             type: "number",
-            desc: "Integer型｜左面を基点とした横幅(単位：1レーンの幅)"
+            desc: "String型｜左面を基点とした横幅(単位：1レーンの幅)"
           }
         ];
       else if (note.type === 96)
@@ -114,17 +114,17 @@ export default {
           {
             label: "red",
             type: "number",
-            desc: "Integer型｜0-255の整数"
+            desc: "String型｜0-255の整数"
           },
           {
             label: "green",
             type: "number",
-            desc: "Integer型｜0-255の整数"
+            desc: "String型｜0-255の整数"
           },
           {
             label: "blue",
             type: "number",
-            desc: "Integer型｜0-255の整数"
+            desc: "String型｜0-255の整数"
           }
         ];
       else if (note.type === 97)
@@ -132,7 +132,7 @@ export default {
           {
             label: "beat",
             type: "number",
-            desc: "Integer型｜変化後の[n/4拍子]の分子の値"
+            desc: "String型｜変化後の[n/4拍子]の分子の値"
           }
         ];
       else if (note.type === 98)
@@ -140,7 +140,7 @@ export default {
           {
             label: "bpm",
             type: "number",
-            desc: "Float型｜変化後のBPMの値"
+            desc: "String型｜変化後のBPMの値"
           }
         ];
       else if (note.type === 100)

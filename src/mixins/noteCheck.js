@@ -91,55 +91,94 @@ export default {
         return "不正なノートタイプです。";
       else return false;
     },
-    // ノートのオプション配列をバリデーション
+    /** ノートをバリデーション */
+    getValidatedNote(note) {
+      const type = Number(note.type);
+
+      // type: 5 は lane: 3
+      // type: 96, 97, 98, 99は lane: -1
+      let lane = Number(note.lane);
+      if (type === 5) lane = 3;
+      if ([96, 97, 98, 99].includes(type)) lane = -1;
+
+      // type: 2 以外は end: []
+      let end = [];
+      if (note.type === 2) {
+        end = [...note.end].map(this.getValidatedNote);
+      }
+
+      return {
+        type,
+        measure: Number(note.measure),
+        lane,
+        position: Number(note.position),
+        split: Number(note.split),
+        option: this.getValidatedOptions(note),
+        end
+      };
+    },
+    /** ノートのオプション配列をバリデーション */
     getValidatedOptions(note) {
-      const option = [];
+      /** @type string[] */
+      const option = []; // optionはStringの配列
+
       // option: []
       if ([1, 2, 5, 99].includes(note.type)) return option;
-      // option: [width: Float (, offsetNumer: Integer, offsetDenom: Integer)]
+
+      // フリックの場合
+      // option: [width: String (, offsetNumer: String, offsetDenom: String)]
       else if ([3, 4].includes(note.type)) {
-        option.append(note.option[0] ? Number(note.option[0]) : -1);
+        option.append(note.option[0] ? String(note.option[0]) : "-1");
         if (note.option[1] && note.option[2]) {
           option.append(
-            Number(note.option[1]).floor,
-            Number(note.option[2]).floor
+            String(note.option[1]),
+            String(note.option[2])
           );
         }
         return option;
       }
-      // option: [source: String, width: Float, height: Float(, offsetNumer: Integer, offsetDenom: Integer)]
+
+      // テクスチャの場合
+      // option: [source: String, width: String, height: String(, offsetNumer: String, offsetDenom: String)]
       else if ([94].includes(note.type)) {
         option.append(note.option[0] || "https://via.placeholder.com/50x100");
         // type94 テクスチャのデフォルト幅は 1
-        option.append(note.option[1] ? Number(note.option[1]) : 1);
+        option.append(note.option[1] ? String(note.option[1]) : "1");
         // type94 テクスチャのデフォルト高さは 0.25
-        option.append(note.option[2] ? Number(note.option[2]) : 0.25);
+        option.append(note.option[2] ? String(note.option[2]) : "0.25");
         if (note.option[3] && note.option[4]) {
           option.append(
-            Number(note.option[3]).floor,
-            Number(note.option[4]).floor
+            String(note.option[3]),
+            String(note.option[4])
           );
         }
         return option;
       }
-      // option: [length: Integer]
-      // option: [beat: Integer(?)]
-      // option: [bpm: Float]
+
+      // 区切り線、拍子変化、BPM変化の場合
+      // option: [length: String]
+      // option: [beat: String]
+      // option: [bpm: String]
       else if ([95, 97, 98].includes(note.type)) {
-        // type95 小節線非表示制御の時は option: [-1]
-        if (note.type === 95 && note.position === 0) return [-1];
-        option.append(note.option[0] ? Number(note.option[0]) : -1);
+        // type95 小節線非表示制御の時は option: ["-1"]
+        if (note.type === 95 && note.position === 0) return ["-1"];
+
+        option.append(note.option[0] ? String(note.option[0]) : "-1");
         return option;
       }
-      // option: [r: Integer, g: Integer, b: Integer]
+
+      // LED制御の場合
+      // option: [r: String, g: String, b: String]
       else if ([96].includes(note.type)) {
         option.append(
-          Number(note.option[0]),
-          Number(note.option[1]),
-          Number(note.option[2])
+          String(note.option[0]),
+          String(note.option[1]),
+          String(note.option[2])
         );
         return option;
       }
+
+      // コメントの場合
       // option: [comment: String]
       else if ([100].includes(note.type)) {
         option.append(
@@ -147,9 +186,11 @@ export default {
         );
         return option;
       }
-      // 不明なtypeの時はそのまま返す
-      else return [...note.option];
+
+      // 不明なtypeの時は全部Stringにしてそのまま返す
+      else return [...note.option].map((opt) => String(opt));
     },
+
     // lane: -1 固定ノートであるか
     isLanelessNote(note) {
       return [5, 96, 97, 98, 99].includes(note.type);
