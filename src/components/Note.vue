@@ -253,18 +253,19 @@ export default {
       }
       // フリック
       else if ([3, 4].includes(this.note.type)) {
-        let _width = this.note.option[0] || 3;
+        let _width = Number(this.note.option[0]) || 3;
         if (_width === -1) _width = 3;
         let _left = (this.note.lane - 1) * 60 + 30;
         let _offset = 0;
-        if (this.note.option[1] && this.note.option[2]) {
-          _offset = (this.note.option[1] / this.note.option[2]) * 60;
+        const numer = Number(this.note.option[1]), denom = Number(this.note.option[2]);
+        if (numer && denom) {
+          _offset = (numer / denom) * 60;
         }
         return _left - (_width / 2) * 60 + _offset;
       }
       // テクスチャ
       else if (this.note.type === 94) {
-        let _width = this.note.option[1] || 1;
+        let _width = Number(this.note.option[1]) || 1;
         let _left = (this.note.lane - 1) * 60 + 30;
         let _offset = 0;
         if (this.note.option[3] && this.note.option[4]) {
@@ -291,18 +292,18 @@ export default {
       if ([1, 2, 100].includes(this.note.type)) return 60;
       // 左右フリック
       else if ([3, 4].includes(this.note.type)) {
-        let _width = this.note.option[0] || 3;
+        let _width = Number(this.note.option[0]) || 3;
         if (_width === -1) _width = 3;
         return 60 * _width;
       }
       // テクスチャ
       else if (this.note.type === 94) {
-        let _width = this.note.option[1] || 1;
+        let _width = Number(this.note.option[1]) || 1;
         return 60 * _width - 1;
       }
       // 区切り線
       else if (this.note.type === 95) {
-        let _width = this.note.option[0] || 1;
+        let _width = Number(this.note.option[0]) || 1;
         if (_width === -1) _width = 1;
         if (this.note.position === 0) _width = 5;
         return 60 * _width;
@@ -323,9 +324,9 @@ export default {
     dispColor() {
       if (this.note.type === 96) {
         if (
-          this.note.option[0] === -1 &&
-          this.note.option[1] === -1 &&
-          this.note.option[2] === -1
+          Number(this.note.option[0]) === -1 &&
+          Number(this.note.option[1]) === -1 &&
+          Number(this.note.option[2]) === -1
         ) {
           return "linear-gradient(0deg, #ff5151 20%, #44a5ff 80%)";
         } else

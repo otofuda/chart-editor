@@ -50,6 +50,14 @@
         </v-col>
       </v-row>
 
+      <v-row class="difficulty-select">
+        <v-btn small dark color="blue" @click="currentDifficulty = 'raku'">RAKU</v-btn>
+        <v-btn small dark color="green" @click="currentDifficulty = 'easy'">EASY</v-btn>
+        <v-btn small dark color="orange" @click="currentDifficulty = 'normal'">NORMAL</v-btn>
+        <v-btn small dark color="#ff0984" @click="currentDifficulty = 'hard'">HARD</v-btn>
+        <v-btn small dark color="purple" @click="currentDifficulty = 'extra'">EXTRA</v-btn>
+      </v-row>
+
       <h3>ノートの挿入（仮配置：{{ preAppendNotes.size }}個）</h3>
 
       <v-checkbox v-model="isAppendMode" label="ノート挿入モード"></v-checkbox>
@@ -489,6 +497,15 @@
             dense
           ></v-text-field>
         </v-col>
+        <v-col>
+          <v-text-field
+            v-model.number="chartObject.info.version"
+            label="譜面ver"
+            outlined
+            dense
+            disabled
+          ></v-text-field>
+        </v-col>
       </v-row>
 
       <v-row class="mb-8">
@@ -507,7 +524,7 @@
           <v-icon left>mdi-chart-timeline-variant</v-icon> 譜面分析
         </v-btn>
       </v-row>
-      <v-row class="mb-8">
+      <v-row class="mb-2">
         <v-btn color="success" @click="saveFile">
           <v-icon left>mdi-content-save</v-icon> 名前をつけて保存
         </v-btn>
@@ -883,6 +900,7 @@ export default {
         hard: [],
         extra: [],
         info: {
+          version: 2,
           offset: 0,
           bpm: 120,
           beat: 4
@@ -1535,6 +1553,15 @@ export default {
     h3,
     h5 {
       margin: 8px -12px;
+    }
+  }
+  .difficulty-select {
+    margin-bottom: 16px;
+    .v-btn {
+      width: 90px;
+      border-radius: 0;
+      &:first-child { border-radius: 8px 0 0 8px }
+      &:last-child { border-radius: 0 8px 8px 0 }
     }
   }
   .v-menu__content {

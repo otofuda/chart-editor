@@ -587,7 +587,7 @@ export default {
                   // 座標計算
                   const _left = (event.noteObject.lane - 1) * 60 + 30;
                   let _offset = 0;
-                  let _width = event.noteObject.option[0] || 3;
+                  let _width = Number(event.noteObject.option[0]) || 3;
                   if (event.noteObject.option[1] && event.noteObject.option[2])
                     _offset =
                       (event.noteObject.option[1] /
@@ -746,9 +746,9 @@ export default {
           else if (note.type === 96) {
             // (-1, -1, -1)の時はデフォルトに戻す
             if (
-              note.option[0] === -1 &&
-              note.option[1] === -1 &&
-              note.option[2] === -1
+              Number(note.option[0]) === -1 &&
+              Number(note.option[1]) === -1 &&
+              Number(note.option[2]) === -1
             ) {
               events[timing].color = this.defaultLEDColor;
             } else
