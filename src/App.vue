@@ -51,11 +51,21 @@
       </v-row>
 
       <v-row class="difficulty-select">
-        <v-btn small dark color="blue" @click="currentDifficulty = 'raku'">RAKU</v-btn>
-        <v-btn small dark color="green" @click="currentDifficulty = 'easy'">EASY</v-btn>
-        <v-btn small dark color="orange" @click="currentDifficulty = 'normal'">NORMAL</v-btn>
-        <v-btn small dark color="#ff0984" @click="currentDifficulty = 'hard'">HARD</v-btn>
-        <v-btn small dark color="purple" @click="currentDifficulty = 'extra'">EXTRA</v-btn>
+        <v-btn small dark color="blue" @click="currentDifficulty = 'raku'">
+          RAKU
+        </v-btn>
+        <v-btn small dark color="green" @click="currentDifficulty = 'easy'">
+          EASY
+        </v-btn>
+        <v-btn small dark color="orange" @click="currentDifficulty = 'normal'">
+          NORMAL
+        </v-btn>
+        <v-btn small dark color="#ff0984" @click="currentDifficulty = 'hard'">
+          HARD
+        </v-btn>
+        <v-btn small dark color="purple" @click="currentDifficulty = 'extra'">
+          EXTRA
+        </v-btn>
       </v-row>
 
       <h3>ノートの挿入（仮配置：{{ preAppendNotes.size }}個）</h3>
@@ -872,8 +882,9 @@
   </v-app>
 </template>
 
-<script>
-import Bury from "buryjs";
+<script lang="ts">
+import "buryjs";
+import { Bury } from "buryjs/lib/main";
 
 import Preview from "./components/Preview.vue";
 import EndForm from "./components/EndForm.vue";
@@ -982,7 +993,9 @@ export default {
       setAppendNoteInfo: this.setAppendNoteInfo
     };
   },
-  beforeCreate: Bury.init,
+  beforeCreate() {
+    new Bury(); // Bury.jsを初期化
+  },
   created: function() {
     document.addEventListener("keydown", this.onPressKey);
   },
@@ -1513,7 +1526,7 @@ export default {
             }
           : null;
       },
-      set: function(value) {
+      set: function(value: any) {
         if (this.appendNote.type === 96) {
           this.$set(this.appendNote.option, 0, value.r);
           this.$set(this.appendNote.option, 1, value.g);
@@ -1560,8 +1573,12 @@ export default {
     .v-btn {
       width: 90px;
       border-radius: 0;
-      &:first-child { border-radius: 8px 0 0 8px }
-      &:last-child { border-radius: 0 8px 8px 0 }
+      &:first-child {
+        border-radius: 8px 0 0 8px;
+      }
+      &:last-child {
+        border-radius: 0 8px 8px 0;
+      }
     }
   }
   .v-menu__content {

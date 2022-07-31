@@ -257,7 +257,8 @@ export default {
         if (_width === -1) _width = 3;
         let _left = (this.note.lane - 1) * 60 + 30;
         let _offset = 0;
-        const numer = Number(this.note.option[1]), denom = Number(this.note.option[2]);
+        const numer = Number(this.note.option[1]),
+          denom = Number(this.note.option[2]);
         if (numer && denom) {
           _offset = (numer / denom) * 60;
         }

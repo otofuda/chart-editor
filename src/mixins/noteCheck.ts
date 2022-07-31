@@ -124,16 +124,12 @@ export default {
 
       // option: []
       if ([1, 2, 5, 99].includes(note.type)) return option;
-
       // フリックの場合
       // option: [width: String (, offsetNumer: String, offsetDenom: String)]
       else if ([3, 4].includes(note.type)) {
         option.append(note.option[0] ? String(note.option[0]) : "-1");
         if (note.option[1] && note.option[2]) {
-          option.append(
-            String(note.option[1]),
-            String(note.option[2])
-          );
+          option.append(String(note.option[1]), String(note.option[2]));
         }
         return option;
       }
@@ -147,10 +143,7 @@ export default {
         // type94 テクスチャのデフォルト高さは 0.25
         option.append(note.option[2] ? String(note.option[2]) : "0.25");
         if (note.option[3] && note.option[4]) {
-          option.append(
-            String(note.option[3]),
-            String(note.option[4])
-          );
+          option.append(String(note.option[3]), String(note.option[4]));
         }
         return option;
       }
@@ -188,7 +181,7 @@ export default {
       }
 
       // 不明なtypeの時は全部Stringにしてそのまま返す
-      else return [...note.option].map((opt) => String(opt));
+      else return [...note.option].map(opt => String(opt));
     },
 
     // lane: -1 固定ノートであるか
