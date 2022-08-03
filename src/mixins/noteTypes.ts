@@ -1,5 +1,22 @@
-export default {
-  data() {
+import { NoteData } from "chart-types";
+import Vue from "vue";
+
+export type NoteTypesDataType = {
+  noteTypes: { text: string; value: number }[];
+};
+
+export type NoteTypesMethodsType = {
+  noteOptions(
+    note: NoteData
+  ): {
+    label: string;
+    type: string;
+    desc: string;
+  };
+};
+
+export default Vue.extend({
+  data(): NoteTypesDataType {
     return {
       noteTypes: [
         {
@@ -54,7 +71,7 @@ export default {
     };
   },
   methods: {
-    noteOptions(note) {
+    noteOptions(note: NoteData) {
       if ([3, 4].includes(note.type))
         return [
           {
@@ -154,4 +171,4 @@ export default {
       else return [];
     }
   }
-};
+});

@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "buryjs": "https://github.com/mtsgi/bury.git#feature/vite_typescript",
+    "chart-types": "^2.0.2",
     "core-js": "^3.6.5",
     "html2canvas": "^1.0.0-rc.7",
     "vue": "2.6.11",

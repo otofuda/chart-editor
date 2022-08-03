@@ -2903,6 +2903,11 @@ chardet@^0.7.0:
   resolved "https://registry.yarnpkg.com/chardet/-/chardet-0.7.0.tgz#90094849f0937f2eedc2425d0d28a9e5f0cbad9e"
   integrity sha512-mT8iDcrh03qDGRRmoA2hmBJnxpllMR+0/0qlzjqZES6NdiWDcZkCNAk4rPFZ9Q85r27unkiNNg8ZOiwZXBHwcA==
 
+chart-types@^2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/chart-types/-/chart-types-2.0.2.tgz#e6ae6e05a2b84857776de88141f8e26b8a8d0cf9"
+  integrity sha512-Qeyi6ztk7tF1m0IYsO0dT22e6l6C40hSxjHkdJghKxcYDVn2RE5lqNrfWEXcueJbl0BUTHSIO8frR1PmegkVnA==
+
 "chokidar@>=2.0.0 <4.0.0", chokidar@^3.4.1:
   version "3.4.3"
   resolved "https://registry.yarnpkg.com/chokidar/-/chokidar-3.4.3.tgz#c1df38231448e45ca4ac588e6c79573ba6a57d5b"

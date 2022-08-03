@@ -1,7 +1,16 @@
-export default {
+import "buryjs";
+import { NoteData } from "chart-types";
+import Vue from "vue";
+
+interface ExtendedNoteData extends NoteData {
+  index?: number | null;
+  isSelected?: boolean;
+}
+
+export default Vue.extend({
   methods: {
     isDuplicated(
-      note,
+      note: ExtendedNoteData,
       option = {
         checkPreAppend: true, // preAppendNotes内を走査するかどうか
         comparators: null // 比較対象となるノーツ配列
@@ -77,7 +86,7 @@ export default {
         return cnt;
       } else return Infinity;
     },
-    hasError(note) {
+    hasError(note: NoteData) {
       if (note.split <= 0) return "splitの値は0より大きい必要があります。";
       else if (note.position < 0)
         return "positionの値は0以上である必要があります。";
@@ -92,17 +101,17 @@ export default {
       else return false;
     },
     /** ノートをバリデーション */
-    getValidatedNote(note) {
+    getValidatedNote(note: NoteData): NoteData {
       const type = Number(note.type);
 
       // type: 5 は lane: 3
       // type: 96, 97, 98, 99は lane: -1
-      let lane = Number(note.lane);
+      let lane = Number(note.lane) as 1 | 2 | 3 | 4 | 5 | -1;
       if (type === 5) lane = 3;
       if ([96, 97, 98, 99].includes(type)) lane = -1;
 
       // type: 2 以外は end: []
-      let end = [];
+      let end: NoteData[] = [];
       if (note.type === 2) {
         end = [...note.end].map(this.getValidatedNote);
       }
@@ -118,9 +127,9 @@ export default {
       };
     },
     /** ノートのオプション配列をバリデーション */
-    getValidatedOptions(note) {
+    getValidatedOptions(note: NoteData): string[] {
       /** @type string[] */
-      const option = []; // optionはStringの配列
+      const option: string[] = []; // optionはStringの配列
 
       // option: []
       if ([1, 2, 5, 99].includes(note.type)) return option;
@@ -137,7 +146,10 @@ export default {
       // テクスチャの場合
       // option: [source: String, width: String, height: String(, offsetNumer: String, offsetDenom: String)]
       else if ([94].includes(note.type)) {
-        option.append(note.option[0] || "https://via.placeholder.com/50x100");
+        option.append(
+          // TODO: asを外す
+          (note.option[0] as string) || "https://via.placeholder.com/50x100"
+        );
         // type94 テクスチャのデフォルト幅は 1
         option.append(note.option[1] ? String(note.option[1]) : "1");
         // type94 テクスチャのデフォルト高さは 0.25
@@ -185,8 +197,8 @@ export default {
     },
 
     // lane: -1 固定ノートであるか
-    isLanelessNote(note) {
+    isLanelessNote(note: NoteData): boolean {
       return [5, 96, 97, 98, 99].includes(note.type);
     }
   }
-};
+});
