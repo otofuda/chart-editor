@@ -2,25 +2,29 @@ import "buryjs";
 import { NoteData } from "chart-types";
 import Vue from "vue";
 
-interface ExtendedNoteData extends NoteData {
-  index?: number | null;
-  isSelected?: boolean;
-}
+import { ExtendedNoteData } from "../types";
+
+type ComparatorsOption = {
+  checkPreAppend: boolean;
+  comparators: ExtendedNoteData[] | null;
+};
 
 export default Vue.extend({
   methods: {
     isDuplicated(
       note: ExtendedNoteData,
-      option = {
+      option: ComparatorsOption = {
         checkPreAppend: true, // preAppendNotes内を走査するかどうか
         comparators: null // 比較対象となるノーツ配列
       }
     ) {
-      const comparators = option.comparators || this.currentChart;
+      const comparators =
+        // @ts-ignore mixin "currentChart"
+        option.comparators || (this.currentChart as NoteData[]);
       if (comparators) {
         const posValue = note.position / note.split;
         let cnt = 0;
-        comparators.each(target => {
+        comparators.each((target: ExtendedNoteData) => {
           // 同じ音符位置かつ同じレーンのノーツを検査
           if (
             target.measure === note.measure &&
@@ -53,7 +57,9 @@ export default Vue.extend({
             cnt++;
           }
         });
+        // @ts-ignore mixin "preAppendNotes"
         if (option.checkPreAppend && this.preAppendNotes) {
+          // @ts-ignore mixin "preAppendNotes"
           this.preAppendNotes.each(target => {
             // 同じ音符位置かつ同じレーンのノーツを検査
             if (
@@ -95,7 +101,7 @@ export default Vue.extend({
       else if (![-1, 1, 2, 3, 4, 5].includes(note.lane))
         return "不正なノートのレーン位置です。";
       else if (
-        ![1, 2, 3, 4, 5, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
+        ![1, 2, 3, 4, 5, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
       )
         return "不正なノートタイプです。";
       else return false;

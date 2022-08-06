@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-mutating-props -->
 <template>
   <!-- note/endはtype 1, 2のみ想定 -->
   <div>

@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-mutating-props -->
 <template>
   <div class="mt-2">
     <v-row align="center" justify="space-between">
@@ -136,10 +137,12 @@ export default {
     },
     // positionにフォーカスして終点移動
     endToLeft() {
+      // eslint-disable-next-line vue/no-mutating-props
       this.end.lane = Math.max(this.end.lane - 1, 1);
       this.$emit("append-to-left", this.index);
     },
     endToRight() {
+      // eslint-disable-next-line vue/no-mutating-props
       this.end.lane = Math.min(this.end.lane + 1, 5);
       this.$emit("append-to-right", this.index);
     },

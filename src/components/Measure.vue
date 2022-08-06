@@ -116,6 +116,7 @@
 import Note from "./Note.vue";
 
 export default {
+  name: "MeasureComponent",
   inject: [
     "deleteNotes",
     "appendNotes",

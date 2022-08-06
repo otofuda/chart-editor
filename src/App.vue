@@ -153,8 +153,8 @@
 
         <!-- オプション入力欄(汎用) -->
         <div
-          v-for="opt in noteOptionsForAppendNote"
-          :key="`option_${opt.type}`"
+          v-for="(opt, i) in noteOptionsForAppendNote"
+          :key="`option_${i}`"
           class="mb-4"
         >
           <v-text-field
@@ -884,28 +884,21 @@
 
 <script lang="ts">
 import "buryjs";
+// @ts-ignore
 import { Bury } from "buryjs/lib/main";
 import Vue from "vue";
 
-// eslint-disable-next-line no-unused-vars
-import { DifficultyString, Measure, ColorObject, TextureObject } from "./types";
-// eslint-disable-next-line no-unused-vars
+import {
+  DifficultyString,
+  Measure,
+  ColorObject,
+  TextureObject,
+  ExtendedNoteData,
+  ExtendedChartData
+} from "./types";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ChartData, NoteData, LaneType } from "chart-types";
-// eslint-disable-next-line no-unused-vars
 import { NoteTypesDataType, NoteTypesMethodsType } from "./mixins/noteTypes";
-
-interface ExtendedNoteData extends NoteData {
-  index?: number | null;
-  isSelected?: boolean;
-}
-
-interface ExtendedChartData extends ChartData {
-  raku: ExtendedNoteData[];
-  easy: ExtendedNoteData[];
-  normal: ExtendedNoteData[];
-  hard: ExtendedNoteData[];
-  extra: ExtendedNoteData[];
-}
 
 import Preview from "./components/Preview.vue";
 import EndForm from "./components/EndForm.vue";
@@ -971,7 +964,7 @@ export type DataType = {
 };
 
 type MethodsType = {
-  readFile(file: File): void;
+  readFile: (file: File) => void;
   newFile(): void;
   saveFile(): void;
   readAudioFile(file: File): void;
@@ -1259,7 +1252,8 @@ export default Vue.extend<
         const index =
           this.currentChart.size === 0
             ? 1
-            : this.currentChart.max_by((n: ExtendedNoteData) => n.index).index +
+            : // @ts-ignore
+              this.currentChart.max_by((n: ExtendedNoteData) => n.index).index +
               1;
         this.currentChart?.append({
           isSelected: false,
@@ -1285,7 +1279,8 @@ export default Vue.extend<
         const index =
           this.preAppendNotes.size === 0
             ? 1
-            : this.preAppendNotes.max_by((n: ExtendedNoteData) => n.index || -1)
+            : // @ts-ignore
+              this.preAppendNotes.max_by((n: ExtendedNoteData) => n.index || -1)
                 .index + 1;
         this.preAppendNotes.append({
           isSelected: false,
@@ -1602,8 +1597,9 @@ export default Vue.extend<
   },
   // localStorageにコンフィグを書き込む
   watch: {
-    beatHeight: value =>
+    beatHeight(value) {
       localStorage.setItem("chart-editor__beat-height", value)
+    }
   },
   computed: {
     // 選択中の難易度の譜面データ配列
@@ -1624,6 +1620,7 @@ export default Vue.extend<
         ? this.currentChart.max_by((n: ExtendedNoteData) => n.measure).measure
         : 1;
     },
+    /** 小節情報を生成 */
     measureData(): Measure[] {
       const measureData: Measure[] = [];
       let measureBeat = this.musicBeat;
@@ -1640,10 +1637,31 @@ export default Vue.extend<
         const bpmChangeNote = this.currentChart.find(
           n => n.type === 98 && n.measure === measure
         );
+        // type 92, 93 をfindして求める
+        const stopNote = this.currentChart.find(
+          n => n.type === 92 && n.measure === measure
+        );
+        const warpNote = this.currentChart.find(
+          n => n.type === 93 && n.measure === measure
+        );
         if (beatChangeNote) measureBeat = Number(beatChangeNote.option[0]);
         if (bpmChangeNote) measureBpm = Number(bpmChangeNote.option[0]);
-        const measureHeight = this.beatHeight * measureBeat;
-        const measureLength = (60 / measureBpm) * measureBeat * 1000;
+
+        // 小節の高さ(px)
+        let measureHeight = this.beatHeight * measureBeat;
+        if (stopNote) {
+          measureHeight = 0;
+        }
+        if (warpNote) {
+          measureHeight = this.beatHeight * Number(warpNote.option[0]);
+        }
+
+        // 小節の長さ(ms)
+        let measureLength = (60 / measureBpm) * measureBeat * 1000;
+        if (warpNote) {
+          measureLength = 0; // 瞬間移動小節は 0ms
+        }
+
         measureData.push({
           measure,
           measureBpm,
@@ -1654,7 +1672,7 @@ export default Vue.extend<
           measureLength
         });
         measureReachTime += measureLength;
-        measurePositionBottom += this.beatHeight * measureBeat;
+        measurePositionBottom += measureHeight;
       });
       return measureData;
     },
@@ -1697,7 +1715,11 @@ export default Vue.extend<
       }
     },
     /** 現在のAppendNote用のオプションを取得する */
-    noteOptionsForAppendNote() {
+    noteOptionsForAppendNote(): {
+      label: string;
+      type: string;
+      desc: string;
+    }[] {
       return this.noteOptions(this.appendNote as NoteData);
     }
   },
@@ -1859,6 +1881,18 @@ export default Vue.extend<
     background: gray;
     border: 3px solid rgba(255, 255, 255, 0.5);
     border-radius: 6px;
+  }
+  &.type92 {
+    z-index: 98;
+    height: 3px;
+    height: 0;
+    border-top: 4px dotted #d950ff;
+  }
+  &.type93 {
+    z-index: 98;
+    height: 3px;
+    height: 0;
+    border-top: 4px dotted #70ff50;
   }
   &.type97 {
     z-index: 98;

@@ -12,7 +12,7 @@ export type NoteTypesMethodsType = {
     label: string;
     type: string;
     desc: string;
-  };
+  }[];
 };
 
 export default Vue.extend({
@@ -38,6 +38,14 @@ export default Vue.extend({
         {
           text: "音札",
           value: 5
+        },
+        {
+          text: "譜面停止",
+          value: 92
+        },
+        {
+          text: "瞬間移動",
+          value: 93
         },
         {
           text: "テクスチャ",
@@ -88,6 +96,14 @@ export default Vue.extend({
             label: "offsetDenom",
             type: "number",
             desc: "String型｜右側へのオフセット分数の分母"
+          }
+        ];
+      else if (note.type === 93)
+        return [
+          {
+            label: "beat",
+            type: "number",
+            desc: "Float型｜瞬間移動する小節の高さの拍子数"
           }
         ];
       else if (note.type === 94)

@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-mutating-props -->
 <template>
   <v-menu
     v-model="menu"
@@ -77,6 +78,8 @@
 
         <strong v-if="note.type === 97">BEAT {{ note.option[0] }}</strong>
         {{ note.position }}/{{ note.split }}
+        <strong v-if="note.type === 92">STOP</strong>
+        <strong v-if="note.type === 93">WARP {{ note.option[0] }}</strong>
         <strong v-if="note.type === 98">BPM {{ note.option[0] }}</strong>
         <strong v-if="note.type === 99">EOF</strong>
       </span>
@@ -205,6 +208,7 @@ import noteTypes from "../mixins/noteTypes";
 import noteCheck from "../mixins/noteCheck";
 
 export default {
+  name: "NoteComponent",
   mixins: [noteTypes, noteCheck],
   inject: ["deleteNotes", "setAppendNoteInfo", "showSnackbar"],
   data() {

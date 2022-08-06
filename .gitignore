@@ -2,6 +2,7 @@
 node_modules
 /dist
 /chart-editor
+/vue2-ts
 
 # local env files
 .env.local
