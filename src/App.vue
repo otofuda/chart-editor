@@ -420,6 +420,14 @@
           :disabled="!isShowDetail || !isCaptureMode || isPreviewMode"
           v-model="isImageMode"
           label="譜面画像生成用"
+          hide-details
+        ></v-checkbox>
+      </v-row>
+      <v-row>
+        <v-checkbox
+          prepend-icon="mdi-image"
+          v-model="isSimulateStop"
+          label="停止をシミュレート"
         ></v-checkbox>
       </v-row>
 
@@ -946,6 +954,7 @@ export type DataType = {
   isCaptureMode: boolean;
   isPreviewMode: boolean;
   isImageMode: boolean;
+  isSimulateStop: boolean;
   batchSelectTypes: number[];
   batchSelectStart: number;
   batchSelectEnd: number;
@@ -1098,6 +1107,7 @@ export default Vue.extend<
       isCaptureMode: false,
       isPreviewMode: false,
       isImageMode: false,
+      isSimulateStop: false,
 
       // 一括選択の対象
       batchSelectTypes: [],
@@ -1649,7 +1659,7 @@ export default Vue.extend<
 
         // 小節の高さ(px)
         let measureHeight = this.beatHeight * measureBeat;
-        if (stopNote) {
+        if (stopNote && this.isSimulateStop) {
           measureHeight = 0;
         }
         if (warpNote) {
@@ -1886,12 +1896,14 @@ export default Vue.extend<
     z-index: 98;
     height: 3px;
     height: 0;
+    text-align: center;
     border-top: 4px dotted #d950ff;
   }
   &.type93 {
     z-index: 98;
     height: 3px;
     height: 0;
+    text-align: center;
     border-top: 4px dotted #70ff50;
   }
   &.type97 {

@@ -497,6 +497,7 @@ export default Vue.extend({
       this.measureData.forEach((measure, index) => {
         const next = this.measureData[index + 1] || {};
         if (measure.measureReachTime > startOffset) {
+          const diff = measure.measureLength === 0 ? -25 : 0;
           this.timeoutIds.push(
             setTimeout(() => {
               this.currentPosition = next.measurePositionBottom;
@@ -518,7 +519,7 @@ export default Vue.extend({
                 this.guideAudio.currentTime = 0;
                 this.guideAudio.play();
               }
-            }, measure.measureReachTime - startOffset)
+            }, measure.measureReachTime - startOffset + diff)
           );
         }
       });
@@ -537,6 +538,7 @@ export default Vue.extend({
       const measureData = [...this.measureData];
       measureData.forEach((measure, index) => {
         const next = measureData[index + 1] || {};
+        const diff = measure.measureLength === 0 ? -25 : 0;
         this.timeoutIds.append(
           setTimeout(() => {
             this.currentPosition = next.measurePositionBottom;
@@ -550,7 +552,7 @@ export default Vue.extend({
               this.guideAudio.currentTime = 0.1;
               this.guideAudio.play();
             }
-          }, measure.measureReachTime)
+          }, measure.measureReachTime + diff)
         );
       });
       this.setNoteEvents(0);

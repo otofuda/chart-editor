@@ -6,7 +6,8 @@
     }"
     class="measure"
     :class="{
-      hiddenControl: notes.find(note => note.type === 95 && note.position === 0)
+      hiddenControl: notes.find(note => note.type === 95 && note.position === 0),
+      isStop: notes.find(note => note.type === 92)
     }"
   >
     <v-menu offset-y :close-on-content-click="false" rounded="lg">
@@ -236,6 +237,10 @@ export default {
 
   &:not(.hiddenControl) {
     box-shadow: inset 0 -1px 0 0 #a0a0a0;
+  }
+
+  &.isStop {
+    background: #572828;
   }
 
   &__separator {
