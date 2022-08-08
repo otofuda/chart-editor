@@ -31,14 +31,38 @@ export default Vue.extend({
             target.lane === note.lane &&
             target.position / target.split === posValue
           ) {
-            // テクスチャと[any]の重複は許容
+            // テクスチャの重複は許容
             if (target.type === 94 || note.type === 94) return;
 
-            // [フリック|区切り線]と[フリック|区切り線]
+            // [通常|譜面停止|瞬間移動|LED制御|拍子変化|BPM変化]どうし
             // (ただし同じTypeでない)の重複は許容
             if (
-              [3, 4, 94, 95].includes(target.type) &&
-              [3, 4, 94, 95].includes(note.type) &&
+              [1, 92, 93, 96, 97, 98].includes(target.type) &&
+              [1, 92, 93, 96, 97, 98].includes(note.type) &&
+              target.type !== note.type
+            ) {
+              return;
+            }
+            // 左フリックと区切り線の重複は許容
+            if (
+              [3, 95].includes(target.type) &&
+              [3, 95].includes(note.type) &&
+              target.type !== note.type
+            ) {
+              return;
+            }
+            // 右フリックと区切り線の重複は許容
+            if (
+              [4, 95].includes(target.type) &&
+              [4, 95].includes(note.type) &&
+              target.type !== note.type
+            ) {
+              return;
+            }
+            // 通常と区切り線の重複は許容
+            if (
+              [1, 95].includes(target.type) &&
+              [1, 95].includes(note.type) &&
               target.type !== note.type
             ) {
               return;

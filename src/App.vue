@@ -155,7 +155,7 @@
         <div
           v-for="(opt, i) in noteOptionsForAppendNote"
           :key="`option_${i}`"
-          class="mb-4"
+          class="my-4"
         >
           <v-text-field
             v-model="appendNote.option[i]"
@@ -237,24 +237,26 @@
         </v-menu>
 
         <!-- Type96 カラーピッカー -->
-        <v-row v-if="appendNote.type === 96">
+        <v-row v-if="appendNote.type === 96" class="pl-2 pt-2">
           <v-color-picker
             v-model="appendNoteColorOption"
             :swatches="colorSwatches"
             show-swatches
             elevation="2"
-            class="mr-2 mb-2"
+            class="mr-4 mb-2"
             hide-inputs
           ></v-color-picker>
           <div>
-            <div class="mb-2">特殊な色を設定</div>
+            <div><strong>特殊な色を設定</strong></div>
             <v-btn
               outlined
               color="primary"
               @click="appendNote.option = ['-1', '-1', '-1']"
+              class="my-2"
             >
               青赤(default)に戻す
             </v-btn>
+            <p><code>['-1', '-1', '-1']</code> を設定します</p>
           </div>
         </v-row>
 
@@ -374,12 +376,13 @@
         </v-col>
       </v-row>
 
-      <v-row align="center">
+      <v-row align="center" class="mb-4">
         <v-text-field
           v-model.number="scrollTo"
           suffix="小節へ"
           outlined
           dense
+          hide-details
         ></v-text-field>
         <v-btn class="ml-4" color="primary" @click="scrollToMeasure(scrollTo)">
           <v-icon left>mdi-arrow-right</v-icon> 遷移
@@ -425,15 +428,15 @@
       </v-row>
       <v-row>
         <v-checkbox
-          prepend-icon="mdi-image"
+          prepend-icon="mdi-stop-circle"
           v-model="isSimulateStop"
-          label="停止をシミュレート"
+          label="譜面停止をシミュレート"
         ></v-checkbox>
       </v-row>
 
       <h3>選択ノーツ（選択中：{{ selectionNumber }}個）</h3>
 
-      <v-row align="center">
+      <v-row align="center" class="py-2">
         <v-btn color="primary" text @click="dialog.batchcheck = true">
           <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
           ノーツの一括選択
@@ -1977,6 +1980,8 @@ export default Vue.extend<
     .note.type5 {
       box-shadow: 0 0 16px 0 gold;
     }
+    .note.type92,
+    .note.type93,
     .note.type97,
     .note.type98,
     .note.type99 {
