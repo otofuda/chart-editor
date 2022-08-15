@@ -334,6 +334,7 @@
 
 <script lang="ts">
 import "buryjs";
+import html2canvas from "html2canvas";
 import Vue, { PropType } from "vue";
 import {
   DifficultyString,
@@ -347,7 +348,6 @@ import MeasureComponent from "./Measure.vue";
 import ObjectBasedMeasure from "./ObjectBasedMeasure.vue";
 import LongNote from "./LongNote.vue";
 import NoteShadow from "./NoteShadow.vue";
-import html2canvas from "html2canvas";
 
 export default Vue.extend({
   name: "ThePreview",
@@ -497,7 +497,7 @@ export default Vue.extend({
       this.measureData.forEach((measure, index) => {
         const next = this.measureData[index + 1] || {};
         if (measure.measureReachTime > startOffset) {
-          const diff = measure.measureLength === 0 ? -25 : 0;
+          const diff = measure.measureLength === 0 ? -30 : 0;
           this.timeoutIds.push(
             setTimeout(() => {
               this.currentPosition = next.measurePositionBottom;
@@ -538,7 +538,7 @@ export default Vue.extend({
       const measureData = [...this.measureData];
       measureData.forEach((measure, index) => {
         const next = measureData[index + 1] || {};
-        const diff = measure.measureLength === 0 ? -25 : 0;
+        const diff = measure.measureLength === 0 ? -30 : 0;
         this.timeoutIds.append(
           setTimeout(() => {
             this.currentPosition = next.measurePositionBottom;

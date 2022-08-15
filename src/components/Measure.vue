@@ -113,10 +113,13 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import Vue, { PropType } from "vue";
+import { DifficultyString, ExtendedNoteData, Measure } from "@/types";
+
 import Note from "./Note.vue";
 
-export default {
+export default Vue.extend({
   name: "MeasureComponent",
   inject: [
     "deleteNotes",
@@ -127,19 +130,15 @@ export default {
   ],
   props: {
     notes: {
-      type: Array,
+      type: Array as PropType<ExtendedNoteData[]>,
       default: () => []
     },
     measure: {
-      type: Object,
+      type: Object as PropType<Measure>,
       required: true
     },
-    measureData: {
-      type: Array,
-      default: () => []
-    },
     currentDifficulty: {
-      type: String,
+      type: String as PropType<DifficultyString>,
       default: "easy"
     }
   },
@@ -154,13 +153,13 @@ export default {
   methods: {
     // 小節内のノーツをすべて選択
     selectAll() {
-      this.notes.each(note => {
+      this.notes.each((note: ExtendedNoteData) => {
         note.isSelected = true;
       });
     },
     // 小節内のノーツをすべて選択解除
     clearAll() {
-      this.notes.each(note => {
+      this.notes.each((note: ExtendedNoteData) => {
         note.isSelected = false;
       });
     },
@@ -173,20 +172,27 @@ export default {
       }
       // const idx = targets.map(note => note.index);
       if (this.currentDifficulty === this.copyToDifficulty) {
+        // @ts-ignore "appendNotes" (inject)
         this.appendNotes(
-          ...targets.map(note =>
-            this.getMovedNote({ ...note }, this.copyToMeasure)
+          ...targets.map(note => {
+            // @ts-ignore "getMovedNote" (inject)
+            return this.getMovedNote({ ...note }, this.copyToMeasure)
+          }
           )
         );
+        // @ts-ignore "showSnackbar" (inject)
         this.showSnackbar(
           `対象の${targets.size}ノーツに対して、${this.measure.measure}小節 => ${this.copyToMeasure}小節へ複製処理を行いました（ロングノーツを除く）`
         );
       } else {
         // 各movedNoteを取得して対象難易度に複製
+        // @ts-ignore "copyNotesToDifficulty" (inject)
         this.copyNotesToDifficulty(
           this.copyToDifficulty,
-          ...targets.map(note =>
-            this.getMovedNote({ ...note }, this.copyToMeasure)
+          ...targets.map(note => {
+            // @ts-ignore "getMovedNote" (inject)
+            return this.getMovedNote({ ...note }, this.copyToMeasure)
+          }
           )
         );
       }
@@ -200,23 +206,30 @@ export default {
       }
       const idx = targets.map(note => note.index);
       if (this.currentDifficulty === this.copyToDifficulty) {
+        // @ts-ignore "appendNotes" (inject)
         this.appendNotes(
-          ...targets.map(note =>
-            this.getMovedNote({ ...note }, this.copyToMeasure)
-          )
+          ...targets.map(note => {
+            // @ts-ignore "getMovedNote" (inject)
+            return this.getMovedNote({ ...note }, this.copyToMeasure)
+          })
         );
+        // @ts-ignore "deleteNotes" (inject)
         this.deleteNotes(...idx);
+        // @ts-ignore "showSnackbar" (inject)
         this.showSnackbar(
           `対象の${targets.size}ノーツに対して、${this.measure.measure}小節 => ${this.copyToMeasure}小節へ移動処理を行いました（ロングノーツを除く）`
         );
       } else {
         // 各movedNoteを取得して対象難易度に複製
+        // @ts-ignore "copyNotesToDifficulty" (inject)
         this.copyNotesToDifficulty(
           this.copyToDifficulty,
-          ...targets.map(note =>
-            this.getMovedNote({ ...note }, this.copyToMeasure)
-          )
+          ...targets.map(note => {
+            // @ts-ignore "getMovedNote" (inject)
+            return this.getMovedNote({ ...note }, this.copyToMeasure)
+          })
         );
+        // @ts-ignore "deleteNotes" (inject)
         this.deleteNotes(...idx);
       }
     }
@@ -224,7 +237,7 @@ export default {
   components: {
     Note
   }
-};
+});
 </script>
 
 <style lang="scss" scoped>

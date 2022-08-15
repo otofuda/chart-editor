@@ -14,7 +14,8 @@
       <span
         class="note"
         :class="{
-          [`type${note.type}`]: true,
+          [`type${drawType}`]: true,
+          isDummy: note.type === 91,
           hidden: isHiddenControl,
           menu
         }"
@@ -29,22 +30,22 @@
       >
         <!-- テクスチャの時 -->
         <img
-          v-if="note.type === 94"
-          :src="note.option[0]"
+          v-if="drawType === 94"
+          :src="drawOptions"
           :style="{
-            height: `${measure.measureHeight * note.option[2]}px`
+            height: `${measure.measureHeight * Number(drawOptions[2])}px`
           }"
           alt="texture"
         />
 
         <!-- コメントの時 -->
-        <v-icon v-if="note.type === 100" color="warning" class="mt-2">
+        <v-icon v-if="drawType === 100" color="warning" class="mt-2">
           mdi-comment
         </v-icon>
         <v-textarea
           outlined
           background-color="amber lighten-4"
-          v-if="note.type === 100"
+          v-if="drawType === 100"
           v-model="note.option[0]"
           class="elevation-4"
           hide-details
@@ -58,30 +59,30 @@
           @click.stop
         />
 
-        <v-tooltip v-if="isDuplicated(note)" bottom>
+        <v-tooltip v-if="getDuplicated" bottom>
           <template v-slot:activator="{ on, attrs }">
             <v-icon color="warning" dark v-bind="attrs" v-on="on" class="mt-2">
               mdi-alert
             </v-icon>
           </template>
-          <span>{{ isDuplicated(note) }}個の重複</span>
+          <span>{{ getDuplicated }}個の重複</span>
         </v-tooltip>
 
-        <v-tooltip v-if="hasError(note)" bottom>
+        <v-tooltip v-if="getError" bottom>
           <template v-slot:activator="{ on, attrs }">
             <v-icon color="error" dark v-bind="attrs" v-on="on" class="mt-2">
               mdi-alert-circle-outline
             </v-icon>
           </template>
-          <span>{{ hasError(note) }}</span>
+          <span>{{ getError }}</span>
         </v-tooltip>
 
-        <strong v-if="note.type === 97">BEAT {{ note.option[0] }}</strong>
+        <strong v-if="drawType === 97">BEAT {{ note.option[0] }}</strong>
         {{ note.position }}/{{ note.split }}
-        <strong v-if="note.type === 92">STOP</strong>
-        <strong v-if="note.type === 93">WARP {{ note.option[0] }}</strong>
-        <strong v-if="note.type === 98">BPM {{ note.option[0] }}</strong>
-        <strong v-if="note.type === 99">EOF</strong>
+        <strong v-if="drawType === 92">STOP</strong>
+        <strong v-if="drawType === 93">WARP {{ note.option[0] }}</strong>
+        <strong v-if="drawType === 98">BPM {{ note.option[0] }}</strong>
+        <strong v-if="drawType === 99">EOF</strong>
       </span>
     </template>
 
@@ -143,7 +144,7 @@
           <v-radio-group
             v-model.number="note.lane"
             row
-            :disabled="isLanelessNote(note)"
+            :disabled="getIsLanelessNote"
           >
             <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
           </v-radio-group>
@@ -151,7 +152,7 @@
 
         <v-list-item>
           <v-select
-            :items="noteTypes"
+            :items="getNoteTypes"
             hide-details
             label="ノート種別"
             v-model="note.type"
@@ -162,11 +163,11 @@
           ></v-select>
         </v-list-item>
 
-        <v-list-item v-if="noteOptions(note).length > 0">
+        <v-list-item v-if="getOptions.length > 0">
           <v-card-text>オプション</v-card-text>
           <v-spacer></v-spacer>
           <v-btn
-            href="https://github.com/mtsgi/fumenedit/blob/master/format.md"
+            href="https://github.com/otofuda/chart-types"
             target="_blank"
             icon
             right
@@ -175,7 +176,7 @@
           </v-btn>
         </v-list-item>
 
-        <v-list-item v-for="(opt, i) in noteOptions(note)" :key="`option_${i}`">
+        <v-list-item v-for="(opt, i) in getOptions" :key="`option_${i}`">
           <v-text-field
             v-model="note.option[i]"
             hide-details
@@ -203,14 +204,18 @@
   </v-menu>
 </template>
 
-<script>
-import noteTypes from "../mixins/noteTypes";
-import noteCheck from "../mixins/noteCheck";
+<script lang="ts">
+import Vue, { PropType } from "vue";
+import { ExtendedNoteData, Measure } from "@/types";
 
-export default {
+import noteTypes, { NoteTypesOption } from "@/mixins/noteTypes";
+import noteCheck from "@/mixins/noteCheck";
+
+export default Vue.extend({
   name: "NoteComponent",
   mixins: [noteTypes, noteCheck],
   inject: ["deleteNotes", "setAppendNoteInfo", "showSnackbar"],
+  // @ts-ignore noteTypes と noteCheck は mixins で定義
   data() {
     return {
       menu: false
@@ -218,68 +223,73 @@ export default {
   },
   props: {
     note: {
-      type: Object,
+      type: Object as PropType<ExtendedNoteData>,
       required: true
     },
     measure: {
-      type: Object,
+      type: Object as PropType<Measure>,
       required: true
     },
     // 重複判定に使用
     currentChart: {
-      type: Array,
+      type: Array as PropType<ExtendedNoteData[]>,
       required: true
     }
   },
+  // @ts-ignore noteOptions は mixins で定義
   methods: {
     deleteThisNote() {
+      // @ts-ignore "deleteNotes" inject
       this.deleteNotes(this.note.index);
       this.menu = false;
     },
     cloneThisNote() {
+      // @ts-ignore "setAppendNoteInfo" inject
       this.setAppendNoteInfo({
         ...this.note,
         option: [...this.note.option],
         end: []
       });
       this.menu = false;
+      // @ts-ignore "showSnackbar" inject
       this.showSnackbar("挿入ノートに同じデータをセットしました");
     },
     showNoteInfo() {
+      // @ts-ignore "showSnackbar" inject
       this.showSnackbar(JSON.stringify(this.note, null, 2));
     }
   },
   computed: {
-    positionLeft() {
+    positionLeft(): number {
       // TAP, ロング, 区切り線, コメント
-      if ([1, 2, 95, 100].includes(this.note.type)) {
+      if ([1, 2, 95, 100].includes(this.drawType)) {
         return (this.note.lane - 1) * 60;
       }
       // フリック
-      else if ([3, 4].includes(this.note.type)) {
-        let _width = Number(this.note.option[0]) || 3;
+      else if ([3, 4].includes(this.drawType)) {
+        let _width = Number(this.drawOptions[0]) || 3;
         if (_width === -1) _width = 3;
         let _left = (this.note.lane - 1) * 60 + 30;
         let _offset = 0;
-        const numer = Number(this.note.option[1]),
-          denom = Number(this.note.option[2]);
+        const numer = Number(this.drawOptions[1]),
+          denom = Number(this.drawOptions[2]);
         if (numer && denom) {
           _offset = (numer / denom) * 60;
         }
         return _left - (_width / 2) * 60 + _offset;
       }
       // テクスチャ
-      else if (this.note.type === 94) {
-        let _width = Number(this.note.option[1]) || 1;
+      else if (this.drawType === 94) {
+        let _width = Number(this.drawOptions[1]) || 1;
         let _left = (this.note.lane - 1) * 60 + 30;
         let _offset = 0;
-        if (this.note.option[3] && this.note.option[4]) {
-          _offset = (this.note.option[3] / this.note.option[4]) * 60;
+        if (this.drawOptions[3] && this.drawOptions[4]) {
+          _offset = (Number(this.drawOptions[3]) / Number(this.drawOptions[4])) * 60;
         }
         return _left - (_width / 2) * 60 + _offset;
       }
       // LED制御
-      else if (this.note.type === 96) {
+      else if (this.drawType === 96) {
         return -50;
       }
       // 音札, その他特殊ノーツ
@@ -287,60 +297,99 @@ export default {
         return 0;
       }
     },
-    positionBottom() {
+    positionBottom(): number {
       return (
         (this.note.position / this.note.split) * this.measure.measureHeight
       );
     },
-    noteWidth() {
+    noteWidth(): number {
       // TAP, ロング, コメント
-      if ([1, 2, 100].includes(this.note.type)) return 60;
+      if ([1, 2, 100].includes(this.drawType)) return 60;
       // 左右フリック
-      else if ([3, 4].includes(this.note.type)) {
-        let _width = Number(this.note.option[0]) || 3;
+      else if ([3, 4].includes(this.drawType)) {
+        let _width = Number(this.drawOptions[0]) || 3;
         if (_width === -1) _width = 3;
         return 60 * _width;
       }
       // テクスチャ
-      else if (this.note.type === 94) {
-        let _width = Number(this.note.option[1]) || 1;
+      else if (this.drawType === 94) {
+        let _width = Number(this.drawOptions[1]) || 1;
         return 60 * _width - 1;
       }
       // 区切り線
-      else if (this.note.type === 95) {
-        let _width = Number(this.note.option[0]) || 1;
+      else if (this.drawType === 95) {
+        let _width = Number(this.drawOptions[0]) || 1;
         if (_width === -1) _width = 1;
         if (this.note.position === 0) _width = 5;
         return 60 * _width;
       }
       // LED制御
-      else if (this.note.type === 96) {
+      else if (this.drawType === 96) {
         return 40;
       }
       // その他
       else return 300;
     },
-    isHiddenControl() {
-      return this.note.type === 95 && this.note.position === 0;
+    isHiddenControl(): boolean {
+      return this.drawType === 95 && this.note.position === 0;
     },
-    noteTypeName() {
+    noteTypeName(): string {
+      // @ts-ignore "noteTypes" mixin
       return this.noteTypes.find(t => t.value === this.note.type)?.text;
     },
-    dispColor() {
-      if (this.note.type === 96) {
+    dispColor(): string | null {
+      if (this.drawType === 96) {
         if (
-          Number(this.note.option[0]) === -1 &&
-          Number(this.note.option[1]) === -1 &&
-          Number(this.note.option[2]) === -1
+          Number(this.drawOptions[0]) === -1 &&
+          Number(this.drawOptions[1]) === -1 &&
+          Number(this.drawOptions[2]) === -1
         ) {
           return "linear-gradient(0deg, #ff5151 20%, #44a5ff 80%)";
         } else
-          return `rgb(${this.note.option[0]},${this.note.option[1]},${this.note.option[2]})`;
+          return `rgb(${this.drawOptions[0]},${this.drawOptions[1]},${this.drawOptions[2]})`;
       }
       return null;
+    },
+    /** 描画用のノートタイプ(ダミー時は擬態対象) */
+    drawType (): number {
+      if (this.note.type === 91) {
+        return Number(this.note.option[0]);
+      }
+      return this.note.type;
+    },
+    /** 描画用のOption配列(ダミー時は[0]を削除したもの) */
+    drawOptions (): string[] {
+      if (this.note.type === 91) {
+        return this.note.option.slice(1)
+      }
+      return this.note.option;
+    },
+
+    /**
+     * mixinから取得する系の値
+     */
+    getDuplicated(): number {
+      // @ts-ignore "isDuplicated" mixin
+      return this.isDuplicated(this.note);
+    },
+    getError(): boolean | string {
+      // @ts-ignore "hasError" mixin
+      return this.hasError(this.note);
+    },
+    getOptions(): NoteTypesOption[] {
+      // @ts-ignore "noteOptions" mixin
+      return this.noteOptions(this.note);
+    },
+    getNoteTypes(): { text: string; value: number }[] {
+      // @ts-ignore "noteTypes" mixin
+      return this.noteTypes;
+    },
+    getIsLanelessNote(): boolean {
+      // @ts-ignore "isLanelessNote" mixin
+      return this.isLanelessNote(this.note);
     }
   }
-};
+});
 </script>
 
 <style lang="scss" scoped>

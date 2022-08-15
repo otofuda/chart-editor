@@ -125,7 +125,7 @@ export default Vue.extend({
       else if (![-1, 1, 2, 3, 4, 5].includes(note.lane))
         return "不正なノートのレーン位置です。";
       else if (
-        ![1, 2, 3, 4, 5, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
+        ![1, 2, 3, 4, 5, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
       )
         return "不正なノートタイプです。";
       else return false;
@@ -228,7 +228,7 @@ export default Vue.extend({
 
     // lane: -1 固定ノートであるか
     isLanelessNote(note: NoteData): boolean {
-      return [5, 96, 97, 98, 99].includes(note.type);
+      return [5, 92, 93, 96, 97, 98, 99].includes(note.type);
     }
   }
 });

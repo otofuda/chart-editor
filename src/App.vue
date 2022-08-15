@@ -296,7 +296,7 @@
           </div>
         </v-row>
 
-        <div class="my-4" v-show="appendNote.type === 2">
+        <div class="my-4" v-show="appendNote.type === 2 || (appendNote.type == 91 && Number(appendNote.option[0]) === 2)">
           <v-row align="center" justify="space-between">
             <h4>ロングノーツ編集</h4>
             <v-btn
@@ -1350,17 +1350,37 @@ export default Vue.extend<
       if (this.appendNote.type === 2) this.addEndToAppendNote();
       else this.appendNote.end = [];
 
-      // optionを自動生成
-      if (this.appendNote.type === 94)
-        this.appendNote.option = [
-          "https://via.placeholder.com/50x100",
-          "1",
-          "0.25"
-        ];
-      else if (this.appendNote.type === 96) {
-        this.appendNote.option = ["255", "81", "81"];
-      } else if (this.appendNote.type === 3 || this.appendNote.type === 4)
-        this.appendNote.option = ["-1"];
+      // typeによってoptionを自動生成
+      switch (this.appendNote.type) {
+        case 3:
+        case 4:
+          this.appendNote.option = ["-1"];
+          break;
+        case 91:
+          this.appendNote.option = ["1"];
+          break;
+        case 93:
+          this.appendNote.option = ["4"];
+          break;
+        case 94:
+          this.appendNote.option = [
+            "https://via.placeholder.com/50x100",
+            "1",
+            "0.25"
+          ];
+          break;
+        case 95:
+          this.appendNote.option = ["5"];
+          break;
+        case 96:
+          this.appendNote.option = ["255", "81", "81"];
+          break;
+        case 100:
+          this.appendNote.option = ["ここにコメントを入力"];
+          break;
+        default:
+          this.appendNote.option = [];
+      }
 
       // laneを自動変更
       if (this.isLanelessNote(this.appendNote)) this.appendNote.lane = -1;
