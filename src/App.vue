@@ -51,11 +51,21 @@
       </v-row>
 
       <v-row class="difficulty-select">
-        <v-btn small dark color="blue" @click="currentDifficulty = 'raku'">RAKU</v-btn>
-        <v-btn small dark color="green" @click="currentDifficulty = 'easy'">EASY</v-btn>
-        <v-btn small dark color="orange" @click="currentDifficulty = 'normal'">NORMAL</v-btn>
-        <v-btn small dark color="#ff0984" @click="currentDifficulty = 'hard'">HARD</v-btn>
-        <v-btn small dark color="purple" @click="currentDifficulty = 'extra'">EXTRA</v-btn>
+        <v-btn small dark color="blue" @click="currentDifficulty = 'raku'">
+          RAKU
+        </v-btn>
+        <v-btn small dark color="green" @click="currentDifficulty = 'easy'">
+          EASY
+        </v-btn>
+        <v-btn small dark color="orange" @click="currentDifficulty = 'normal'">
+          NORMAL
+        </v-btn>
+        <v-btn small dark color="#ff0984" @click="currentDifficulty = 'hard'">
+          HARD
+        </v-btn>
+        <v-btn small dark color="purple" @click="currentDifficulty = 'extra'">
+          EXTRA
+        </v-btn>
       </v-row>
 
       <h3>ノートの挿入（仮配置：{{ preAppendNotes.size }}個）</h3>
@@ -143,9 +153,9 @@
 
         <!-- オプション入力欄(汎用) -->
         <div
-          v-for="(opt, i) in noteOptions(appendNote)"
+          v-for="(opt, i) in noteOptionsForAppendNote"
           :key="`option_${i}`"
-          class="mb-4"
+          class="my-4"
         >
           <v-text-field
             v-model="appendNote.option[i]"
@@ -227,24 +237,26 @@
         </v-menu>
 
         <!-- Type96 カラーピッカー -->
-        <v-row v-if="appendNote.type === 96">
+        <v-row v-if="appendNote.type === 96" class="pl-2 pt-2">
           <v-color-picker
             v-model="appendNoteColorOption"
             :swatches="colorSwatches"
             show-swatches
             elevation="2"
-            class="mr-2 mb-2"
+            class="mr-4 mb-2"
             hide-inputs
           ></v-color-picker>
           <div>
-            <div class="mb-2">特殊な色を設定</div>
+            <div><strong>特殊な色を設定</strong></div>
             <v-btn
               outlined
               color="primary"
-              @click="appendNote.option = [-1, -1, -1]"
+              @click="appendNote.option = ['-1', '-1', '-1']"
+              class="my-2"
             >
               青赤(default)に戻す
             </v-btn>
+            <p><code>['-1', '-1', '-1']</code> を設定します</p>
           </div>
         </v-row>
 
@@ -284,7 +296,7 @@
           </div>
         </v-row>
 
-        <div class="my-4" v-show="appendNote.type === 2">
+        <div class="my-4" v-show="appendNote.type === 2 || (appendNote.type == 91 && Number(appendNote.option[0]) === 2)">
           <v-row align="center" justify="space-between">
             <h4>ロングノーツ編集</h4>
             <v-btn
@@ -364,12 +376,13 @@
         </v-col>
       </v-row>
 
-      <v-row align="center">
+      <v-row align="center" class="mb-4">
         <v-text-field
           v-model.number="scrollTo"
           suffix="小節へ"
           outlined
           dense
+          hide-details
         ></v-text-field>
         <v-btn class="ml-4" color="primary" @click="scrollToMeasure(scrollTo)">
           <v-icon left>mdi-arrow-right</v-icon> 遷移
@@ -410,12 +423,20 @@
           :disabled="!isShowDetail || !isCaptureMode || isPreviewMode"
           v-model="isImageMode"
           label="譜面画像生成用"
+          hide-details
+        ></v-checkbox>
+      </v-row>
+      <v-row>
+        <v-checkbox
+          prepend-icon="mdi-stop-circle"
+          v-model="isSimulateStop"
+          label="譜面停止をシミュレート"
         ></v-checkbox>
       </v-row>
 
       <h3>選択ノーツ（選択中：{{ selectionNumber }}個）</h3>
 
-      <v-row align="center">
+      <v-row align="center" class="py-2">
         <v-btn color="primary" text @click="dialog.batchcheck = true">
           <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
           ノーツの一括選択
@@ -872,8 +893,23 @@
   </v-app>
 </template>
 
-<script>
-import Bury from "buryjs";
+<script lang="ts">
+import "buryjs";
+// @ts-ignore
+import { Bury } from "buryjs/lib/main";
+import Vue from "vue";
+
+import {
+  DifficultyString,
+  Measure,
+  ColorObject,
+  TextureObject,
+  ExtendedNoteData,
+  ExtendedChartData
+} from "./types";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { ChartData, NoteData, LaneType } from "chart-types";
+import { NoteTypesDataType, NoteTypesMethodsType } from "./mixins/noteTypes";
 
 import Preview from "./components/Preview.vue";
 import EndForm from "./components/EndForm.vue";
@@ -881,10 +917,132 @@ import EndForm from "./components/EndForm.vue";
 import noteTypes from "./mixins/noteTypes";
 import noteCheck from "./mixins/noteCheck";
 
-export default {
+export type DataType = {
+  isLoaded: boolean;
+  reader: FileReader;
+  previewAudio: HTMLAudioElement;
+  fileName: string;
+  difficulties: DifficultyString[];
+  currentDifficulty: DifficultyString;
+  audioVolume: number;
+  chartObject: ExtendedChartData;
+  dialog: {
+    selectionDelete: boolean;
+    analyzer: boolean;
+    help: boolean;
+    logs: boolean;
+    checked: boolean;
+    batchcheck: boolean;
+    texture: boolean;
+  };
+  texturePayload: {
+    contents: TextureObject[];
+  };
+  textureTabs: string[];
+  textureCurrentTab: string | null;
+  analysisData: {
+    notesCount: number;
+    trendValues: number[];
+    trendLabels: string[];
+    otofudaNotes: number[];
+    typeCount: Record<number, number>;
+  };
+  appendNote: ExtendedNoteData;
+  preAppendNotes: ExtendedNoteData[];
+  colorSwatches: string[][];
+  isAppendMode: boolean;
+  isAutoFollow: boolean;
+  scrollTo: number;
+  isShowDetail: boolean;
+  isCaptureMode: boolean;
+  isPreviewMode: boolean;
+  isImageMode: boolean;
+  isSimulateStop: boolean;
+  batchSelectTypes: number[];
+  batchSelectStart: number;
+  batchSelectEnd: number;
+  selectionLaneTo: LaneType;
+  selectionLaneAddition: number;
+  selectionTypeTo: number;
+  selectionMeasureAddition: number;
+  snackbar: boolean;
+  snackbarText: string;
+  logs: {
+    message: string;
+    type: string;
+    date: Date;
+  }[];
+  beatHeight: number;
+};
+
+type MethodsType = {
+  readFile: (file: File) => void;
+  newFile(): void;
+  saveFile(): void;
+  readAudioFile(file: File): void;
+  zoomOut(): void;
+  zoomIn(): void;
+  scrollToMeasure(measureNumber: number): void;
+  appendNotes(...notes: NoteData[]): void;
+  placeNotes(...notes: NoteData[]): void;
+  appendSimultaneously(...notes: NoteData[]): void;
+  addEndToAppendNote(): void;
+  deleteEndOfAppendNote(index: number): void;
+  changeAppendNoteType(): void;
+  appendNoteToLeft(): void;
+  appendNoteToRight(): void;
+  appendNoteToUp(): void;
+  appendNoteToDown(): void;
+  deleteNotes(...index: number[]): void;
+  setAppendNoteInfo(object: NoteData): void;
+  cancelNote(index: number): void;
+  copyNotesToDifficulty(
+    targetDifficulty: DifficultyString | null,
+    ...targets: NoteData[]
+  ): void;
+  getMovedNote(oldNote: NoteData, newMeasure: number): NoteData;
+  selectionClear(): void;
+  selectionDelete(): void;
+  selectionChangeType(type: number): void;
+  selectionChangeLane(lane: LaneType): void;
+  selectionAddLane(diff: number): void;
+  selectionAddMeasure(diff: number): void;
+  batchSelect(): void;
+  showSnackbar(message: string): void;
+  analyze(): void;
+  setTexture(obj: TextureObject): void;
+  restoreBackup(): void;
+  onPressKey(e: KeyboardEvent): void;
+};
+
+type ComputedType = {
+  currentChart: ExtendedNoteData[];
+  musicBpm: number;
+  musicBeat: number;
+  musicOffset: number;
+  maxMeasure: number;
+  measureData: Measure[];
+  batchSelectTarget: ExtendedNoteData[];
+  selectionNumber: number;
+  getAppendNote: ExtendedNoteData | null;
+  appendNoteColorOption: ColorObject | null;
+  noteOptionsForAppendNote: {
+    label: string;
+    type: string;
+    desc: string;
+  }[];
+};
+
+export default Vue.extend<
+  // data
+  DataType & NoteTypesDataType,
+  MethodsType & NoteTypesMethodsType,
+  ComputedType
+>({
   name: "App",
   mixins: [noteTypes, noteCheck],
-  data() {
+  // @ts-ignore noteTypes と noteCheck は mixins で定義
+  data(): DataType {
     return {
       isLoaded: false,
       reader: new FileReader(),
@@ -915,7 +1073,9 @@ export default {
         batchcheck: false, // ノーツの一括選択
         texture: false // テクスチャセレクター
       },
-      texturePayload: {}, // テクスチャDBからの応答
+      texturePayload: {
+        contents: []
+      }, // テクスチャDBからの応答
       textureTabs: [], // テクスチャの持つタブ
       textureCurrentTab: null,
       analysisData: {
@@ -950,6 +1110,7 @@ export default {
       isCaptureMode: false,
       isPreviewMode: false,
       isImageMode: false,
+      isSimulateStop: false,
 
       // 一括選択の対象
       batchSelectTypes: [],
@@ -967,7 +1128,8 @@ export default {
       logs: [], // メッセージログ
 
       // 一拍あたりの高さ(px)
-      beatHeight: localStorage.getItem("chart-editor__beat-height") || 100
+      beatHeight:
+        Number(localStorage.getItem("chart-editor__beat-height")) || 100
     };
   },
   // 依存性注入(DI)
@@ -982,14 +1144,20 @@ export default {
       setAppendNoteInfo: this.setAppendNoteInfo
     };
   },
-  beforeCreate: Bury.init,
+  beforeCreate() {
+    new Bury(); // Bury.jsを初期化
+  },
   created: function() {
     document.addEventListener("keydown", this.onPressKey);
   },
   mounted() {
     this.reader.onload = event => {
-      this.chartObject = JSON.parse(event.target.result);
-      this.difficulties.each(d => {
+      if (!event.target || !event.target.result) {
+        return;
+      }
+
+      this.chartObject = JSON.parse(String(event.target.result));
+      this.difficulties.each((d: DifficultyString) => {
         this.chartObject[d] = this.chartObject[d].map((note, index) => {
           // 編集用の情報を付加
           return {
@@ -1015,23 +1183,26 @@ export default {
       .then(data => {
         this.texturePayload = data;
         // タブ一覧を生成
-        const tabs = [];
-        this.texturePayload.contents.each(obj => tabs.append(...obj.tab));
+        const tabs: string[] = [];
+        this.texturePayload.contents.each((obj: TextureObject) =>
+          tabs.append(...obj.tab)
+        );
         this.textureTabs = tabs.uniq;
         this.textureCurrentTab = tabs.first;
       });
   },
+  // @ts-ignore noteTypes と noteCheck は mixins で定義
   methods: {
-    readFile(e) {
-      this.fileName = e.name;
-      this.reader.readAsText(e);
+    readFile(file: File): void {
+      this.fileName = file.name;
+      this.reader.readAsText(file);
     },
-    newFile() {
+    newFile(): void {
       this.fileName = "default.json";
       this.isLoaded = true;
     },
     /** JSONファイルを保存 */
-    saveFile() {
+    saveFile(): void {
       const saveObject = {
         raku: [],
         easy: [],
@@ -1044,7 +1215,7 @@ export default {
         }
       };
       // 各ノートにValidationを実行
-      this.difficulties.each(d => {
+      this.difficulties.each((d: DifficultyString) => {
         saveObject[d] = this.chartObject[d].map(this.getValidatedNote);
       });
       console.log("saveObject", saveObject);
@@ -1059,19 +1230,19 @@ export default {
       document.body.removeChild(a);
       this.showSnackbar(`ファイル「${this.fileName}」を保存しました`);
     },
-    readAudioFile(e) {
-      this.previewAudio.src = window.URL.createObjectURL(e);
+    readAudioFile(file: File): void {
+      this.previewAudio.src = window.URL.createObjectURL(file);
     },
-    zoomOut() {
+    zoomOut(): void {
       this.beatHeight = this.beatHeight - 10 || 0;
     },
-    zoomIn() {
+    zoomIn(): void {
       this.beatHeight = this.beatHeight + 10 || 100;
     },
-    scrollToMeasure(measureNumber) {
+    scrollToMeasure(measureNumber: number): void {
       if (!this.measureData[measureNumber]) {
         this.showSnackbar(`${measureNumber}小節はありません`);
-        return false;
+        return;
       }
       const measurePositionTop =
         this.measureData.last?.measurePositionBottom -
@@ -1079,8 +1250,8 @@ export default {
       this.$vuetify.goTo(measurePositionTop);
     },
     // ノーツを挿入
-    appendNotes(...notes) {
-      notes.each(note => {
+    appendNotes(...notes: NoteData[]): void {
+      notes.each((note: NoteData) => {
         const dup = this.isDuplicated(note, {
           checkPreAppend: false
         });
@@ -1094,7 +1265,9 @@ export default {
         const index =
           this.currentChart.size === 0
             ? 1
-            : this.currentChart.max_by(n => n.index).index + 1;
+            : // @ts-ignore
+              this.currentChart.max_by((n: ExtendedNoteData) => n.index).index +
+              1;
         this.currentChart?.append({
           isSelected: false,
           ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
@@ -1106,8 +1279,8 @@ export default {
       this.preAppendNotes = [];
     },
     // ノーツを仮配置
-    placeNotes(...notes) {
-      notes.each(note => {
+    placeNotes(...notes: NoteData[]): void {
+      notes.each((note: NoteData) => {
         const dup = this.isDuplicated(note);
         if (dup) {
           this.showSnackbar(
@@ -1115,11 +1288,13 @@ export default {
           );
           return false;
         }
-        // 仮配置のindexは、preAppendNotes内の最大index+1
+        // 仮配置のindexは、preAppendNotes内の最大index + 1
         const index =
           this.preAppendNotes.size === 0
             ? 1
-            : this.preAppendNotes.max_by(n => n.index).index + 1;
+            : // @ts-ignore
+              this.preAppendNotes.max_by((n: ExtendedNoteData) => n.index || -1)
+                .index + 1;
         this.preAppendNotes.append({
           isSelected: false,
           ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
@@ -1129,11 +1304,11 @@ export default {
       });
     },
     // ノーツを全ての難易度に同時挿入
-    appendSimultaneously(...notes) {
-      notes.each(note => {
+    appendSimultaneously(...notes: NoteData[]): void {
+      notes.each((note: NoteData) => {
         let difficultyCount = 0;
         // 各難易度に対して重複検査＋append
-        this.difficulties.each(difficulty => {
+        this.difficulties.each((difficulty: DifficultyString) => {
           const dup = this.isDuplicated(note, {
             comparators: this.chartObject[difficulty]
           });
@@ -1154,7 +1329,7 @@ export default {
       });
     },
     // appendNoteに終点を追加
-    addEndToAppendNote() {
+    addEndToAppendNote(): void {
       this.appendNote.end.append({
         type: 1,
         lane: this.appendNote.lane,
@@ -1166,38 +1341,58 @@ export default {
       });
     },
     // appendNoteから終点を削除
-    deleteEndOfAppendNote(index) {
+    deleteEndOfAppendNote(index: number): void {
       this.appendNote.end.delete_at(index);
     },
     // ノーツ種別変更時制御
-    changeAppendNoteType() {
+    changeAppendNoteType(): void {
       // endを自動生成／削除
       if (this.appendNote.type === 2) this.addEndToAppendNote();
       else this.appendNote.end = [];
 
-      // optionを自動生成
-      if (this.appendNote.type === 94)
-        this.appendNote.option = [
-          "https://via.placeholder.com/50x100",
-          1,
-          0.25
-        ];
-      else if (this.appendNote.type === 96) {
-        this.appendNote.option = [255, 81, 81];
-      } else if (this.appendNote.type === 3 || this.appendNote.type === 4)
-        this.appendNote.option = [-1, null, null];
+      // typeによってoptionを自動生成
+      switch (this.appendNote.type) {
+        case 3:
+        case 4:
+          this.appendNote.option = ["-1"];
+          break;
+        case 91:
+          this.appendNote.option = ["1"];
+          break;
+        case 93:
+          this.appendNote.option = ["4"];
+          break;
+        case 94:
+          this.appendNote.option = [
+            "https://via.placeholder.com/50x100",
+            "1",
+            "0.25"
+          ];
+          break;
+        case 95:
+          this.appendNote.option = ["5"];
+          break;
+        case 96:
+          this.appendNote.option = ["255", "81", "81"];
+          break;
+        case 100:
+          this.appendNote.option = ["ここにコメントを入力"];
+          break;
+        default:
+          this.appendNote.option = [];
+      }
 
       // laneを自動変更
       if (this.isLanelessNote(this.appendNote)) this.appendNote.lane = -1;
       else if (this.appendNote.lane === -1) this.appendNote.lane = 1;
     },
-    appendNoteToLeft() {
-      this.appendNote.lane = Math.max(this.appendNote.lane - 1, 1);
+    appendNoteToLeft(): void {
+      this.appendNote.lane = Math.max(this.appendNote.lane - 1, 1) as LaneType;
     },
-    appendNoteToRight() {
-      this.appendNote.lane = Math.min(this.appendNote.lane + 1, 5);
+    appendNoteToRight(): void {
+      this.appendNote.lane = Math.min(this.appendNote.lane + 1, 5) as LaneType;
     },
-    appendNoteToUp() {
+    appendNoteToUp(): void {
       const note = this.appendNote;
       if (note.split - 1 <= note.position) {
         note.measure++;
@@ -1207,7 +1402,7 @@ export default {
           this.scrollToMeasure(note.measure);
       } else note.position++;
     },
-    appendNoteToDown() {
+    appendNoteToDown(): void {
       const note = this.appendNote;
       if (note.position === 0) {
         note.measure--;
@@ -1216,51 +1411,51 @@ export default {
         if (this.isAutoFollow) this.scrollToMeasure(note.measure);
       } else note.position--;
     },
-    deleteNotes(...index) {
-      index.each(i => {
+    deleteNotes(...index: number[]): void {
+      index.each((i: number) => {
         this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
-          note => note.index === i
+          (note: ExtendedNoteData) => note.index === i
         );
       });
     },
     // appendNoteに任意のデータをセット
-    setAppendNoteInfo(object) {
+    setAppendNoteInfo(object: NoteData): void {
       this.appendNote = {
         ...this.appendNote,
         ...object,
         index: null
       };
     },
-    cancelNote(index) {
+    cancelNote(index: number): void {
       this.preAppendNotes = this.preAppendNotes?.delete_if(
-        note => note.index === index
+        (note: ExtendedNoteData) => note.index === index
       );
     },
     // 対象難易度とノーツオブジェクトからノーツを複製 (現在の難易度=>対象難易度)
     copyNotesToDifficulty(
-      targetDifficulty = this.currentDifficulty,
-      ...targets
-    ) {
+      targetDifficulty: DifficultyString | null,
+      ...targets: NoteData[]
+    ): void {
       const currentDifficulty = this.currentDifficulty;
-      this.currentDifficulty = targetDifficulty;
+      this.currentDifficulty = targetDifficulty || this.currentDifficulty;
       this.appendNotes(...targets);
       this.currentDifficulty = currentDifficulty;
     },
     // oldNoteがnewMeasure小節に移動した時のノートオブジェクトを返す
-    getMovedNote(oldNote, newMeasure) {
+    getMovedNote(oldNote: NoteData, newMeasure: number): NoteData {
       const diff = newMeasure - oldNote.measure;
       return {
         ...oldNote,
         measure: newMeasure,
         end: oldNote.end.map(end => {
-          this.getMovedNote({ ...end }, newMeasure + diff);
+          return this.getMovedNote({ ...end }, newMeasure + diff);
         })
       };
     },
     // すべて選択解除
-    selectionClear() {
+    selectionClear(): void {
       this.chartObject[this.currentDifficulty] = this.currentChart?.map(
-        note => {
+        (note: NoteData) => {
           return {
             ...note,
             isSelected: false
@@ -1269,75 +1464,81 @@ export default {
       );
     },
     // 選択ノーツを削除
-    selectionDelete() {
+    selectionDelete(): void {
       const num = this.selectionNumber;
       this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
-        note => note.isSelected
+        (note: ExtendedNoteData) => note.isSelected
       );
       this.dialog.selectionDelete = false;
       this.showSnackbar(`${num}個のノーツを削除しました`);
     },
     // 選択ノーツのTypeを変更
-    selectionChangeType(type) {
+    selectionChangeType(type: number): void {
       const t = Number(type);
       if ([2, 5, 94].includes(t)) {
         this.showSnackbar(`Typeを${t}に一括変更することはできません`);
-        return false;
+        return;
       }
       const targets = this.chartObject[this.currentDifficulty].filter(
         note => note.isSelected && ![2, 5].includes(note.type)
       );
       if (targets.size === 0) {
         this.showSnackbar("対象ノーツがありません(Type一括変更)");
-        return false;
+        return;
       }
-      targets.each(note => (note.type = t));
+      targets.each((note: ExtendedNoteData) => (note.type = t));
       this.showSnackbar(`Type:${t}への一括変更を実行しました`);
       this.dialog.checked = false;
     },
     // 選択ノーツのレーンを変更
-    selectionChangeLane(lane) {
-      const l = Number(lane);
+    selectionChangeLane(lane: LaneType): void {
+      const l = lane;
       const targets = this.chartObject[this.currentDifficulty].filter(
         note => note.isSelected && ![2, 5].includes(note.type)
       );
       if (targets.size === 0) {
         this.showSnackbar("対象ノーツがありません(Lane一括変更)");
-        return false;
+        return;
       }
-      targets.each(note => (note.lane = l));
+      targets.each((note: ExtendedNoteData) => (note.lane = l));
       this.showSnackbar(`Lane:${l}への一括変更を実行しました`);
       this.dialog.checked = false;
     },
     // 選択ノーツのレーンを加算または減算
-    selectionAddLane(diff) {
+    selectionAddLane(diff: number): void {
       const d = Number(diff);
       const targets = this.chartObject[this.currentDifficulty].filter(
         note => note.isSelected && ![2, 5].includes(note.type)
       );
       if (targets.size === 0) {
         this.showSnackbar("対象ノーツがありません(Lane一括加算)");
-        return false;
+        return;
       }
       if (d < 0) {
-        targets.each(note => (note.lane = Math.max(note.lane + d, 1)));
+        targets.each(
+          (note: NoteData) =>
+            (note.lane = Math.max(note.lane + d, 1) as LaneType)
+        );
         this.showSnackbar(`${d} 一括減算処理を実行しました`);
       } else {
-        targets.each(note => (note.lane = Math.min(note.lane + d, 5)));
+        targets.each(
+          (note: NoteData) =>
+            (note.lane = Math.min(note.lane + d, 5) as LaneType)
+        );
         this.showSnackbar(`+${d} 一括加算処理を実行しました`);
       }
       this.dialog.checked = false;
     },
     // 選択ノーツの小節を加算または減算
-    selectionAddMeasure(diff) {
+    selectionAddMeasure(diff: number): void {
       const d = Number(diff);
       const targets = this.chartObject[this.currentDifficulty].filter(
         note => note.isSelected
       );
-      targets.each(note => {
+      targets.each((note: NoteData) => {
         note.measure = Math.max(note.measure + d, 0);
         // TODO: ネスト終点に対応
-        note.end.each(end => {
+        note.end.each((end: NoteData) => {
           end.measure = Math.max(end.measure + d, 0);
         });
       });
@@ -1345,14 +1546,16 @@ export default {
       this.dialog.checked = false;
     },
     // 対象ノーツを一括選択
-    batchSelect() {
+    batchSelect(): void {
       const num = this.batchSelectTarget.size;
-      this.batchSelectTarget.each(target => (target.isSelected = true));
+      this.batchSelectTarget.each(
+        (target: ExtendedNoteData) => (target.isSelected = true)
+      );
       this.dialog.batchcheck = false;
       this.showSnackbar(`${num}個のノーツを一括選択しました`);
     },
     // 通知を表示
-    showSnackbar(message) {
+    showSnackbar(message: string): void {
       this.snackbar = false;
       this.snackbarText = message;
       setTimeout(() => (this.snackbar = true), 100);
@@ -1363,17 +1566,17 @@ export default {
       });
     },
     // 譜面分析
-    analyze() {
+    analyze(): void {
       // 分析データを初期化
       this.analysisData.trendLabels = [];
       this.analysisData.trendValues = [];
       this.analysisData.otofudaNotes = [];
       this.analysisData.notesCount = 0;
-      this.noteTypes.each(type => {
+      this.noteTypes.each((type: { text: string; value: number }) => {
         this.analysisData.typeCount[type.value] = 0;
       });
       // ラベルとデータ配列を初期化
-      this.measureData.each(m => {
+      this.measureData.each((m: Measure) => {
         if (m.measure % 10 === 0)
           this.analysisData.trendLabels.append(String(m.measure));
         else this.analysisData.trendLabels.append(" ");
@@ -1381,7 +1584,7 @@ export default {
         this.analysisData.otofudaNotes.append(0);
       });
       // 分析
-      this.currentChart.each(note => {
+      this.currentChart.each((note: ExtendedNoteData) => {
         // 判定オブジェクト => ノーツ数を加算
         if ([1, 2, 3, 4, 5].includes(note.type)) {
           this.analysisData.trendValues[note.measure] += 1;
@@ -1393,7 +1596,7 @@ export default {
       this.dialog.analyzer = true;
     },
     // テクスチャをセットする
-    setTexture(obj) {
+    setTexture(obj: TextureObject): void {
       const note = this.appendNote;
       if (note.type === 94) {
         this.$set(note.option, 0, obj.url);
@@ -1402,17 +1605,17 @@ export default {
       } else this.showSnackbar("挿入中のノートがテクスチャではありません");
     },
     // バックアップから復元
-    restoreBackup() {
+    restoreBackup(): void {
       const dialog = window.confirm(
         "バックアップからデータを復元しますか？(現在の譜面データは失われます)"
       );
-      if (dialog) {
-        const backupData = localStorage.getItem("chart-editor__backup");
+      const backupData = localStorage.getItem("chart-editor__backup");
+      if (dialog && backupData) {
         this.chartObject = JSON.parse(backupData);
         this.showSnackbar("バックアップから復元しました");
       }
     },
-    onPressKey(e) {
+    onPressKey(e: KeyboardEvent): void {
       // localStorageに譜面バックアップを保存
       if (e.ctrlKey && e.key === "s") {
         e.preventDefault();
@@ -1427,37 +1630,39 @@ export default {
   },
   // localStorageにコンフィグを書き込む
   watch: {
-    beatHeight: value =>
+    beatHeight(value) {
       localStorage.setItem("chart-editor__beat-height", value)
+    }
   },
   computed: {
     // 選択中の難易度の譜面データ配列
-    currentChart() {
+    currentChart(): NoteData[] {
       return this.chartObject[this.currentDifficulty] || [];
     },
-    musicBpm() {
+    musicBpm(): number {
       return this.chartObject.info.bpm;
     },
-    musicBeat() {
+    musicBeat(): number {
       return this.chartObject.info.beat;
     },
-    musicOffset() {
+    musicOffset(): number {
       return this.chartObject.info.offset;
     },
-    maxMeasure() {
+    maxMeasure(): number {
       return this.currentChart.size > 0
-        ? this.currentChart.max_by(n => n.measure).measure
+        ? this.currentChart.max_by((n: ExtendedNoteData) => n.measure).measure
         : 1;
     },
-    measureData() {
-      const measureData = [];
+    /** 小節情報を生成 */
+    measureData(): Measure[] {
+      const measureData: Measure[] = [];
       let measureBeat = this.musicBeat;
       let measureBpm = this.musicBpm;
       let measureReachTime = this.musicOffset;
       let measurePositionBottom =
         (this.musicOffset / ((60 / measureBpm) * 1000)) * this.beatHeight;
       // 小節データを生成
-      (this.maxMeasure + 1).times(measure => {
+      (this.maxMeasure + 1).times((measure: number) => {
         // type 97, 98 をfindして求める
         const beatChangeNote = this.currentChart.find(
           n => n.type === 97 && n.measure === measure
@@ -1465,10 +1670,31 @@ export default {
         const bpmChangeNote = this.currentChart.find(
           n => n.type === 98 && n.measure === measure
         );
-        if (beatChangeNote) measureBeat = beatChangeNote.option[0];
-        if (bpmChangeNote) measureBpm = bpmChangeNote.option[0];
-        const measureHeight = this.beatHeight * measureBeat;
-        const measureLength = (60 / measureBpm) * measureBeat * 1000;
+        // type 92, 93 をfindして求める
+        const stopNote = this.currentChart.find(
+          n => n.type === 92 && n.measure === measure
+        );
+        const warpNote = this.currentChart.find(
+          n => n.type === 93 && n.measure === measure
+        );
+        if (beatChangeNote) measureBeat = Number(beatChangeNote.option[0]);
+        if (bpmChangeNote) measureBpm = Number(bpmChangeNote.option[0]);
+
+        // 小節の高さ(px)
+        let measureHeight = this.beatHeight * measureBeat;
+        if (stopNote && this.isSimulateStop) {
+          measureHeight = 0;
+        }
+        if (warpNote) {
+          measureHeight = this.beatHeight * Number(warpNote.option[0]);
+        }
+
+        // 小節の長さ(ms)
+        let measureLength = (60 / measureBpm) * measureBeat * 1000;
+        if (warpNote) {
+          measureLength = 0; // 瞬間移動小節は 0ms
+        }
+
         measureData.push({
           measure,
           measureBpm,
@@ -1479,12 +1705,12 @@ export default {
           measureLength
         });
         measureReachTime += measureLength;
-        measurePositionBottom += this.beatHeight * measureBeat;
+        measurePositionBottom += measureHeight;
       });
       return measureData;
     },
     // 一括選択の対象ノーツ
-    batchSelectTarget() {
+    batchSelectTarget(): NoteData[] {
       const min = this.batchSelectStart;
       const max = this.batchSelectEnd === 0 ? Infinity : this.batchSelectEnd;
       return this.currentChart.filter(
@@ -1495,38 +1721,46 @@ export default {
       );
     },
     // 選択中のノーツ個数
-    selectionNumber() {
+    selectionNumber(): number {
       return this.currentChart.filter(note => note.isSelected).size;
     },
-    getAppendNote() {
+    getAppendNote(): NoteData | null {
       return this.isAppendMode ? this.appendNote : null;
     },
     // 色オブジェクト⇔option配列のためのgetterとsetter
     appendNoteColorOption: {
-      get: function() {
+      get: function(): ColorObject | null {
         return this.appendNote.type === 96
           ? {
-              r: this.appendNote.option[0],
-              g: this.appendNote.option[1],
-              b: this.appendNote.option[2],
+              r: String(this.appendNote.option[0]),
+              g: String(this.appendNote.option[1]),
+              b: String(this.appendNote.option[2]),
               a: 1
             }
           : null;
       },
       set: function(value) {
-        if (this.appendNote.type === 96) {
+        if (this.appendNote.type === 96 && value) {
           this.$set(this.appendNote.option, 0, value.r);
           this.$set(this.appendNote.option, 1, value.g);
           this.$set(this.appendNote.option, 2, value.b);
         }
       }
+    },
+    /** 現在のAppendNote用のオプションを取得する */
+    noteOptionsForAppendNote(): {
+      label: string;
+      type: string;
+      desc: string;
+    }[] {
+      return this.noteOptions(this.appendNote as NoteData);
     }
   },
   components: {
     Preview,
     EndForm
   }
-};
+});
 </script>
 
 <style lang="scss">
@@ -1560,8 +1794,12 @@ export default {
     .v-btn {
       width: 90px;
       border-radius: 0;
-      &:first-child { border-radius: 8px 0 0 8px }
-      &:last-child { border-radius: 0 8px 8px 0 }
+      &:first-child {
+        border-radius: 8px 0 0 8px;
+      }
+      &:last-child {
+        border-radius: 0 8px 8px 0;
+      }
     }
   }
   .v-menu__content {
@@ -1677,6 +1915,20 @@ export default {
     border: 3px solid rgba(255, 255, 255, 0.5);
     border-radius: 6px;
   }
+  &.type92 {
+    z-index: 98;
+    height: 3px;
+    height: 0;
+    text-align: center;
+    border-top: 4px dotted #d950ff;
+  }
+  &.type93 {
+    z-index: 98;
+    height: 3px;
+    height: 0;
+    text-align: center;
+    border-top: 4px dotted #70ff50;
+  }
   &.type97 {
     z-index: 98;
     height: 1px;
@@ -1748,6 +2000,8 @@ export default {
     .note.type5 {
       box-shadow: 0 0 16px 0 gold;
     }
+    .note.type92,
+    .note.type93,
     .note.type97,
     .note.type98,
     .note.type99 {

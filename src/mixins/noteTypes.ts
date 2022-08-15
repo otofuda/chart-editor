@@ -1,5 +1,22 @@
-export default {
-  data() {
+import { NoteData } from "chart-types";
+import Vue from "vue";
+
+export type NoteTypesDataType = {
+  noteTypes: { text: string; value: number }[];
+};
+
+export type NoteTypesOption = {
+  label: string;
+  type: string;
+  desc: string;
+}
+
+export type NoteTypesMethodsType = {
+  noteOptions(note: NoteData): NoteTypesOption[];
+};
+
+export default Vue.extend({
+  data(): NoteTypesDataType {
     return {
       noteTypes: [
         {
@@ -21,6 +38,18 @@ export default {
         {
           text: "音札",
           value: 5
+        },
+        {
+          text: "ダミー",
+          value: 91
+        },
+        {
+          text: "譜面停止",
+          value: 92
+        },
+        {
+          text: "瞬間移動",
+          value: 93
         },
         {
           text: "テクスチャ",
@@ -54,7 +83,7 @@ export default {
     };
   },
   methods: {
-    noteOptions(note) {
+    noteOptions(note: NoteData): NoteTypesOption[] {
       if ([3, 4].includes(note.type))
         return [
           {
@@ -71,6 +100,29 @@ export default {
             label: "offsetDenom",
             type: "number",
             desc: "String型｜右側へのオフセット分数の分母"
+          }
+        ];
+      else if (note.type === 91) {
+        // 擬態するtypeによって出し分け
+        const additionalOptions = this.noteOptions({
+          ...note,
+          type: Number(note.option[0]),
+        })
+        return [
+          {
+            label: "type",
+            type: "number",
+            desc: "Integer型｜擬態するノート種別(1-5)"
+          },
+          ...additionalOptions
+        ];
+      }
+      else if (note.type === 93)
+        return [
+          {
+            label: "beat",
+            type: "number",
+            desc: "Float型｜瞬間移動する小節の高さの拍子数"
           }
         ];
       else if (note.type === 94)
@@ -154,4 +206,4 @@ export default {
       else return [];
     }
   }
-};
+});

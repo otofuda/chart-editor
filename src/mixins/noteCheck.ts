@@ -1,31 +1,68 @@
-export default {
+import "buryjs";
+import { NoteData } from "chart-types";
+import Vue from "vue";
+
+import { ExtendedNoteData } from "../types";
+
+type ComparatorsOption = {
+  checkPreAppend: boolean;
+  comparators: ExtendedNoteData[] | null;
+};
+
+export default Vue.extend({
   methods: {
     isDuplicated(
-      note,
-      option = {
+      note: ExtendedNoteData,
+      option: ComparatorsOption = {
         checkPreAppend: true, // preAppendNotes内を走査するかどうか
         comparators: null // 比較対象となるノーツ配列
       }
     ) {
-      const comparators = option.comparators || this.currentChart;
+      const comparators =
+        // @ts-ignore mixin "currentChart"
+        option.comparators || (this.currentChart as NoteData[]);
       if (comparators) {
         const posValue = note.position / note.split;
         let cnt = 0;
-        comparators.each(target => {
+        comparators.each((target: ExtendedNoteData) => {
           // 同じ音符位置かつ同じレーンのノーツを検査
           if (
             target.measure === note.measure &&
             target.lane === note.lane &&
             target.position / target.split === posValue
           ) {
-            // テクスチャと[any]の重複は許容
+            // テクスチャの重複は許容
             if (target.type === 94 || note.type === 94) return;
 
-            // [フリック|区切り線]と[フリック|区切り線]
+            // [通常|譜面停止|瞬間移動|LED制御|拍子変化|BPM変化]どうし
             // (ただし同じTypeでない)の重複は許容
             if (
-              [3, 4, 94, 95].includes(target.type) &&
-              [3, 4, 94, 95].includes(note.type) &&
+              [1, 92, 93, 96, 97, 98].includes(target.type) &&
+              [1, 92, 93, 96, 97, 98].includes(note.type) &&
+              target.type !== note.type
+            ) {
+              return;
+            }
+            // 左フリックと区切り線の重複は許容
+            if (
+              [3, 95].includes(target.type) &&
+              [3, 95].includes(note.type) &&
+              target.type !== note.type
+            ) {
+              return;
+            }
+            // 右フリックと区切り線の重複は許容
+            if (
+              [4, 95].includes(target.type) &&
+              [4, 95].includes(note.type) &&
+              target.type !== note.type
+            ) {
+              return;
+            }
+            // 通常と区切り線の重複は許容
+            if (
+              [1, 95].includes(target.type) &&
+              [1, 95].includes(note.type) &&
               target.type !== note.type
             ) {
               return;
@@ -44,7 +81,9 @@ export default {
             cnt++;
           }
         });
+        // @ts-ignore mixin "preAppendNotes"
         if (option.checkPreAppend && this.preAppendNotes) {
+          // @ts-ignore mixin "preAppendNotes"
           this.preAppendNotes.each(target => {
             // 同じ音符位置かつ同じレーンのノーツを検査
             if (
@@ -77,7 +116,7 @@ export default {
         return cnt;
       } else return Infinity;
     },
-    hasError(note) {
+    hasError(note: NoteData) {
       if (note.split <= 0) return "splitの値は0より大きい必要があります。";
       else if (note.position < 0)
         return "positionの値は0以上である必要があります。";
@@ -86,23 +125,23 @@ export default {
       else if (![-1, 1, 2, 3, 4, 5].includes(note.lane))
         return "不正なノートのレーン位置です。";
       else if (
-        ![1, 2, 3, 4, 5, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
+        ![1, 2, 3, 4, 5, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
       )
         return "不正なノートタイプです。";
       else return false;
     },
     /** ノートをバリデーション */
-    getValidatedNote(note) {
+    getValidatedNote(note: NoteData): NoteData {
       const type = Number(note.type);
 
       // type: 5 は lane: 3
       // type: 96, 97, 98, 99は lane: -1
-      let lane = Number(note.lane);
+      let lane = Number(note.lane) as 1 | 2 | 3 | 4 | 5 | -1;
       if (type === 5) lane = 3;
       if ([96, 97, 98, 99].includes(type)) lane = -1;
 
       // type: 2 以外は end: []
-      let end = [];
+      let end: NoteData[] = [];
       if (note.type === 2) {
         end = [...note.end].map(this.getValidatedNote);
       }
@@ -118,22 +157,18 @@ export default {
       };
     },
     /** ノートのオプション配列をバリデーション */
-    getValidatedOptions(note) {
+    getValidatedOptions(note: NoteData): string[] {
       /** @type string[] */
-      const option = []; // optionはStringの配列
+      const option: string[] = []; // optionはStringの配列
 
       // option: []
       if ([1, 2, 5, 99].includes(note.type)) return option;
-
       // フリックの場合
       // option: [width: String (, offsetNumer: String, offsetDenom: String)]
       else if ([3, 4].includes(note.type)) {
         option.append(note.option[0] ? String(note.option[0]) : "-1");
         if (note.option[1] && note.option[2]) {
-          option.append(
-            String(note.option[1]),
-            String(note.option[2])
-          );
+          option.append(String(note.option[1]), String(note.option[2]));
         }
         return option;
       }
@@ -141,16 +176,16 @@ export default {
       // テクスチャの場合
       // option: [source: String, width: String, height: String(, offsetNumer: String, offsetDenom: String)]
       else if ([94].includes(note.type)) {
-        option.append(note.option[0] || "https://via.placeholder.com/50x100");
+        option.append(
+          // TODO: asを外す
+          (note.option[0] as string) || "https://via.placeholder.com/50x100"
+        );
         // type94 テクスチャのデフォルト幅は 1
         option.append(note.option[1] ? String(note.option[1]) : "1");
         // type94 テクスチャのデフォルト高さは 0.25
         option.append(note.option[2] ? String(note.option[2]) : "0.25");
         if (note.option[3] && note.option[4]) {
-          option.append(
-            String(note.option[3]),
-            String(note.option[4])
-          );
+          option.append(String(note.option[3]), String(note.option[4]));
         }
         return option;
       }
@@ -188,12 +223,12 @@ export default {
       }
 
       // 不明なtypeの時は全部Stringにしてそのまま返す
-      else return [...note.option].map((opt) => String(opt));
+      else return [...note.option].map(opt => String(opt));
     },
 
     // lane: -1 固定ノートであるか
-    isLanelessNote(note) {
-      return [5, 96, 97, 98, 99].includes(note.type);
+    isLanelessNote(note: NoteData): boolean {
+      return [5, 92, 93, 96, 97, 98, 99].includes(note.type);
     }
   }
-};
+});
