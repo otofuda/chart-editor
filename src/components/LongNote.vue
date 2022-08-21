@@ -13,7 +13,10 @@
       <!-- 始点 -->
       <span
         class="note"
-        :class="`type${note.type}`"
+        :class="{
+          [`type${drawType}`]: true,
+          isDummy: note.type === 91,
+        }"
         :style="{
           left: `${getLeft(note)}px`,
           bottom: `${getBottom(note)}px`,
@@ -56,7 +59,11 @@
     <v-card v-if="menu" rounded="lg">
       <v-list>
         <v-list-item>
-          <v-card-text>#{{ note.index }} ロング</v-card-text>
+          <v-card-text>
+            #{{ note.index }}
+            ロング
+            {{ note.type === 91 ? "(ダミー)" : "" }}
+          </v-card-text>
           <v-spacer></v-spacer>
           <v-btn icon @click="menu = false" right>
             <v-icon>mdi-close</v-icon>
@@ -102,6 +109,8 @@
           </v-row>
         </v-list-item>
         <v-list-item>
+          LANE
+          <v-spacer></v-spacer>
           <v-radio-group v-model="note.lane" row hide-details>
             <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
           </v-radio-group>
@@ -129,6 +138,8 @@
             </v-row>
           </v-list-item>
           <v-list-item>
+            LANE
+            <v-spacer></v-spacer>
             <v-radio-group v-model="end.lane" row hide-details>
               <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
             </v-radio-group>
@@ -168,8 +179,12 @@
   </v-menu>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import Vue, { PropType } from "vue";
+
+import { ExtendedNoteData, Measure } from "@/types";
+
+export default Vue.extend({
   inject: ["deleteNotes"],
   data() {
     return {
@@ -178,34 +193,52 @@ export default {
   },
   props: {
     note: {
-      type: Object,
+      type: Object as PropType<ExtendedNoteData>,
       required: true
     },
     measureData: {
-      type: Array,
+      type: Array as PropType<Measure[]>,
       required: true
     }
   },
   methods: {
-    getLeft(note) {
+    getLeft(note: ExtendedNoteData) {
       return (note.lane - 1) * 60 + 60;
     },
-    getBottom(note) {
+    getBottom(note: ExtendedNoteData) {
       return (
         this.measureData[note.measure].measurePositionBottom +
         (note.position / note.split) *
           this.measureData[note.measure].measureHeight
       );
     },
-    getWidth() {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    getWidth(note: ExtendedNoteData) {
       return 60;
     },
     deleteThisNote() {
+      // @ts-ignore "deleteNotes" inject
       this.deleteNotes(this.note.index);
       this.menu = false;
     }
+  },
+  computed: {
+    /** 描画用のノートタイプ(ダミー時は擬態対象) */
+    drawType (): number {
+      if (this.note.type === 91) {
+        return Number(this.note.option[0]);
+      }
+      return this.note.type;
+    },
+    /** 描画用のOption配列(ダミー時は[0]を削除したもの) */
+    drawOptions (): string[] {
+      if (this.note.type === 91) {
+        return this.note.option.slice(1)
+      }
+      return this.note.option;
+    }
   }
-};
+});
 </script>
 
 <style lang="scss" scoped>

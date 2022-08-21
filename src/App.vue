@@ -70,7 +70,12 @@
 
       <h3>ノートの挿入（仮配置：{{ preAppendNotes.size }}個）</h3>
 
-      <v-checkbox v-model="isAppendMode" label="ノート挿入モード"></v-checkbox>
+      <v-checkbox
+        v-model="isAppendMode"
+        label="ノート挿入モード"
+        hide-details
+        class="mb-2"
+      />
 
       <div v-show="isAppendMode">
         <v-row justify="space-between">
@@ -78,6 +83,7 @@
             v-model="isAutoFollow"
             label="編集小節を自動追従"
             class="mt-0 ml-3"
+            hide-details
           ></v-checkbox>
           <v-btn
             class="ml-4 white--text"
@@ -237,7 +243,7 @@
         </v-menu>
 
         <!-- Type96 カラーピッカー -->
-        <v-row v-if="appendNote.type === 96" class="pl-2 pt-2">
+        <v-row v-if="appendNote.type === 96" class="pl-2">
           <v-color-picker
             v-model="appendNoteColorOption"
             :swatches="colorSwatches"
@@ -314,6 +320,7 @@
             :end="end"
             :parent="appendNote"
             :index="i"
+            :max-measure="maxMeasure"
             @delete-end="deleteEndOfAppendNote"
             @append-to-left="appendNoteToLeft"
             @append-to-right="appendNoteToRight"
@@ -350,6 +357,7 @@
         @click:append="zoomIn"
         @click:prepend="zoomOut"
         step="10"
+        hide-details
       ></v-slider>
 
       <v-row align="center">
@@ -361,6 +369,7 @@
             dense
             prepend-icon="mdi-music"
             @change="readAudioFile"
+            hide-details
           ></v-file-input>
         </v-col>
         <v-col cols="12" sm="6">
@@ -372,6 +381,7 @@
             max="100"
             prepend-icon="mdi-volume-high"
             step="5"
+            hide-details
           ></v-slider>
         </v-col>
       </v-row>
@@ -391,7 +401,7 @@
 
       <h3>プレビュー表示モード</h3>
 
-      <v-row>
+      <v-row class="mb-0">
         <v-checkbox
           prepend-icon="mdi-format-align-justify"
           v-model="isShowDetail"
@@ -399,7 +409,7 @@
           hide-details
         ></v-checkbox>
       </v-row>
-      <v-row>
+      <v-row class="mb-0">
         <v-checkbox
           prepend-icon="mdi-camera"
           :disabled="!isShowDetail"
@@ -408,7 +418,7 @@
           hide-details
         ></v-checkbox>
       </v-row>
-      <v-row>
+      <v-row class="mb-0">
         <v-checkbox
           prepend-icon="mdi-play-circle-outline"
           :disabled="!isShowDetail || !isCaptureMode || isImageMode"
@@ -417,7 +427,7 @@
           hide-details
         ></v-checkbox>
       </v-row>
-      <v-row>
+      <v-row class="mb-0">
         <v-checkbox
           prepend-icon="mdi-image"
           :disabled="!isShowDetail || !isCaptureMode || isPreviewMode"
@@ -529,7 +539,7 @@
         </v-col>
       </v-row>
 
-      <v-row class="mb-8">
+      <v-row>
         <v-btn color="primary" @click="dialog.help = true" text>
           <v-icon left>mdi-help-circle</v-icon> 使い方
         </v-btn>
@@ -545,7 +555,7 @@
           <v-icon left>mdi-chart-timeline-variant</v-icon> 譜面分析
         </v-btn>
       </v-row>
-      <v-row class="mb-2">
+      <v-row>
         <v-btn color="success" @click="saveFile">
           <v-icon left>mdi-content-save</v-icon> 名前をつけて保存
         </v-btn>
@@ -1036,7 +1046,9 @@ type ComputedType = {
 export default Vue.extend<
   // data
   DataType & NoteTypesDataType,
+  // methods
   MethodsType & NoteTypesMethodsType,
+  // computed
   ComputedType
 >({
   name: "App",
@@ -1266,7 +1278,7 @@ export default Vue.extend<
           this.currentChart.size === 0
             ? 1
             : // @ts-ignore
-              this.currentChart.max_by((n: ExtendedNoteData) => n.index).index +
+              this.currentChart.max_by((n) => n.index).index +
               1;
         this.currentChart?.append({
           isSelected: false,
@@ -1293,7 +1305,7 @@ export default Vue.extend<
           this.preAppendNotes.size === 0
             ? 1
             : // @ts-ignore
-              this.preAppendNotes.max_by((n: ExtendedNoteData) => n.index || -1)
+              this.preAppendNotes.max_by((n) => n.index || -1)
                 .index + 1;
         this.preAppendNotes.append({
           isSelected: false,
@@ -1804,6 +1816,10 @@ export default Vue.extend<
   }
   .v-menu__content {
     z-index: 111 !important;
+  }
+  .row {
+    margin-top: 0;
+    margin-bottom: 10px;
   }
 }
 .note {
