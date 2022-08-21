@@ -104,7 +104,7 @@
     <span class="measure__number" v-text="measure.measure"></span>
 
     <Note
-      v-for="(note, i) in notes.filter(n => n.type !== 2)"
+      v-for="(note, i) in dispNotes"
       :key="`note_${measure.measure}_${i}`"
       :note="note"
       :measure="measure"
@@ -232,6 +232,13 @@ export default Vue.extend({
         // @ts-ignore "deleteNotes" (inject)
         this.deleteNotes(...idx);
       }
+    }
+  },
+  computed: {
+    dispNotes (): ExtendedNoteData[] {
+      return this.notes.filter((note) => {
+        return note.type !== 2 && !(note.type === 91 && note.option[0] === "2")
+      })
     }
   },
   components: {

@@ -14,7 +14,7 @@
         </v-btn>
       </div>
     </v-row>
-    <v-row>
+    <v-row class="mb-2">
       <v-col cols="12" sm="3">
         <v-select
           :items="[1, 2, 3, 4, 5]"
@@ -91,33 +91,39 @@
         :parent="end"
         :index="i"
         @delete-end="deleteChild"
-      >
-      </EndForm>
+      />
     </div>
   </div>
 </template>
 
-<script>
-import EndForm from "./EndForm.vue";
+<script lang="ts">
+import Vue, { PropType } from "vue";
 
-export default {
+// import EndForm from "./EndForm.vue";
+import { LaneType, NoteData } from "chart-types";
+
+export default Vue.extend({
   name: "EndForm",
   props: {
     end: {
-      type: Object,
+      type: Object as PropType<NoteData>,
       required: true
     },
     parent: {
-      type: Object,
+      type: Object as PropType<NoteData>,
       required: true
     },
     index: {
       type: Number,
       required: true
+    },
+    maxMeasure: {
+      type: Number,
+      required: true
     }
   },
   methods: {
-    addEndToThis() {
+    addEndToThis(): void {
       this.end.end.append({
         type: 1,
         lane: this.end.lane,
@@ -128,25 +134,25 @@ export default {
         end: []
       });
     },
-    deleteThisEnd() {
+    deleteThisEnd(): void {
       this.$emit("delete-end", this.index);
     },
     // 再帰の場合、自分の終点リストから子を消去
-    deleteChild(index) {
+    deleteChild(index: number): void {
       this.end.end.delete_at(index);
     },
     // positionにフォーカスして終点移動
-    endToLeft() {
+    endToLeft(): void {
       // eslint-disable-next-line vue/no-mutating-props
-      this.end.lane = Math.max(this.end.lane - 1, 1);
+      this.end.lane = Math.max(this.end.lane - 1, 1) as LaneType;
       this.$emit("append-to-left", this.index);
     },
-    endToRight() {
+    endToRight(): void {
       // eslint-disable-next-line vue/no-mutating-props
-      this.end.lane = Math.min(this.end.lane + 1, 5);
+      this.end.lane = Math.min(this.end.lane + 1, 5) as LaneType;
       this.$emit("append-to-right", this.index);
     },
-    endToUp(event) {
+    endToUp(event: KeyboardEvent): void {
       const note = this.end;
       if (note.split - 1 <= note.position) {
         note.measure++;
@@ -155,7 +161,7 @@ export default {
       // Shift同時押しで親も移動
       if (event.shiftKey) this.$emit("append-to-up", this.index);
     },
-    endToDown() {
+    endToDown(event: KeyboardEvent): void {
       const note = this.end;
       if (note.position === 0) {
         note.measure--;
@@ -165,32 +171,34 @@ export default {
       if (event.shiftKey) this.$emit("append-to-down", this.index);
     },
     // App.vueの配置メソッドを発火
-    placeNotes() {
+    placeNotes(): void {
       this.$emit("place-notes");
     }
   },
   computed: {
     // 親ノートの小節ベース座標
-    parentPosition() {
+    parentPosition(): number {
       return this.parent.measure + this.parent.position / this.parent.split;
     },
     // 自分自身の小節ベース座標
-    selfPosition() {
+    selfPosition(): number {
       return this.end.measure + this.end.position / this.end.split;
     },
-    errors() {
-      const array = [];
-      if (this.selfPosition <= this.parentPosition)
+    errors(): string[] {
+      const array = new Array<string>();
+      if (this.selfPosition <= this.parentPosition) {
         array.append("終点が親ノートよりも手前または同じ位置にあります。");
-      if (this.end.lane !== this.parent.lane)
+      }
+      if (this.end.lane !== this.parent.lane) {
         array.append("終点と親ノートのレーン位置が異なります。");
+      }
+      if (this.end.measure > this.maxMeasure) {
+        array.append(`存在しない小節に終点を配置できません(現在、譜面は${this.maxMeasure}小節まで)`);
+      }
       return array;
     }
-  },
-  components: {
-    EndForm
   }
-};
+});
 </script>
 
 <style lang="scss" scoped>

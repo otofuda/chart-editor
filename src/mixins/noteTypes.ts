@@ -112,7 +112,7 @@ export default Vue.extend({
           {
             label: "type",
             type: "number",
-            desc: "Integer型｜擬態するノート種別(1-5)"
+            desc: "Integer型｜擬態するノート種別(対応type: 1, 2, 3, 4, 5)"
           },
           ...additionalOptions
         ];

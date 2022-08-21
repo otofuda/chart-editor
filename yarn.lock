@@ -2134,7 +2134,7 @@ buffer@^5.5.0:
 
 "buryjs@https://github.com/mtsgi/bury.git#feature/vite_typescript":
   version "0.7.0-alpha"
-  resolved "https://github.com/mtsgi/bury.git#decd2d20a05f30d9272d57ea8c13ca2424393624"
+  resolved "https://github.com/mtsgi/bury.git#0bbd23cfbd1e3ac07e08e75524a47790f7c39baf"
 
 bytes@3.0.0:
   version "3.0.0"
@@ -6011,7 +6011,7 @@ vue@2.6.11:
   resolved "https://registry.yarnpkg.com/vue/-/vue-2.6.11.tgz#76594d877d4b12234406e84e35275c6d514125c5"
   integrity sha512-VfPwgcGABbGAue9+sfrD4PuwFar7gPb1yl1UK1MwXoQPAw0BKSqWfoYCT/ThFrdEVWoI51dBuyCoiNU9bZDZxQ==
 
-vuetify-loader@^1.3.0:
+vuetify-loader@^1.7.0:
   version "1.9.2"
   resolved "https://registry.yarnpkg.com/vuetify-loader/-/vuetify-loader-1.9.2.tgz#adcadac71c6d9b24bde42a5b81dfda1871f73f81"
   integrity sha512-8PP2w7aAs/rjA+Izec6qY7sHVb75MNrGQrDOTZJ5IEnvl+NiFhVpU2iWdRDZ3eMS842cWxSWStvkr+KJJKy+Iw==

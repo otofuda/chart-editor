@@ -713,9 +713,11 @@ export default Vue.extend({
     }
   },
   computed: {
-    // 全体からロングノーツだけを取得
+    // 全体からロングノーツ(＋ロングのダミー)だけを取得
     longNotes(): ExtendedNoteData[] {
-      return this.currentChart.filter(note => note.type === 2);
+      return this.currentChart.filter(note => {
+        return note.type === 2 || (note.type === 91 && note.option[0] === "2")
+      });
     },
     // ノートの到達イベント情報を生成
     previewEvents(): PreviewEvents {

@@ -128,25 +128,42 @@
   </div>
 </template>
 
-<script>
-import noteTypes from "../mixins/noteTypes";
-import noteCheck from "../mixins/noteCheck";
-import ObjectBasedMeasure from "./ObjectBasedMeasure.vue";
+<script lang="ts">
+import Vue, { PropType } from "vue";
+import { DifficultyString, ExtendedNoteData, Measure } from "@/types";
 
-export default {
+import noteCheck from "../mixins/noteCheck";
+import noteTypes, { NoteTypesDataType, NoteTypesMethodsType } from "../mixins/noteTypes";
+
+type MethodsType = {
+  deleteNote(note: ExtendedNoteData): void;
+  noteTypeName(note: ExtendedNoteData): string;
+}
+
+type PropsType = {
+  notes: ExtendedNoteData[];
+  measure: Measure;
+  measureData: any[];
+  currentDifficulty: DifficultyString;
+}
+
+export default Vue.extend<
+  NoteTypesDataType,
+  MethodsType & NoteTypesMethodsType,
+  {},
+  PropsType
+>({
   name: "ObjectBasedMeasure",
   mixins: [noteTypes, noteCheck],
   inject: ["deleteNotes", "showSnackbar"],
-  components: {
-    ObjectBasedMeasure
-  },
   props: {
     notes: {
-      type: Array,
+      type: Array as PropType<ExtendedNoteData[]>,
+      required: false,
       default: () => []
     },
     measure: {
-      type: Object,
+      type: Object as PropType<Measure>,
       required: true
     },
     measureData: {
@@ -154,20 +171,23 @@ export default {
       default: () => []
     },
     currentDifficulty: {
-      type: String,
+      type: String as PropType<DifficultyString>,
       default: "easy"
     }
   },
+  // @ts-ignore "noteOptions" はmixin内に定義
   methods: {
     deleteNote(note) {
+      // @ts-ignore "deleteNotes" inject
       this.deleteNotes(note.index);
-      this.menu = false;
+      // this.menu = false;
     },
     noteTypeName(note) {
-      return this.noteTypes.find(t => t.value === note.type)?.text;
+      const types = this.noteTypes;
+      return types.find(t => t.value === note.type)?.text || "---";
     }
   }
-};
+});
 </script>
 
 <style lang="scss" scoped>
