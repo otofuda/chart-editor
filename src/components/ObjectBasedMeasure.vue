@@ -184,7 +184,12 @@ export default Vue.extend<
     },
     noteTypeName(note) {
       const types = this.noteTypes;
-      return types.find(t => t.value === note.type)?.text || "---";
+      if (note.type !== 91) {
+        return types.find(t => t.value === note.type)?.text || "---";
+      }
+      else {
+        return 'ダミー ' + types.find(t => String(t.value) === note.option[0])?.text
+      }
     }
   }
 });

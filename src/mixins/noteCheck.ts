@@ -140,9 +140,9 @@ export default Vue.extend({
       if (type === 5) lane = 3;
       if ([96, 97, 98, 99].includes(type)) lane = -1;
 
-      // type: 2 以外は end: []
+      // ロング or ロングダミー 以外は end: []
       let end: NoteData[] = [];
-      if (note.type === 2) {
+      if (note.type === 2 || (note.type === 91 && note.option[1] === "2")) {
         end = [...note.end].map(this.getValidatedNote);
       }
 
