@@ -31,7 +31,7 @@
         <!-- テクスチャの時 -->
         <img
           v-if="drawType === 94"
-          :src="drawOptions"
+          :src="drawOptions[0]"
           :style="{
             height: `${measure.measureHeight * Number(drawOptions[2])}px`
           }"

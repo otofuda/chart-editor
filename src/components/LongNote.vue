@@ -22,6 +22,8 @@
           bottom: `${getBottom(note)}px`,
           width: `${getWidth(note)}px`
         }"
+        v-bind="attrs"
+        v-on="on"
       >
         <input
           type="checkbox"
@@ -56,6 +58,7 @@
         ></i>
       </div>
     </template>
+
     <v-card v-if="menu" rounded="lg">
       <v-list>
         <v-list-item>
@@ -169,6 +172,16 @@
             </v-row>
           </v-list-item>
         </div>
+
+        <v-alert
+          v-if="note.end.size === 0"
+          class="mx-4 mb-0"
+          dense
+          type="warning"
+          rounded="lg"
+        >
+          終点が1つもありません
+        </v-alert>
       </v-list>
       <v-card-actions class="pt-0">
         <v-btn color="error" text @click="deleteThisNote">
