@@ -31,7 +31,11 @@
         <!-- テクスチャの時 -->
         <img
           v-if="drawType === 94"
-          :src="drawOptions[0]"
+          :src="
+            String(drawOptions[0]).startsWith('texture')
+            ? `https://db.otofuda.com/${drawOptions[0]}`
+            : drawOptions[0]
+          "
           :style="{
             height: `${measure.measureHeight * Number(drawOptions[2])}px`
           }"
@@ -102,7 +106,7 @@
             <v-col>
               <v-text-field
                 :value="note.measure"
-                @change="value => (note.measure = Number(value))"
+                @change="(value) => (note.measure = Number(value))"
                 @keydown.enter.stop="menu = false"
                 hide-details
                 suffix="小節"

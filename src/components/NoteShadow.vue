@@ -22,9 +22,13 @@
       <!-- テクスチャの時 -->
       <img
         v-if="note.type === 94"
-        :src="note.option[0]"
+        :src="
+          String(note.option[0]).startsWith('texture')
+          ? `https://db.otofuda.com/${note.option[0]}`
+          : note.option[0]
+        "
         :style="{
-          height: `${this.measureData.last.measureHeight * Number(note.option[2])}px`
+          height: `${measureData.last.measureHeight * Number(note.option[2])}px`
         }"
         alt="texture"
       />

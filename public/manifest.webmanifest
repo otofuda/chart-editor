@@ -1,0 +1,18 @@
+{
+  "short_name": "譜面エディターV2",
+  "name": "譜面エディタ―V2",
+  "description": "Otofuda Chart Editor V2",
+  "icons": [
+    {
+      "src": "./favicon.png",
+      "type": "image/png",
+      "sizes": "122x122",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "./",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "scope": "./",
+  "theme_color": "#ffffff"
+}
