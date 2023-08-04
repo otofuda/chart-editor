@@ -16,9 +16,6 @@ jobs:
         with:
           node-version: '16.x'
 
-      - name: setup yarn
-        run: npm install -g yarn
-
       - name: Cache node modules
         uses: actions/cache@preview
         with:

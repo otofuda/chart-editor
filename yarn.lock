@@ -3085,7 +3085,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"buryjs@https://github.com/mtsgi/bury.git#commit=0bbd23cfbd1e3ac07e08e75524a47790f7c39baf":
+"buryjs@https://github.com/mtsgi/bury.git#feature/vite_typescript":
   version: 0.7.0-alpha
   resolution: "buryjs@https://github.com/mtsgi/bury.git#commit=0bbd23cfbd1e3ac07e08e75524a47790f7c39baf"
   checksum: ff4975349d6428a4014a8bdb27d8e07073a5cdbf700453ee12e79a5db16d897d77c4bf92c229c27e94b03113e3e93eedc4283bbf0bb114001d000f60a80dd080
@@ -3242,7 +3242,7 @@ __metadata:
     "@vue/cli-plugin-typescript": ~5.0.0
     "@vue/cli-service": ~5.0.0
     "@vue/eslint-config-typescript": ^9.1.0
-    buryjs: "https://github.com/mtsgi/bury.git#commit=0bbd23cfbd1e3ac07e08e75524a47790f7c39baf"
+    buryjs: "https://github.com/mtsgi/bury.git#feature/vite_typescript"
     chart-types: ^2.0.2
     core-js: ^3.32.0
     eslint: ^7.32.0

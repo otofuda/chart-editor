@@ -8,7 +8,7 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
-    "buryjs": "https://github.com/mtsgi/bury.git#commit=0bbd23cfbd1e3ac07e08e75524a47790f7c39baf",
+    "buryjs": "https://github.com/mtsgi/bury.git#feature/vite_typescript",
     "chart-types": "^2.0.2",
     "core-js": "^3.32.0",
     "html2canvas": "^1.0.0-rc.7",
