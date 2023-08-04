@@ -178,7 +178,7 @@ export default Vue.extend({
       else if ([94].includes(note.type)) {
         option.append(
           // TODO: asを外す
-          (note.option[0] as string) || "https://via.placeholder.com/50x100"
+          (note.option[0] as string) || "texture/202020.png"
         );
         // type94 テクスチャのデフォルト幅は 1
         option.append(note.option[1] ? String(note.option[1]) : "1");

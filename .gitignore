@@ -3,6 +3,7 @@ node_modules
 /dist
 /chart-editor
 /vue2-ts
+/.yarn
 
 # local env files
 .env.local

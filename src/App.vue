@@ -183,7 +183,7 @@
           v-model="dialog.texture"
           :close-on-content-click="false"
           max-width="600"
-          offset-y
+          offset-overflow
         >
           <template v-slot:activator="{ on, attrs }">
             <v-btn color="indigo" dark outlined v-bind="attrs" v-on="on">
@@ -216,18 +216,23 @@
                     md="4"
                   >
                     <v-card rounded="lg" class="texture-card" elevation="2">
-                      <v-img :src="texture.url" height="100px">
+                      <v-img
+                        :src="
+                          texture.url.startsWith('texture')
+                          ? `https://db.otofuda.com/${texture.url}`
+                          : texture.url
+                        "
+                        height="100px"
+                      >
                         <span class="texture-card__name">
                           {{ texture.name }}
                         </span>
                       </v-img>
 
-                      <v-card-actions class="justify-end">
+                      <v-card-actions class="justify-end pa-0">
                         <v-btn
                           small
-                          outlined
-                          rounded
-                          depressed
+                          text
                           color="primary"
                           @click="setTexture(texture)"
                         >
@@ -839,11 +844,11 @@
           </p>
           <v-checkbox
             class="d-inline-block mr-4"
-            v-for="type in noteTypes"
+            v-for="(type) in noteTypes"
+            :key="`batch-select-type_${type.value}`"
             v-model="batchSelectTypes"
             :label="type.text"
             :value="type.value"
-            :key="`batch-select-type_${type.value}`"
             hide-details
           ></v-checkbox>
         </v-card-text>
@@ -906,7 +911,7 @@
 <script lang="ts">
 import "buryjs";
 // @ts-ignore
-import { Bury } from "buryjs/lib/main";
+import { Bury } from "buryjs/dist/bury";
 import Vue from "vue";
 
 import {
@@ -1376,7 +1381,7 @@ export default Vue.extend<
           break;
         case 94:
           this.appendNote.option = [
-            "https://via.placeholder.com/50x100",
+            "texture/202020.png",
             "1",
             "0.25"
           ];
