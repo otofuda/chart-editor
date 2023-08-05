@@ -697,8 +697,12 @@ export default Vue.extend({
       this.timeoutIds = [];
       this.eventIds.each((id: number) => clearInterval(id));
       this.eventIds = [];
-      if (this.returnPosition >= 0) this.$vuetify.goTo(this.returnPosition);
-      this.returnPosition = -1;
+      if (this.returnPosition >= 0) {
+        setTimeout(() => {
+          window.scrollTo({ top: this.returnPosition, behavior: 'auto' });
+          this.returnPosition = -1;
+        }, 50);
+      }
     },
     setLEDColor(color?: string) {
       (this.$refs.LEDLeft as HTMLElement).style.background = color || this.defaultLEDColor;
