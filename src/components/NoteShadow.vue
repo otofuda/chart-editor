@@ -7,7 +7,7 @@
       class="note"
       :class="{
         [`type${drawType}`]: true,
-        isDummy: note.type === 91,
+        isDummy: note.type === 90,
         shadow: !isPreAppend,
         preappend: isPreAppend
       }"
@@ -108,8 +108,8 @@ export default Vue.extend({
   methods: {
     getLeft(note: ExtendedNoteData) {
       // 引数のノートの描画用typeとoption配列を取得
-      const drawType = (note.type === 91) ? Number(note.option[0]) : note.type;
-      const drawOptions = (note.type === 91) ? note.option.slice(1) : note.option;
+      const drawType = (note.type === 90) ? Number(note.option[0]) : note.type;
+      const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option;
 
       // TAP, ロング, 区切り線, コメント
       if ([1, 2, 95, 100].includes(drawType)) {
@@ -173,8 +173,8 @@ export default Vue.extend({
 
     getWidth(note: ExtendedNoteData) {
       // 引数のノートの描画用typeとoption配列を取得
-      const drawType = (note.type === 91) ? Number(note.option[0]) : note.type;
-      const drawOptions = (note.type === 91) ? note.option.slice(1) : note.option;
+      const drawType = (note.type === 90) ? Number(note.option[0]) : note.type;
+      const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option;
 
       // TAP, ロング, コメント
       if ([1, 2, 100].includes(drawType)) return 60;
@@ -224,7 +224,7 @@ export default Vue.extend({
     },
     /** 描画用のノートタイプ(ダミー時は擬態対象) */
     drawType () {
-      if (this.note.type === 91) {
+      if (this.note.type === 90) {
         return Number(this.note.option[0]);
       }
       return this.note.type;

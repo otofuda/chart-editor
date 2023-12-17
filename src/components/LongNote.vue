@@ -15,7 +15,7 @@
         class="note"
         :class="{
           [`type${drawType}`]: true,
-          isDummy: note.type === 91,
+          isDummy: note.type === 90,
         }"
         :style="{
           left: `${getLeft(note)}px`,
@@ -65,7 +65,7 @@
           <v-card-text>
             #{{ note.index }}
             ロング
-            {{ note.type === 91 ? "(ダミー)" : "" }}
+            {{ note.type === 90 ? "(ダミー)" : "" }}
           </v-card-text>
           <v-spacer></v-spacer>
           <v-btn icon @click="menu = false" right>
@@ -238,14 +238,14 @@ export default Vue.extend({
   computed: {
     /** 描画用のノートタイプ(ダミー時は擬態対象) */
     drawType (): number {
-      if (this.note.type === 91) {
+      if (this.note.type === 90) {
         return Number(this.note.option[0]);
       }
       return this.note.type;
     },
     /** 描画用のOption配列(ダミー時は[0]を削除したもの) */
     drawOptions (): string[] {
-      if (this.note.type === 91) {
+      if (this.note.type === 90) {
         return this.note.option.slice(1)
       }
       return this.note.option;

@@ -106,10 +106,13 @@
               v-model="appendNote.type"
               outlined
               dense
-              :menu-props="{
-                rounded: 'lg'
-              }"
-            ></v-select>
+              :menu-props="{ rounded: 'lg' }"
+            >
+              <template v-slot:item="{ item }">
+                <v-chip label outlined class="mr-4">{{ item.value }}</v-chip>
+                {{ item.text }}
+              </template>
+            </v-select>
           </v-col>
           <!-- Measure -->
           <v-col cols="12" sm="3">
@@ -307,7 +310,7 @@
           </div>
         </v-row>
 
-        <div class="my-4" v-show="appendNote.type === 2 || (appendNote.type == 91 && Number(appendNote.option[0]) === 2)">
+        <div class="my-4" v-show="appendNote.type === 2 || (appendNote.type == 90 && Number(appendNote.option[0]) === 2)">
           <v-row align="center" justify="space-between">
             <h4>ロングノーツ編集</h4>
             <v-btn
@@ -1373,7 +1376,7 @@ export default Vue.extend<
         case 4:
           this.appendNote.option = ["-1"];
           break;
-        case 91:
+        case 90:
           this.appendNote.option = ["1"];
           break;
         case 93:
@@ -1921,6 +1924,13 @@ export default Vue.extend<
       background: rgba(255, 255, 255, 0.25);
     }
   }
+  &.type91 {
+    z-index: 98;
+    height: 3px;
+    height: 0;
+    text-align: right;
+    border-top: 5px dotted #50dcff;
+  }
   &.type95 {
     z-index: 98;
     height: 1px;
@@ -2021,6 +2031,7 @@ export default Vue.extend<
     .note.type5 {
       box-shadow: 0 0 16px 0 gold;
     }
+    .note.type91,
     .note.type92,
     .note.type93,
     .note.type97,
@@ -2040,6 +2051,7 @@ export default Vue.extend<
       color: transparent;
       text-shadow: none;
       &.shadow,
+      &.type91,
       &.type97,
       &.type98,
       &.type99 {

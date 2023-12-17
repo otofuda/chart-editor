@@ -184,7 +184,7 @@ export default Vue.extend<
     },
     noteTypeName(note) {
       const types = this.noteTypes;
-      if (note.type !== 91) {
+      if (note.type !== 90) {
         return types.find(t => t.value === note.type)?.text || "---";
       }
       else {

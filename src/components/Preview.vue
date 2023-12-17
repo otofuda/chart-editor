@@ -563,7 +563,7 @@ export default Vue.extend({
       let prevMoveTimer: number | null = null;
       const isShowFlickEffect = this.isShowFlickEffect;
       const isShowHandguide = this.isShowHandguide;
-      Object.entries(this.previewEvents).forEach(([timing, event]: [number | string, PreviewEvent]) => {
+      Object.entries(this.previewEvents).forEach(([timing, event]: [string, PreviewEvent]) => {
         const time = Number(timing) - offset;
         const keybeamDOMs = (this.$refs.keybeams as HTMLElement).querySelectorAll("div");
         const comboDOM = this.$refs.currentCombo as HTMLElement;
@@ -720,7 +720,7 @@ export default Vue.extend({
     // 全体からロングノーツ(＋ロングのダミー)だけを取得
     longNotes(): ExtendedNoteData[] {
       return this.currentChart.filter(note => {
-        return note.type === 2 || (note.type === 91 && note.option[0] === "2")
+        return note.type === 2 || (note.type === 90 && note.option[0] === "2")
       });
     },
     // ノートの到達イベント情報を生成
