@@ -237,7 +237,7 @@ export default Vue.extend({
   computed: {
     dispNotes (): ExtendedNoteData[] {
       return this.notes.filter((note) => {
-        return note.type !== 2 && !(note.type === 91 && note.option[0] === "2")
+        return note.type !== 2 && !(note.type === 90 && note.option[0] === "2")
       })
     }
   },

@@ -15,7 +15,7 @@
         class="note"
         :class="{
           [`type${drawType}`]: true,
-          isDummy: note.type === 91,
+          isDummy: note.type === 90,
           hidden: isHiddenControl,
           menu
         }"
@@ -83,6 +83,7 @@
 
         <strong v-if="drawType === 97">BEAT {{ note.option[0] }}</strong>
         {{ note.position }}/{{ note.split }}
+        <strong v-if="drawType === 91">SpObj</strong>
         <strong v-if="drawType === 92">STOP</strong>
         <strong v-if="drawType === 93">WARP {{ note.option[0] }}</strong>
         <strong v-if="drawType === 98">BPM {{ note.option[0] }}</strong>
@@ -338,8 +339,8 @@ export default Vue.extend({
       return this.drawType === 95 && this.note.position === 0;
     },
     noteTypeName(): string {
-      // @ts-ignore "noteTypes" mixin
-      return this.noteTypes.find(t => t.value === this.note.type)?.text;
+      return this.noteTypes.find(t => t.value === this.note.type)?.text
+        || `不明 (type: ${this.note.type})`;
     },
     dispColor(): string | null {
       if (this.drawType === 96) {
@@ -356,14 +357,14 @@ export default Vue.extend({
     },
     /** 描画用のノートタイプ(ダミー時は擬態対象) */
     drawType (): number {
-      if (this.note.type === 91) {
+      if (this.note.type === 90) {
         return Number(this.note.option[0]);
       }
       return this.note.type;
     },
     /** 描画用のOption配列(ダミー時は[0]を削除したもの) */
     drawOptions (): string[] {
-      if (this.note.type === 91) {
+      if (this.note.type === 90) {
         return this.note.option.slice(1)
       }
       return this.note.option;
@@ -373,23 +374,18 @@ export default Vue.extend({
      * mixinから取得する系の値
      */
     getDuplicated(): number {
-      // @ts-ignore "isDuplicated" mixin
       return this.isDuplicated(this.note);
     },
     getError(): boolean | string {
-      // @ts-ignore "hasError" mixin
       return this.hasError(this.note);
     },
     getOptions(): NoteTypesOption[] {
-      // @ts-ignore "noteOptions" mixin
       return this.noteOptions(this.note);
     },
     getNoteTypes(): { text: string; value: number }[] {
-      // @ts-ignore "noteTypes" mixin
       return this.noteTypes;
     },
     getIsLanelessNote(): boolean {
-      // @ts-ignore "isLanelessNote" mixin
       return this.isLanelessNote(this.note);
     }
   }

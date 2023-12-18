@@ -41,6 +41,10 @@ export default Vue.extend({
         },
         {
           text: "ダミー",
+          value: 90
+        },
+        {
+          text: "特殊オブジェクト",
           value: 91
         },
         {
@@ -102,7 +106,7 @@ export default Vue.extend({
             desc: "String型｜右側へのオフセット分数の分母"
           }
         ];
-      else if (note.type === 91) {
+      else if (note.type === 90) {
         // 擬態するtypeによって出し分け
         const additionalOptions = this.noteOptions({
           ...note,
@@ -117,6 +121,24 @@ export default Vue.extend({
           ...additionalOptions
         ];
       }
+      else if (note.type === 91)
+        return [
+          {
+            label: "objectType",
+            type: "string",
+            desc: "String型｜表示するオブジェクトの種類"
+          },
+          {
+            label: "objectName",
+            type: "string",
+            desc: "String型｜表示するオブジェクト名"
+          },
+          {
+            label: "option",
+            type: "string",
+            desc: "String型｜その他のフラグ"
+          }
+        ];
       else if (note.type === 93)
         return [
           {

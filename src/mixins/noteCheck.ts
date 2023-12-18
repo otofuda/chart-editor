@@ -18,9 +18,7 @@ export default Vue.extend({
         comparators: null // 比較対象となるノーツ配列
       }
     ) {
-      const comparators =
-        // @ts-ignore mixin "currentChart"
-        option.comparators || (this.currentChart as NoteData[]);
+      const comparators = option.comparators || (this.currentChart as NoteData[]);
       if (comparators) {
         const posValue = note.position / note.split;
         let cnt = 0;
@@ -81,9 +79,7 @@ export default Vue.extend({
             cnt++;
           }
         });
-        // @ts-ignore mixin "preAppendNotes"
         if (option.checkPreAppend && this.preAppendNotes) {
-          // @ts-ignore mixin "preAppendNotes"
           this.preAppendNotes.each(target => {
             // 同じ音符位置かつ同じレーンのノーツを検査
             if (
@@ -125,7 +121,7 @@ export default Vue.extend({
       else if (![-1, 1, 2, 3, 4, 5].includes(note.lane))
         return "不正なノートのレーン位置です。";
       else if (
-        ![1, 2, 3, 4, 5, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
+        ![1, 2, 3, 4, 5, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
       )
         return "不正なノートタイプです。";
       else return false;
@@ -142,7 +138,7 @@ export default Vue.extend({
 
       // ロング or ロングダミー 以外は end: []
       let end: NoteData[] = [];
-      if (note.type === 2 || (note.type === 91 && note.option[1] === "2")) {
+      if (note.type === 2 || (note.type === 90 && note.option[1] === "2")) {
         end = [...note.end].map(this.getValidatedNote);
       }
 
