@@ -88,7 +88,20 @@ export default Vue.extend({
   },
   methods: {
     noteOptions(note: NoteData): NoteTypesOption[] {
-      if ([3, 4].includes(note.type))
+      if ([1, 2].includes(note.type))
+        return [
+          {
+            label: "speed",
+            type: "number",
+            desc: "Float型｜スピード(倍率)"
+          },
+          {
+            label: "orbit",
+            type: "number",
+            desc: "Float型｜軌道(レーン幅/秒)"
+          }
+        ];
+      else if ([3, 4].includes(note.type))
         return [
           {
             label: "width",
@@ -104,6 +117,24 @@ export default Vue.extend({
             label: "offsetDenom",
             type: "number",
             desc: "String型｜右側へのオフセット分数の分母"
+          },
+          {
+            label: "speed",
+            type: "number",
+            desc: "Float型｜スピード(倍率)"
+          },
+          {
+            label: "orbit",
+            type: "number",
+            desc: "Float型｜軌道(レーン幅/秒)"
+          }
+        ];
+      else if ([5].includes(note.type))
+        return [
+          {
+            label: "speed",
+            type: "number",
+            desc: "Float型｜スピード(倍率)"
           }
         ];
       else if (note.type === 90) {
@@ -173,6 +204,16 @@ export default Vue.extend({
             label: "offsetDenom",
             type: "number",
             desc: "String型｜右側へのオフセット分数の分母"
+          },
+          {
+            label: "speed",
+            type: "number",
+            desc: "Float型｜スピード(倍率)"
+          },
+          {
+            label: "orbit",
+            type: "number",
+            desc: "Float型｜軌道(レーン幅/秒)"
           }
         ];
       else if (note.type === 95)
@@ -181,6 +222,16 @@ export default Vue.extend({
             label: "length",
             type: "number",
             desc: "String型｜左面を基点とした横幅(単位：1レーンの幅)"
+          },
+          {
+            label: "speed",
+            type: "number",
+            desc: "Float型｜スピード(倍率)"
+          },
+          {
+            label: "orbit",
+            type: "number",
+            desc: "Float型｜軌道(レーン幅/秒)"
           }
         ];
       else if (note.type === 96)

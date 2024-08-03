@@ -1210,6 +1210,7 @@ export default Vue.extend<
         this.textureTabs = tabs.uniq;
         this.textureCurrentTab = tabs.first;
       });
+    console.log('App', this)
   },
   // @ts-ignore noteTypes と noteCheck は mixins で定義
   methods: {
