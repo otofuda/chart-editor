@@ -158,13 +158,44 @@ export default Vue.extend({
       const option: string[] = []; // optionはStringの配列
 
       // option: []
-      if ([1, 2, 5, 99].includes(note.type)) return option;
+      if ([99].includes(note.type)) return option;
+
+      // 通常／ロングの場合
+      // option: [(speed (, orbit))]
+      else if ([1, 2].includes(note.type)) {
+        // speed
+        if (note.option[0]) {
+          option.append(String(note.option[0]));
+          // orbit
+          if (note.option[1]) { option.append(String(note.option[1])); }
+        }
+        return option;
+      }
+
       // フリックの場合
-      // option: [width: String (, offsetNumer: String, offsetDenom: String)]
+      // option: [width (, offsetNumer, offsetDenom (, speed (, orbit)))]
       else if ([3, 4].includes(note.type)) {
+        // width
         option.append(note.option[0] ? String(note.option[0]) : "-1");
+        // offsetNumer, offsetDenom
         if (note.option[1] && note.option[2]) {
           option.append(String(note.option[1]), String(note.option[2]));
+          // speed
+          if (note.option[3]) {
+            option.append(String(note.option[3]));
+            // orbit
+            if (note.option[4]) { option.append(String(note.option[4])); }
+          }
+        }
+        return option;
+      }
+
+      // 音札の場合
+      // option: [(speed)]
+      else if ([5].includes(note.type)) {
+        // speed
+        if (note.option[0]) {
+          option.append(String(note.option[0]));
         }
         return option;
       }
