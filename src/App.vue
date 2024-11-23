@@ -1849,6 +1849,8 @@ export default Vue.extend<
   transition: 0.1s all ease;
   strong {
     color: #a0a0a0;
+    &.speed { color: #f08080; }
+    &.orbit { color: #87cefa; }
   }
   input[type="checkbox"] {
     position: absolute;
