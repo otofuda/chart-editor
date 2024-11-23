@@ -81,6 +81,9 @@
           <span>{{ getError }}</span>
         </v-tooltip>
 
+        <strong v-if="noteSpeed !== 1" class="speed">x{{ noteSpeed }}</strong>
+        <strong v-if="noteOrbit !== 0" class="orbit">&gt;{{ noteOrbit }}</strong>
+
         <strong v-if="drawType === 97">BEAT {{ note.option[0] }}</strong>
         {{ note.position }}/{{ note.split }}
         <strong v-if="drawType === 91">SpObj</strong>
@@ -354,6 +357,44 @@ export default Vue.extend({
           return `rgb(${this.drawOptions[0]},${this.drawOptions[1]},${this.drawOptions[2]})`;
       }
       return null;
+    },
+    noteSpeed(): number {
+      // TAP, ロング, 音札
+      if ([1, 2, 5].includes(this.drawType)) {
+        if (this.drawOptions[0]) { return Number(this.drawOptions[0]) }
+      }
+      // 左右フリック
+      else if ([3, 4].includes(this.drawType)) {
+        if (this.drawOptions[3]) { return Number(this.drawOptions[3]) }
+      }
+      // テクスチャ
+      else if (this.drawType === 94) {
+        if (this.drawOptions[5]) { return Number(this.drawOptions[5]) }
+      }
+      // 区切り線
+      else if (this.drawType === 95) {
+        if (this.drawOptions[1]) { return Number(this.drawOptions[1]) }
+      }
+      return 1;
+    },
+    noteOrbit(): number {
+      // TAP, ロング
+      if ([1, 2].includes(this.drawType)) {
+        if (this.drawOptions[1]) { return Number(this.drawOptions[1]) }
+      }
+      // 左右フリック
+      else if ([3, 4].includes(this.drawType)) {
+        if (this.drawOptions[4]) { return Number(this.drawOptions[4]) }
+      }
+      // テクスチャ
+      else if (this.drawType === 94) {
+        if (this.drawOptions[6]) { return Number(this.drawOptions[6]) }
+      }
+      // 区切り線
+      else if (this.drawType === 95) {
+        if (this.drawOptions[2]) { return Number(this.drawOptions[2]) }
+      }
+      return 0;
     },
     /** 描画用のノートタイプ(ダミー時は擬態対象) */
     drawType (): number {
