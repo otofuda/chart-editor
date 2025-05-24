@@ -50,6 +50,6 @@ export type PreviewEvent = {
   color: string | null;
   count: number;
   sound: boolean;
-  handMove: null | "-left" | "-right";
+  handMove: null | "-left" | "-right" | "-up" | "-down";
   noteObject: null | ExtendedNoteData;
 };

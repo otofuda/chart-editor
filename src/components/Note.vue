@@ -273,8 +273,8 @@ export default Vue.extend({
       if ([1, 2, 95, 100].includes(this.drawType)) {
         return (this.note.lane - 1) * 60;
       }
-      // フリック
-      else if ([3, 4].includes(this.drawType)) {
+      // 左右フリック, 上下フリック
+      else if ([3, 4, 6, 7].includes(this.drawType)) {
         let _width = Number(this.drawOptions[0]) || 3;
         if (_width === -1) _width = 3;
         let _left = (this.note.lane - 1) * 60 + 30;
@@ -311,10 +311,10 @@ export default Vue.extend({
       );
     },
     noteWidth(): number {
-      // TAP, ロング, コメント
-      if ([1, 2, 100].includes(this.drawType)) return 60;
-      // 左右フリック
-      else if ([3, 4].includes(this.drawType)) {
+      // TAP, ロング, 終点, コメント
+      if ([1, 2, 89, 100].includes(this.drawType)) return 60;
+      // 左右フリック, 上下フリック
+      else if ([3, 4, 6, 7].includes(this.drawType)) {
         let _width = Number(this.drawOptions[0]) || 3;
         if (_width === -1) _width = 3;
         return 60 * _width;

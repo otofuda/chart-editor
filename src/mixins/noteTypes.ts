@@ -40,6 +40,14 @@ export default Vue.extend({
           value: 5
         },
         {
+          text: '上フリック',
+          value: 6
+        },
+        {
+          text: "下フリック",
+          value: 7
+        },
+        {
           text: "ダミー",
           value: 90
         },
@@ -101,7 +109,7 @@ export default Vue.extend({
             desc: "Float型｜軌道(レーン幅/秒)"
           }
         ];
-      else if ([3, 4].includes(note.type))
+      else if ([3, 4, 6, 7].includes(note.type))
         return [
           {
             label: "width",

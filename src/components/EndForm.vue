@@ -17,6 +17,22 @@
     <v-row class="mb-2">
       <v-col cols="12" sm="3">
         <v-select
+          :items="[
+            { text: '通常', value: 1 },
+            { text: '終端なし', value: 89 }
+          ]"
+          hide-details
+          label="type"
+          v-model="end.type"
+          outlined
+          dense
+          :menu-props="{
+            rounded: 'lg'
+          }"
+        ></v-select>
+      </v-col>
+      <!-- <v-col cols="12" sm="3">
+        <v-select
           :items="[1, 2, 3, 4, 5]"
           hide-details
           label="lane"
@@ -27,7 +43,7 @@
             rounded: 'lg'
           }"
         ></v-select>
-      </v-col>
+      </v-col> -->
       <v-col cols="12" sm="3">
         <v-text-field
           v-model.number="end.measure"

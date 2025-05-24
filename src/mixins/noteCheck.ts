@@ -121,7 +121,7 @@ export default Vue.extend({
       else if (![-1, 1, 2, 3, 4, 5].includes(note.lane))
         return "不正なノートのレーン位置です。";
       else if (
-        ![1, 2, 3, 4, 5, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
+        ![1, 2, 3, 4, 5, 6, 7, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
       )
         return "不正なノートタイプです。";
       else return false;
@@ -174,7 +174,7 @@ export default Vue.extend({
 
       // フリックの場合
       // option: [width (, offsetNumer, offsetDenom (, speed (, orbit)))]
-      else if ([3, 4].includes(note.type)) {
+      else if ([3, 4, 6, 7].includes(note.type)) {
         // width
         option.append(note.option[0] ? String(note.option[0]) : "-1");
         // offsetNumer, offsetDenom

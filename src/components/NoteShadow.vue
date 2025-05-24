@@ -111,12 +111,12 @@ export default Vue.extend({
       const drawType = (note.type === 90) ? Number(note.option[0]) : note.type;
       const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option;
 
-      // TAP, ロング, 区切り線, コメント
-      if ([1, 2, 95, 100].includes(drawType)) {
+      // TAP, ロング, 終点, 区切り線, コメント
+      if ([1, 2, 89, 95, 100].includes(drawType)) {
         return (note.lane - 1) * 60;
       }
-      // フリック
-      else if ([3, 4].includes(drawType)) {
+      // 左右フリック, 上下フリック
+      else if ([3, 4, 6, 7].includes(drawType)) {
         let _width = Number(drawOptions[0]) || 3;
         if (_width === -1) _width = 3;
         let _left = (note.lane - 1) * 60 + 30;
@@ -176,10 +176,10 @@ export default Vue.extend({
       const drawType = (note.type === 90) ? Number(note.option[0]) : note.type;
       const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option;
 
-      // TAP, ロング, コメント
-      if ([1, 2, 100].includes(drawType)) return 60;
-      // 左右フリック
-      else if ([3, 4].includes(drawType)) {
+      // TAP, ロング, 終点, コメント
+      if ([1, 2, 89, 100].includes(drawType)) return 60;
+      // 左右フリック, 上下フリック
+      else if ([3, 4, 6, 7].includes(drawType)) {
         let _width = Number(drawOptions[0]) || 3;
         if (_width === -1) _width = 3;
         return 60 * _width;

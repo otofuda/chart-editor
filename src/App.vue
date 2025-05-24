@@ -684,7 +684,7 @@
               <td>{{ analysisData.typeCount[type.value] }}</td>
               <td>
                 {{
-                  [1, 2, 3, 4, 5].includes(type.value)
+                  [1, 2, 3, 4, 5, 6, 7].includes(type.value)
                     ? `${Math.floor(
                         (analysisData.typeCount[type.value] /
                           analysisData.notesCount) *
@@ -1375,6 +1375,8 @@ export default Vue.extend<
       switch (this.appendNote.type) {
         case 3:
         case 4:
+        case 6:
+        case 7:
           this.appendNote.option = ["-1"];
           break;
         case 90:
@@ -1408,10 +1410,20 @@ export default Vue.extend<
       else if (this.appendNote.lane === -1) this.appendNote.lane = 1;
     },
     appendNoteToLeft(): void {
-      this.appendNote.lane = Math.max(this.appendNote.lane - 1, 1) as LaneType;
+      const lane = Math.max(this.appendNote.lane - 1, 1) as LaneType;
+      this.appendNote.lane = lane;
+      // TODO: ネスト終点に対応
+      this.appendNote.end.each((end) => {
+        end.lane = lane;
+      });
     },
     appendNoteToRight(): void {
-      this.appendNote.lane = Math.min(this.appendNote.lane + 1, 5) as LaneType;
+      const lane = Math.min(this.appendNote.lane + 1, 5) as LaneType;
+      this.appendNote.lane = lane;
+      // TODO: ネスト終点に対応
+      this.appendNote.end.each((end) => {
+        end.lane = lane;
+      });
     },
     appendNoteToUp(): void {
       const note = this.appendNote;
@@ -1607,7 +1619,7 @@ export default Vue.extend<
       // 分析
       this.currentChart.each((note: ExtendedNoteData) => {
         // 判定オブジェクト => ノーツ数を加算
-        if ([1, 2, 3, 4, 5].includes(note.type)) {
+        if ([1, 2, 3, 4, 5, 6, 7].includes(note.type)) {
           this.analysisData.trendValues[note.measure] += 1;
           this.analysisData.notesCount += 1;
         }
@@ -1915,6 +1927,48 @@ export default Vue.extend<
     height: 8px;
     background: linear-gradient(to right, gold, #fde08d, gold);
   }
+  &.type6 {
+    z-index: 99;
+    height: 6px;
+    background: #87f080;
+    &::after {
+      content: "";
+      display: inline-block;
+      position: absolute;
+      left: calc(50% - 20px);
+      top: -16px;
+      height: 0;
+      width: 0;
+      border-left: 20px solid transparent;
+      border-right: 20px solid transparent;
+      border-bottom: 20px solid #87f080;
+    }
+  }
+  &.type7 {
+    z-index: 99;
+    height: 6px;
+    background: #ec80f0;
+    &::after {
+      content: "";
+      display: inline-block;
+      position: absolute;
+      left: calc(50% - 20px);
+      top: 2px;
+      height: 0;
+      width: 0;
+      border-left: 20px solid transparent;
+      border-right: 20px solid transparent;
+      border-top: 20px solid #ec80f0;
+    }
+  }
+  &.type89 {
+    height: 0;
+    background: transparent;
+
+    & + .note-hold {
+      border-radius: 5px 5px 0 0;
+    }
+  }
   &.type94 {
     z-index: 1;
     height: auto;
@@ -2099,6 +2153,24 @@ export default Vue.extend<
     );
     animation: 250ms flickRight ease;
   }
+  &.-up {
+    background: radial-gradient(
+      at 50% 100%,
+      #87f080f0 0%,
+      #87f080a0 5%,
+      #87f08000 60%
+    );
+    animation: 250ms flickUp ease;
+  }
+  &.-down {
+    background: radial-gradient(
+      at 50% 100%,
+      #ec80f0f0 0%,
+      #ec80f0a0 5%,
+      #ec80f000 60%
+    );
+    animation: 250ms flickDown ease;
+  }
 }
 
 @keyframes flickLeft {
@@ -2115,6 +2187,24 @@ export default Vue.extend<
   }
   to {
     transform: scaleX(0.5) scaleY(0) translateX(100%);
+  }
+}
+@keyframes flickUp {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(2);
+    opacity: 0;
+  }
+}
+@keyframes flickDown {
+  from {
+    transform: scaleY(1);
+  }
+  to {
+    transform: scaleY(0);
+    opacity: 0;
   }
 }
 
