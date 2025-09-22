@@ -733,7 +733,7 @@ export default Vue.extend({
             measure.measureReachTime +
             (note.position / note.split) * measure.measureLength;
           // タイミングをkeyにイベント情報をセット
-          if (!events[timing] && [1, 2, 3, 4, 5, 96].includes(note.type))
+          if (!events[timing] && [1, 2, 3, 4, 5, 6, 7, 96].includes(note.type))
             events[timing] = {
               timing, // 到達時間(ms)
               lane: [], // キービームを出すレーン番号
@@ -766,13 +766,25 @@ export default Vue.extend({
             });
           }
           // フリック
-          else if (note.type === 3 || note.type === 4) {
+          else if (note.type === 3 || note.type === 4 || note.type === 6 || note.type === 7) {
             events[timing].sound = true;
             events[timing].count += 1;
             events[timing].noteObject = note;
             // 手の動き LeapMotion補助線
-            if (note.type === 3) events[timing].handMove = "-left";
-            else events[timing].handMove = "-right";
+            switch (note.type) {
+              case 3:
+                events[timing].handMove = "-left";
+                break;
+              case 4:
+                events[timing].handMove = "-right";
+                break;
+              case 6:
+                events[timing].handMove = "-up";
+                break;
+              case 7:
+                events[timing].handMove = "-down";
+                break;
+            }
           }
           // 音札
           else if (note.type === 5) {
