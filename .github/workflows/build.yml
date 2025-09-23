@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+      - feature/rsbuild
+    workflow_dispatch:
 
 jobs:
   build-deploy:
@@ -11,21 +13,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: setup node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
-          cache: 'yarn'
+          node-version: '22.x'
 
-      - name: install
-        run: yarn install
+      - name: Install dependencies
+        run: npm install
 
-      - name: build
-        run: yarn build --mode=production
+      - name: Build
+        run: npm run build
 
-      - name: deploy
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: ./dist
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

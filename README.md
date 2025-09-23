@@ -13,12 +13,12 @@ Chart editor (v2) for Otofuda format
 ### Compiles and hot-reloads for development
 
 ```sh
-yarn install
-yarn serve
+npm install
+npm run serve
 ```
 
 ### Compiles and minifies for production
 
 ```sh
-yarn build
+npm run build
 ```
