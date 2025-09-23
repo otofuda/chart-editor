@@ -7,6 +7,11 @@ on:
       - feature/rsbuild
     workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
