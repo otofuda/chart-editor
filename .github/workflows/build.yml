@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - feature/rsbuild
     workflow_dispatch:
 
 permissions:
