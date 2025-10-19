@@ -201,7 +201,7 @@ export default Vue.extend({
       }
 
       // テクスチャの場合
-      // option: [source: String, width: String, height: String(, offsetNumer: String, offsetDenom: String)]
+      // option: [source: String, width: String, height: String (, offsetNumer: String, offsetDenom: String (, speed (, orbit)))]
       else if ([94].includes(note.type)) {
         option.append(
           // TODO: asを外す
@@ -211,8 +211,17 @@ export default Vue.extend({
         option.append(note.option[1] ? String(note.option[1]) : "1");
         // type94 テクスチャのデフォルト高さは 0.25
         option.append(note.option[2] ? String(note.option[2]) : "0.25");
+        // offsetNumer, offsetDenom
         if (note.option[3] && note.option[4]) {
           option.append(String(note.option[3]), String(note.option[4]));
+          // speed
+          if (note.option[5]) {
+            option.append(String(note.option[5]));
+            // orbit
+            if (note.option[6]) {
+              option.append(String(note.option[6]));
+            }
+          }
         }
         return option;
       }
