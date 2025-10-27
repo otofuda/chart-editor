@@ -106,23 +106,19 @@
         </v-list-item>
 
         <v-list-item>
-          <v-row>
-            <v-col>
-              <v-text-field
-                :value="note.measure"
-                @change="(value) => (note.measure = Number(value))"
-                @keydown.enter.stop="menu = false"
-                hide-details
-                suffix="小節"
-                outlined
-                dense
-              ></v-text-field>
-            </v-col>
-          </v-row>
+          <v-text-field
+            :value="note.measure"
+            @change="(value) => (note.measure = Number(value))"
+            @keydown.enter.stop="menu = false"
+            hide-details
+            suffix="小節"
+            outlined
+            dense
+          ></v-text-field>
         </v-list-item>
 
         <v-list-item>
-          <v-row>
+          <v-row class="mb-0">
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model.number="note.position"
@@ -152,7 +148,9 @@
           <v-radio-group
             v-model.number="note.lane"
             row
+            hide-details
             :disabled="getIsLanelessNote"
+            class="mt-0"
           >
             <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
           </v-radio-group>
@@ -367,6 +365,10 @@ export default Vue.extend({
       else if ([3, 4].includes(this.drawType)) {
         if (this.drawOptions[3]) { return Number(this.drawOptions[3]) }
       }
+      // 上下フリック
+      else if ([6, 7].includes(this.drawType)) {
+        if (this.drawOptions[3]) { return Number(this.drawOptions[3]) }
+      }
       // テクスチャ
       else if (this.drawType === 94) {
         if (this.drawOptions[5]) { return Number(this.drawOptions[5]) }
@@ -384,6 +386,10 @@ export default Vue.extend({
       }
       // 左右フリック
       else if ([3, 4].includes(this.drawType)) {
+        if (this.drawOptions[4]) { return Number(this.drawOptions[4]) }
+      }
+      // 上下フリック
+      else if ([6, 7].includes(this.drawType)) {
         if (this.drawOptions[4]) { return Number(this.drawOptions[4]) }
       }
       // テクスチャ
