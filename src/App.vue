@@ -609,13 +609,8 @@
           エディタの使い方
         </v-card-title>
         <v-card-text>
-          <a target="_blank" rel="noopener noreferrer">
-            エディタの使い方
-          </a>
-        </v-card-text>
-        <v-card-text>
           <a
-            href="https://github.com/mtsgi/fumenedit/blob/master/format.md"
+            href="https://github.com/otofuda/chart-types"
             target="_blank"
             rel="noopener noreferrer"
           >
