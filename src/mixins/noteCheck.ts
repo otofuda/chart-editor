@@ -201,7 +201,7 @@ export default Vue.extend({
       }
 
       // テクスチャの場合
-      // option: [source: String, width: String, height: String (, offsetNumer: String, offsetDenom: String (, speed (, orbit)))]
+      // option: [source, width, height (, offsetNumer, offsetDenom (, speed (, orbit)))]
       else if ([94].includes(note.type)) {
         option.append(
           // TODO: asを外す
@@ -215,10 +215,10 @@ export default Vue.extend({
         if (note.option[3] && note.option[4]) {
           option.append(String(note.option[3]), String(note.option[4]));
           // speed
-          if (note.option[5]) {
+          if (note.option[5] !== undefined) {
             option.append(String(note.option[5]));
             // orbit
-            if (note.option[6]) {
+            if (note.option[6] !== undefined) {
               option.append(String(note.option[6]));
             }
           }
@@ -227,9 +227,9 @@ export default Vue.extend({
       }
 
       // 区切り線、拍子変化、BPM変化の場合
-      // option: [length: String]
-      // option: [beat: String]
-      // option: [bpm: String]
+      // option: [length]
+      // option: [beat]
+      // option: [bpm]
       else if ([95, 97, 98].includes(note.type)) {
         // type95 小節線非表示制御の時は option: ["-1"]
         if (note.type === 95 && note.position === 0) return ["-1"];
@@ -239,7 +239,7 @@ export default Vue.extend({
       }
 
       // LED制御の場合
-      // option: [r: String, g: String, b: String]
+      // option: [r, g, b]
       else if ([96].includes(note.type)) {
         option.append(
           String(note.option[0]),
@@ -250,7 +250,7 @@ export default Vue.extend({
       }
 
       // コメントの場合
-      // option: [comment: String]
+      // option: [comment]
       else if ([100].includes(note.type)) {
         option.append(
           note.option && note.option[0] ? String(note.option[0]) : ""
