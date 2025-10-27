@@ -226,14 +226,28 @@ export default Vue.extend({
         return option;
       }
 
-      // 区切り線、拍子変化、BPM変化の場合
-      // option: [length]
+      // 区切り線の場合
+      // option: [length (, speed (, orbit))]
+      else if ([95].includes(note.type)) {
+        // position: 0 => 小節線非表示制御の時は option: ["-1"]
+        if (note.type === 95 && note.position === 0) return ["-1"];
+        // length
+        option.append(note.option[0] ? String(note.option[0]) : "1");
+        // speed
+        if (note.option[1]) {
+          option.append(String(note.option[1]));
+          // orbit
+          if (note.option[2]) {
+            option.append(String(note.option[2]));
+          }
+        }
+        return option;
+      }
+
+      // 拍子変化、BPM変化の場合
       // option: [beat]
       // option: [bpm]
-      else if ([95, 97, 98].includes(note.type)) {
-        // type95 小節線非表示制御の時は option: ["-1"]
-        if (note.type === 95 && note.position === 0) return ["-1"];
-
+      else if ([97, 98].includes(note.type)) {
         option.append(note.option[0] ? String(note.option[0]) : "-1");
         return option;
       }

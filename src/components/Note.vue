@@ -365,6 +365,10 @@ export default Vue.extend({
       else if ([3, 4].includes(this.drawType)) {
         if (this.drawOptions[3]) { return Number(this.drawOptions[3]) }
       }
+      // 上下フリック
+      else if ([6, 7].includes(this.drawType)) {
+        if (this.drawOptions[3]) { return Number(this.drawOptions[3]) }
+      }
       // テクスチャ
       else if (this.drawType === 94) {
         if (this.drawOptions[5]) { return Number(this.drawOptions[5]) }
@@ -382,6 +386,10 @@ export default Vue.extend({
       }
       // 左右フリック
       else if ([3, 4].includes(this.drawType)) {
+        if (this.drawOptions[4]) { return Number(this.drawOptions[4]) }
+      }
+      // 上下フリック
+      else if ([6, 7].includes(this.drawType)) {
         if (this.drawOptions[4]) { return Number(this.drawOptions[4]) }
       }
       // テクスチャ

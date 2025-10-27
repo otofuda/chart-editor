@@ -2058,6 +2058,10 @@ export default Vue.extend<
     > .v-icon {
       display: none;
     }
+    .speed,
+    .orbit {
+      visibility: hidden;
+    }
   }
   .note.type94,
   .note.type95 {
@@ -2079,6 +2083,11 @@ export default Vue.extend<
     .note {
       color: transparent;
       text-shadow: none;
+
+      .speed,
+      .orbit {
+        visibility: hidden;
+      }
     }
     .note.type5 {
       box-shadow: 0 0 16px 0 gold;
@@ -2116,6 +2125,10 @@ export default Vue.extend<
         border-radius: 4px;
         width: 20px !important;
         left: -40px !important;
+      }
+      .speed,
+      .orbit {
+        visibility: hidden;
       }
     }
   }
