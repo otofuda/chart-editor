@@ -59,6 +59,7 @@
       </div>
     </template>
 
+    <!-- ポップアップ編集 -->
     <v-card v-if="menu" rounded="lg">
       <v-list>
         <v-list-item>
@@ -74,21 +75,17 @@
         </v-list-item>
         <v-card-text class="ml-4">始点</v-card-text>
         <v-list-item>
-          <v-row>
-            <v-col>
-              <v-text-field
-                :value="note.measure"
-                @change="value => (note.measure = Number(value))"
-                hide-details
-                suffix="小節"
-                outlined
-                dense
-              ></v-text-field>
-            </v-col>
-          </v-row>
+          <v-text-field
+            :value="note.measure"
+            @change="value => (note.measure = Number(value))"
+            hide-details
+            suffix="小節"
+            outlined
+            dense
+          ></v-text-field>
         </v-list-item>
         <v-list-item>
-          <v-row>
+          <v-row class="mb-0">
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="note.position"
@@ -125,20 +122,16 @@
           :key="`longnote_end_${note.index}_${i}`"
         >
           <v-divider></v-divider>
-          <v-card-text class="ml-4 mt-2">終点{{ i }}</v-card-text>
+          <v-card-text class="ml-4 mt-2">終点 #{{ i }}</v-card-text>
           <v-list-item>
-            <v-row>
-              <v-col>
-                <v-text-field
-                  :value="end.measure"
-                  @change="value => (end.measure = Number(value))"
-                  hide-details
-                  suffix="小節"
-                  outlined
-                  dense
-                ></v-text-field>
-              </v-col>
-            </v-row>
+            <v-text-field
+              :value="end.measure"
+              @change="value => (end.measure = Number(value))"
+              hide-details
+              suffix="小節"
+              outlined
+              dense
+            ></v-text-field>
           </v-list-item>
           <v-list-item>
             LANE
@@ -148,7 +141,7 @@
             </v-radio-group>
           </v-list-item>
           <v-list-item>
-            <v-row>
+            <v-row class="mb-0">
               <v-col cols="12" sm="6">
                 <v-text-field
                   v-model="end.position"
@@ -170,6 +163,14 @@
                 ></v-text-field>
               </v-col>
             </v-row>
+          </v-list-item>
+          <v-list-item>
+            終端
+            <v-spacer></v-spacer>
+            <v-radio-group v-model="end.type" row hide-details>
+              <v-radio label="あり" :value="1" class="ml-2"></v-radio>
+              <v-radio label="なし" :value="89" class="ml-2"></v-radio>
+            </v-radio-group>
           </v-list-item>
         </div>
 
