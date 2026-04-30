@@ -10,13 +10,13 @@
       isStop: notes.find(note => note.type === 92)
     }"
   >
-    <v-menu offset-y :close-on-content-click="false" rounded="lg">
-      <template v-slot:activator="{ on, attrs }">
+    <v-menu offset-y :close-on-content-click="false">
+      <template v-slot:activator="{ props }">
         <v-btn
-          dark
           icon
-          v-bind="attrs"
-          v-on="on"
+          size="small"
+          variant="text"
+          v-bind="props"
           @click="
             copyToDifficulty = currentDifficulty;
             copyToMeasure = measure.measure;
@@ -26,11 +26,11 @@
         </v-btn>
       </template>
 
-      <v-list>
+      <v-list density="compact">
         <v-list-item>
           <v-list-item-title>
             <strong>{{ measure.measure }} 小節</strong>
-            （{{ notes.size }} OBJ）
+            （{{ notes.length }} OBJ）
           </v-list-item-title>
         </v-list-item>
         <v-list-item>
@@ -39,11 +39,11 @@
         <v-divider></v-divider>
         <v-list-item><strong>小節内のノーツを</strong></v-list-item>
         <v-list-item class="px-0 mx-2">
-          <v-btn color="primary" text dense @click="selectAll">
-            <v-icon left>mdi-select</v-icon> 全て選択
+          <v-btn color="primary" variant="text" prepend-icon="mdi-select" @click="selectAll">
+            全て選択
           </v-btn>
-          <v-btn color="warning" text dense @click="clearAll">
-            <v-icon left>mdi-select-off</v-icon> 全て選択解除
+          <v-btn color="warning" variant="text" prepend-icon="mdi-select-off" @click="clearAll">
+            全て選択解除
           </v-btn>
         </v-list-item>
         <v-divider></v-divider>
@@ -54,12 +54,11 @@
           <v-select
             :items="difficulties"
             label="複製先難易度"
+            class="mt-2"
             v-model="copyToDifficulty"
-            align="left"
             hide-details
-            outlined
-            dense
-            :menu-props="{ rounded: 'lg' }"
+            variant="outlined"
+            density="compact"
           ></v-select>
         </v-list-item>
         <v-list-item class="px-0 mx-2">
@@ -67,23 +66,24 @@
             v-model.number="copyToMeasure"
             hide-details
             label="複製先小節"
-            outlined
-            dense
+            class="mt-2"
+            variant="outlined"
+            density="compact"
           ></v-text-field>
         </v-list-item>
         <v-list-item class="px-0 mx-2">
           小節に
           <v-spacer></v-spacer>
-          <v-btn color="primary" text dense @click="copyAll">
-            <v-icon left>mdi-content-copy</v-icon> 複製
+          <v-btn color="primary" prepend-icon="mdi-content-copy" variant="text" @click="copyAll">
+            複製
           </v-btn>
-          <v-btn color="warning" text dense @click="moveAll">
-            <v-icon left>mdi-content-cut</v-icon> 移動
+          <v-btn color="warning" prepend-icon="mdi-content-cut" variant="text" @click="moveAll">
+            移動
           </v-btn>
         </v-list-item>
-        <v-list-item class="px-0 mx-2 mb-2">
+        <v-list-item class="px-0 mx-2">
           Option：
-          <v-radio-group v-model="copyOrMoveOnlySelected" hide-details="">
+          <v-radio-group v-model="copyOrMoveOnlySelected" hide-details>
             <v-radio label="すべてのノーツを対象" :value="false"></v-radio>
             <v-radio label="チェック済みのみ対象" :value="true"></v-radio>
           </v-radio-group>
@@ -113,138 +113,77 @@
   </div>
 </template>
 
-<script lang="ts">
-import Vue, { PropType } from "vue";
-import { DifficultyString, ExtendedNoteData, Measure } from "@/types";
+<script setup lang="ts">
+import { ref, computed, inject } from 'vue'
+import { type DifficultyString, type ExtendedNoteData, type Measure } from '@/types'
+import Note from './Note.vue'
+import {
+  deleteNotesKey, appendNotesKey, showSnackbarKey, getMovedNoteKey, copyNotesToDifficultyKey,
+} from '@/composables/injectionKeys'
 
-import Note from "./Note.vue";
+const props = defineProps<{
+  notes?: ExtendedNoteData[]
+  measure: Measure
+  currentDifficulty?: DifficultyString
+}>()
 
-export default Vue.extend({
-  name: "MeasureComponent",
-  inject: [
-    "deleteNotes",
-    "appendNotes",
-    "showSnackbar",
-    "getMovedNote",
-    "copyNotesToDifficulty"
-  ],
-  props: {
-    notes: {
-      type: Array as PropType<ExtendedNoteData[]>,
-      default: () => []
-    },
-    measure: {
-      type: Object as PropType<Measure>,
-      required: true
-    },
-    currentDifficulty: {
-      type: String as PropType<DifficultyString>,
-      default: "easy"
-    }
-  },
-  data() {
-    return {
-      difficulties: ["raku", "easy", "normal", "hard", "extra"],
-      copyToDifficulty: this.currentDifficulty,
-      copyToMeasure: 0,
-      copyOrMoveOnlySelected: false // チェック済みのみ複製・移動するか
-    };
-  },
-  methods: {
-    // 小節内のノーツをすべて選択
-    selectAll() {
-      this.notes.each((note: ExtendedNoteData) => {
-        note.isSelected = true;
-      });
-    },
-    // 小節内のノーツをすべて選択解除
-    clearAll() {
-      this.notes.each((note: ExtendedNoteData) => {
-        note.isSelected = false;
-      });
-    },
-    // 小節内のノーツをすべて複製
-    copyAll() {
-      let targets = this.notes.filter(note => note.type !== 2);
-      // チェック済みのみ複製する場合のフィルター
-      if (this.copyOrMoveOnlySelected) {
-        targets = targets.filter(note => note.isSelected);
-      }
-      // const idx = targets.map(note => note.index);
-      if (this.currentDifficulty === this.copyToDifficulty) {
-        // @ts-ignore "appendNotes" (inject)
-        this.appendNotes(
-          ...targets.map(note => {
-            // @ts-ignore "getMovedNote" (inject)
-            return this.getMovedNote({ ...note }, this.copyToMeasure)
-          }
-          )
-        );
-        // @ts-ignore "showSnackbar" (inject)
-        this.showSnackbar(
-          `対象の${targets.size}ノーツに対して、${this.measure.measure}小節 => ${this.copyToMeasure}小節へ複製処理を行いました（ロングノーツを除く）`
-        );
-      } else {
-        // 各movedNoteを取得して対象難易度に複製
-        // @ts-ignore "copyNotesToDifficulty" (inject)
-        this.copyNotesToDifficulty(
-          this.copyToDifficulty,
-          ...targets.map(note => {
-            // @ts-ignore "getMovedNote" (inject)
-            return this.getMovedNote({ ...note }, this.copyToMeasure)
-          }
-          )
-        );
-      }
-    },
-    // 小節内のノーツをすべて移動
-    moveAll() {
-      let targets = this.notes.filter(note => note.type !== 2);
-      // チェック済みのみ移動する場合のフィルター
-      if (this.copyOrMoveOnlySelected) {
-        targets = targets.filter(note => note.isSelected);
-      }
-      const idx = targets.map(note => note.index);
-      if (this.currentDifficulty === this.copyToDifficulty) {
-        // @ts-ignore "appendNotes" (inject)
-        this.appendNotes(
-          ...targets.map(note => {
-            // @ts-ignore "getMovedNote" (inject)
-            return this.getMovedNote({ ...note }, this.copyToMeasure)
-          })
-        );
-        // @ts-ignore "deleteNotes" (inject)
-        this.deleteNotes(...idx);
-        // @ts-ignore "showSnackbar" (inject)
-        this.showSnackbar(
-          `対象の${targets.size}ノーツに対して、${this.measure.measure}小節 => ${this.copyToMeasure}小節へ移動処理を行いました（ロングノーツを除く）`
-        );
-      } else {
-        // 各movedNoteを取得して対象難易度に複製
-        // @ts-ignore "copyNotesToDifficulty" (inject)
-        this.copyNotesToDifficulty(
-          this.copyToDifficulty,
-          ...targets.map(note => {
-            // @ts-ignore "getMovedNote" (inject)
-            return this.getMovedNote({ ...note }, this.copyToMeasure)
-          })
-        );
-        // @ts-ignore "deleteNotes" (inject)
-        this.deleteNotes(...idx);
-      }
-    }
-  },
-  computed: {
-    dispNotes (): ExtendedNoteData[] {
-      return this.notes.filter((note) => {
-        return note.type !== 2 && !(note.type === 90 && note.option[0] === "2")
-      })
-    }
-  },
-  components: {
-    Note
+const deleteNotes = inject(deleteNotesKey)!
+const appendNotes = inject(appendNotesKey)!
+const showSnackbar = inject(showSnackbarKey)!
+const getMovedNote = inject(getMovedNoteKey)!
+const copyNotesToDifficulty = inject(copyNotesToDifficultyKey)!
+
+const difficulties = ['raku', 'easy', 'normal', 'hard', 'extra'] as DifficultyString[]
+const copyToDifficulty = ref<DifficultyString>(props.currentDifficulty ?? 'easy')
+const copyToMeasure = ref(0)
+const copyOrMoveOnlySelected = ref(false) // チェック済みのみ複製・移動するか
+
+const notesList = computed(() => props.notes ?? [])
+
+// 小節内のノーツをすべて選択
+function selectAll() {
+  notesList.value.forEach((note: ExtendedNoteData) => { note.isSelected = true })
+}
+
+// 小節内のノーツをすべて選択解除
+function clearAll() {
+  notesList.value.forEach((note: ExtendedNoteData) => { note.isSelected = false })
+}
+
+// 小節内のノーツをすべて複製
+function copyAll() {
+  let targets = notesList.value.filter(note => note.type !== 2)
+  // チェック済みのみ複製する場合のフィルター
+  if (copyOrMoveOnlySelected.value) targets = targets.filter(note => note.isSelected)
+  if ((props.currentDifficulty ?? 'easy') === copyToDifficulty.value) {
+    appendNotes(...targets.map(note => getMovedNote({ ...note }, copyToMeasure.value)))
+    showSnackbar(`対象の${targets.length}ノーツに対して、${props.measure.measure}小節 => ${copyToMeasure.value}小節へ複製処理を行いました（ロングノーツを除く）`)
+  } else {
+    // 各movedNoteを取得して対象難易度に複製
+    copyNotesToDifficulty(copyToDifficulty.value, ...targets.map(note => getMovedNote({ ...note }, copyToMeasure.value)))
   }
-});
+}
+
+// 小節内のノーツをすべて移動
+function moveAll() {
+  let targets = notesList.value.filter(note => note.type !== 2)
+  // チェック済みのみ移動する場合のフィルター
+  if (copyOrMoveOnlySelected.value) targets = targets.filter(note => note.isSelected)
+  const idx = targets.map(note => note.index)
+  if ((props.currentDifficulty ?? 'easy') === copyToDifficulty.value) {
+    appendNotes(...targets.map(note => getMovedNote({ ...note }, copyToMeasure.value)))
+    deleteNotes(...idx)
+    showSnackbar(`対象の${targets.length}ノーツに対して、${props.measure.measure}小節 => ${copyToMeasure.value}小節へ移動処理を行いました（ロングノーツを除く）`)
+  } else {
+    // 各movedNoteを取得して対象難易度に複製
+    copyNotesToDifficulty(copyToDifficulty.value, ...targets.map(note => getMovedNote({ ...note }, copyToMeasure.value)))
+    deleteNotes(...idx)
+  }
+}
+
+const dispNotes = computed(() =>
+  notesList.value.filter(note => note.type !== 2 && !(note.type === 90 && note.option[0] === '2'))
+)
 </script>
 
 <style lang="scss" scoped>

@@ -9,7 +9,7 @@
     left
     :max-width="240"
   >
-    <template v-slot:activator="{ on, attrs }">
+    <template v-slot:activator="{ props }">
       <!-- 始点 -->
       <span
         class="note"
@@ -22,13 +22,12 @@
           bottom: `${getBottom(note)}px`,
           width: `${getWidth(note)}px`
         }"
-        v-bind="attrs"
-        v-on="on"
+        v-bind="props"
       >
         <input
           type="checkbox"
           v-model="note.isSelected"
-          :id="note.index"
+          :id="String(note.index)"
           @click.stop
         />{{ note.position }}/{{ note.split }}</span
       >
@@ -53,8 +52,7 @@
             left: `${getLeft(end)}px`,
             height: `${getBottom(end) - getBottom(note)}px`
           }"
-          v-bind="attrs"
-          v-on="on"
+          v-bind="props"
         ></i>
       </div>
     </template>
@@ -175,7 +173,7 @@
         </div>
 
         <v-alert
-          v-if="note.end.size === 0"
+          v-if="note.end.length === 0"
           class="mx-4 mb-0"
           dense
           type="warning"
@@ -193,66 +191,49 @@
   </v-menu>
 </template>
 
-<script lang="ts">
-import Vue, { PropType } from "vue";
+<script setup lang="ts">
+import { ref, computed, inject } from 'vue'
+import { type ExtendedNoteData, type Measure } from '@/types'
+import { deleteNotesKey } from '@/composables/injectionKeys'
 
-import { ExtendedNoteData, Measure } from "@/types";
+const props = defineProps<{
+  note: ExtendedNoteData
+  measureData: Measure[]
+}>()
 
-export default Vue.extend({
-  inject: ["deleteNotes"],
-  data() {
-    return {
-      menu: false
-    };
-  },
-  props: {
-    note: {
-      type: Object as PropType<ExtendedNoteData>,
-      required: true
-    },
-    measureData: {
-      type: Array as PropType<Measure[]>,
-      required: true
-    }
-  },
-  methods: {
-    getLeft(note: ExtendedNoteData) {
-      return (note.lane - 1) * 60 + 60;
-    },
-    getBottom(note: ExtendedNoteData) {
-      return (
-        this.measureData[note.measure].measurePositionBottom +
-        (note.position / note.split) *
-          this.measureData[note.measure].measureHeight
-      );
-    },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getWidth(note: ExtendedNoteData) {
-      return 60;
-    },
-    deleteThisNote() {
-      // @ts-ignore "deleteNotes" inject
-      this.deleteNotes(this.note.index);
-      this.menu = false;
-    }
-  },
-  computed: {
-    /** 描画用のノートタイプ(ダミー時は擬態対象) */
-    drawType (): number {
-      if (this.note.type === 90) {
-        return Number(this.note.option[0]);
-      }
-      return this.note.type;
-    },
-    /** 描画用のOption配列(ダミー時は[0]を削除したもの) */
-    drawOptions (): string[] {
-      if (this.note.type === 90) {
-        return this.note.option.slice(1)
-      }
-      return this.note.option;
-    }
-  }
-});
+const deleteNotes = inject(deleteNotesKey)!
+
+const menu = ref(false)
+
+function getLeft(note: ExtendedNoteData) {
+  return (note.lane - 1) * 60 + 60
+}
+
+function getBottom(note: ExtendedNoteData) {
+  return (
+    props.measureData[note.measure].measurePositionBottom +
+    (note.position / note.split) * props.measureData[note.measure].measureHeight
+  )
+}
+
+function getWidth(_note: ExtendedNoteData) {
+  return 60
+}
+
+function deleteThisNote() {
+  deleteNotes(props.note.index)
+  menu.value = false
+}
+
+const drawType = computed(() => {
+  if (props.note.type === 90) return Number(props.note.option[0])
+  return props.note.type
+})
+
+const drawOptions = computed(() => {
+  if (props.note.type === 90) return props.note.option.slice(1)
+  return props.note.option
+})
 </script>
 
 <style lang="scss" scoped>

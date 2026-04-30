@@ -1,11 +1,25 @@
-import Vue from 'vue';
-import Vuetify from 'vuetify/lib/framework';
+import { createVuetify } from 'vuetify'
+import { aliases, mdi } from 'vuetify/iconsets/mdi'
+import 'vuetify/styles'
 
-Vue.use(Vuetify);
-
-export default new Vuetify({
-  lang: {
-    // locales: { ja },
-    current: "ja"
+export default createVuetify({
+  icons: {
+    defaultSet: 'mdi',
+    aliases,
+    sets: { mdi },
+  },
+  theme: {
+    defaultTheme: 'light',
+  },
+  defaults: {
+    VCard: {
+      rounded: 'lg'
+    },
+    VList: {
+      rounded: 'lg',
+    },
+    VBtn: {
+      rounded: 'lg'
+    }
   }
-});
+})
