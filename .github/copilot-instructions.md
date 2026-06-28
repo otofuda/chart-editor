@@ -1,171 +1,233 @@
 # Chart Editor V2 for Otofuda Format
 
-Chart Editor V2 is a Vue.js 2.7 + TypeScript web application for creating and editing music charts in the Otofuda format. The application uses RSBuild (replacement for Webpack/Vue CLI), Vuetify 2.x for UI components, and provides a comprehensive chart editing interface with note placement, timing controls, and multiple difficulty levels.
+Chart Editor V2 is a **Vue 3 + TypeScript** web application for creating and editing music charts in the Otofuda format. The application uses **Vite 8** for bundling, **Vuetify 4** for UI components, and **Vitest** for unit testing. Chart logic is organized into 8 Composition API composables.
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
 ## Working Effectively
 
 ### Prerequisites and Setup
-- Node.js 22.x is required (specified in .node-version file and volta config)
+- Node.js 22.x is required (specified in `.node-version`)
 - The project uses NPM for package management
-- RSBuild is used for bundling (modern replacement for Vue CLI/Webpack)
+- Vite 8 is used for bundling and development server
 
 ### Bootstrap and Build Process
-Run these commands in sequence:
 ```bash
-cd /home/runner/work/chart-editor/chart-editor
-npm install  # Takes ~17 seconds, ignore deprecation warnings
-npm run build  # Takes ~5 seconds - FAST BUILD. NEVER CANCEL
+cd /home/mtsgi/workspace/chart-editor
+npm install        # Install dependencies
+npm run build      # Production build (~1 second, very fast)
 ```
 
-**BUILD TIMING**: Build is very fast (~5 seconds) due to RSBuild. No special timeout needed.
+**BUILD TIMING**: Build completes in ~1 second due to Vite 8 + Rolldown. Never cancel mid-build.
 
 ### Development Server
 ```bash
-npm run serve  # Starts dev server in ~3 seconds
+npm run dev        # Starts dev server (or: npm run serve)
 ```
-- **Local URL**: http://localhost:3000/chart-editor/
-- **NEVER CANCEL**: Dev server starts quickly (~3 seconds) but keep it running for testing
-- **Base Path**: Application is configured to run under `/chart-editor/` path (for GitHub Pages deployment)
+- **Local URL**: http://localhost:5173/ (Vite default)
+- **Base Path**: `/chart-editor/` for GitHub Pages deployment (configured in `vite.config.ts`)
 
 ### Code Quality and Validation
 ```bash
-npx tsc --noEmit  # TypeScript type checking - WORKS, takes ~2 seconds
+npx tsc --noEmit   # TypeScript type checking (~2 seconds, 0 errors expected)
+npx vitest run     # Run all 38 unit tests
 ```
 
-**ESLint Issues**: The project has ESLint configured but missing TypeScript config. ESLint fails with:
-```
-Error: ESLint couldn't find the config "@vue/typescript" to extend from
-```
-Do NOT attempt to fix ESLint configuration unless specifically needed. TypeScript checking works fine with `npx tsc --noEmit`.
+**No ESLint config**: The project does not have a working ESLint setup. Use `npx tsc --noEmit` for type validation only.
 
 ### Production Build and Preview
 ```bash
-npm run build    # Production build - ~5 seconds
-npm run preview  # Serves production build on http://localhost:3000/chart-editor/
+npm run build    # Production build to ./dist/
+npm run preview  # Serves production build locally
 ```
 
-## Validation Scenarios
+## Repository Structure
 
-### Essential User Workflow Testing
-After making changes, ALWAYS test this complete scenario:
-
-1. **Start the application**: `npm run serve` and navigate to http://localhost:3000/chart-editor/
-2. **Modify chart settings**: 
-   - Change BPM from 120 to 140 (should update "現在のハイスピードの速度値" immediately)
-   - Change difficulty level using the colored buttons (RAKU/EASY/NORMAL/HARD/EXTRA)
-3. **Place notes**:
-   - Click "ノートを仮配置" (Place note temporarily)
-   - Verify heading changes to "ノートの挿入（仮配置：1個）"
-   - Verify note appears in preview area as "#1"
-   - Click "挿入する" (Insert) to commit notes
-4. **Verify UI responsiveness**: All controls should respond immediately
-
-### Expected Application Behavior
-- **Chart data persistence**: Changes to BPM, difficulty, and notes should persist during the session
-- **Real-time preview**: Note placement appears immediately in the preview area
-- **Multi-difficulty support**: Five difficulty levels with separate note tracks
-- **Audio integration**: Audio file upload and volume controls (external audio loading may fail in restricted environments)
-
-## Common Tasks
-
-### Repository Structure
 ```
-/home/runner/work/chart-editor/chart-editor/
-├── README.md
+/home/mtsgi/workspace/chart-editor/
 ├── package.json              # NPM scripts and dependencies
-├── rsbuild.config.ts         # Build configuration
-├── tsconfig.json            # TypeScript configuration
-├── vue.config.js            # Legacy Vue CLI config (still used)
-├── babel.config.js          # Babel configuration
-├── .node-version            # Node.js 22.19.0
+├── vite.config.ts            # Vite 8 build configuration (ESM, base: '/chart-editor/')
+├── vitest.config.ts          # Vitest test configuration (environment: jsdom)
+├── tsconfig.json             # TypeScript configuration (strict: false, moduleResolution: bundler)
+├── .node-version             # Node.js 22.x
 ├── src/
-│   ├── App.vue             # Main application component (~65KB, complex)
-│   ├── main.ts             # Application entry point
-│   ├── types.d.ts          # TypeScript type definitions
-│   ├── env.d.ts            # Environment type definitions
-│   ├── components/         # Vue components
-│   │   ├── Preview.vue     # Chart preview component (31KB)
-│   │   ├── Note.vue        # Note rendering
-│   │   ├── Measure.vue     # Musical measure component
-│   │   └── EndForm.vue     # Note ending controls
-│   ├── mixins/            # Vue mixins
-│   │   ├── noteTypes.ts   # Note type definitions and options
-│   │   └── noteCheck.ts   # Note validation logic
+│   ├── App.vue               # Main application component (~1000 lines, <script setup>)
+│   ├── main.ts               # Application entry point (createApp + vuetify)
+│   ├── types.d.ts            # TypeScript type definitions (ExtendedNoteData, ColorObject, etc.)
+│   ├── env.d.ts              # Vite client types + *.vue module declaration
+│   ├── components/
+│   │   ├── Preview.vue       # Chart preview / playback component
+│   │   ├── Note.vue          # Single note rendering and editing
+│   │   ├── LongNote.vue      # Long note (hold) rendering
+│   │   ├── Measure.vue       # Musical measure component
+│   │   ├── NoteShadow.vue    # Note shadow/ghost rendering
+│   │   ├── ObjectBasedMeasure.vue  # Object-based measure editor
+│   │   └── EndForm.vue       # Note endpoint controls (recursive)
+│   ├── composables/
+│   │   ├── injectionKeys.ts  # Typed InjectionKey<T> for provide/inject
+│   │   ├── useNoteTypes.ts   # Note type constants and option generation
+│   │   ├── useNoteCheck.ts   # Note validation and duplicate detection (pure functions)
+│   │   ├── useChartData.ts   # Chart data, measureData, beatHeight reactive state
+│   │   ├── useNoteEditor.ts  # Note staging, insertion, move, copy
+│   │   ├── useSelection.ts   # Multi-note bulk selection and modification
+│   │   ├── useFileIO.ts      # JSON read/write, audio file loading
+│   │   ├── useTextureDB.ts   # Texture DB fetch and application
+│   │   ├── useBackup.ts      # Backup save/restore and analysis
+│   │   └── __tests__/        # Vitest unit tests (38 tests, Japanese test names)
 │   └── plugins/
-│       └── vuetify.ts     # Vuetify configuration
-├── public/                # Static assets
-│   ├── index.html
-│   ├── favicon.png
-│   ├── logo.png
-│   ├── guide.mp3          # Audio guide file
-│   └── manifest.webmanifest
+│       └── vuetify.ts        # Vuetify 4 createVuetify({...}) configuration
+├── public/                   # Static assets (index.html, favicon, guide.mp3)
 └── .github/
     └── workflows/
-        └── build.yml      # GitHub Actions CI/CD
+        └── build.yml         # GitHub Actions CI/CD (builds and deploys to GitHub Pages)
 ```
 
-### NPM Scripts Reference
+## Key Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `vue` | ^3.5.0 | Vue 3 framework |
+| `vuetify` | ^4.0.0 | UI component library |
+| `chart-types` | ^2.0.2 | Shared Otofuda chart data types (NoteData, etc.) |
+| `vite` | ^8.0.10 | Build tool |
+| `@vitejs/plugin-vue` | ^6.0.6 | Vue SFC support for Vite |
+| `vite-plugin-vuetify` | ^2.0.0 | Vuetify 4 tree-shaking for Vite |
+| `vitest` | ^4.x | Unit testing framework |
+| `@vue/test-utils` | ^2.4.0 | Vue component testing utilities |
+| `vue-tsc` | ^2.0.0 | TypeScript type checking for Vue SFCs |
+| `typescript` | ^5.4.0 | TypeScript compiler |
+
+## Architecture
+
+### Composition API Pattern
+All application logic is in `<script setup lang="ts">` components and composables. No Options API or mixins are used.
+
+```ts
+// App.vue — composable usage pattern
+const chartData = useChartData()
+const { chartObject, currentDifficulty, measureData, ... } = chartData
+const { placeNotes, appendNotes, ... } = useNoteEditor(chartData, showSnackbar, scrollToMeasure)
+const { readFile, readAudioFile, saveFile } = useFileIO(chartData, showSnackbar)
+```
+
+### Provide/Inject with Typed Keys
+Child components receive callbacks via typed `InjectionKey<T>` (defined in `injectionKeys.ts`), not string keys:
+
+```ts
+// App.vue
+provide(deleteNotesKey, deleteNotes)
+provide(showSnackbarKey, showSnackbar)
+
+// Note.vue / Measure.vue
+const deleteNotes = inject(deleteNotesKey)!
+```
+
+### Chart Data Format (Otofuda)
+- Five difficulty levels: `raku`, `easy`, `normal`, `hard`, `extra`
+- Each difficulty is a `NoteData[]` array
+- Note fields: `type`, `lane` (1–4 as `LaneType`), `measure`, `position`, `split`, `option[]`, `end[]`
+- Chart metadata in `chartObject.value.info`: `version`, `bpm`, `beat`, `offset`
+
+## Vuetify 4 Patterns
+
+### Activator slot (v-menu, v-tooltip, v-dialog)
+```html
+<!-- CORRECT (Vuetify 4) -->
+<v-menu>
+  <template v-slot:activator="{ props }">
+    <v-btn v-bind="props">Open</v-btn>
+  </template>
+</v-menu>
+
+<!-- WRONG (Vuetify 2 - do not use) -->
+<template v-slot:activator="{ on, attrs }">
+  <v-btn v-bind="attrs" v-on="on">Open</v-btn>
+</template>
+```
+
+### File input change event
+```html
+<!-- CORRECT: use @update:model-value, not @change -->
+<v-file-input @update:model-value="readFile" />
+```
+`readFile` receives `File | File[] | null | undefined` (not a DOM Event).
+
+### Sparkline
+```html
+<!-- CORRECT (Vuetify 4) -->
+<v-sparkline :model-value="values" :smooth="3" />
+
+<!-- WRONG (Vuetify 2) -->
+<v-sparkline :value="values" smooth="3" />
+```
+
+### Removed / renamed props
+- `v-menu` does NOT support `rounded` prop — use CSS class instead
+- `:menu-props="{ rounded: 'lg' }"` → `:menu-props="{}"`
+- `v-badge :value` → `:model-value`
+- `hide-details=""` → `hide-details` (boolean attribute)
+- `v-tabs-items` / `v-tab-item` → `v-window` / `v-window-item`
+- `v-simple-table` → `v-table`
+- `v-list-item-content` → removed (children go directly inside `v-list-item`)
+- `v-expansion-panel-header` → `v-expansion-panel-title`
+- `v-expansion-panel-content` → `v-expansion-panel-text`
+- `background-color=` (v-text-field) → `bg-color=`
+
+## Common Pitfalls
+
+### structuredClone with Vue reactive objects
+Vue reactive objects are Proxy instances. `structuredClone(reactiveObj)` throws `DOMException: Proxy object could not be cloned`.
+
+```ts
+// CORRECT: unwrap Proxy before cloning
+import { toRaw } from 'vue'
+structuredClone(toRaw(note))
+
+// WRONG
+structuredClone(note)  // note is a reactive Proxy → DOMException
+```
+
+### TypeScript: LaneType cast in tests
+`lane` must be typed as `LaneType` (not `number`) in test fixtures:
+```ts
+import { type LaneType } from 'chart-types'
+const note = { lane: 1 as LaneType, ... }
+```
+
+### ESM config files (vite.config.ts, vitest.config.ts)
+`__dirname` is not available in ESM. Use:
+```ts
+import { fileURLToPath, URL } from 'node:url'
+'@': fileURLToPath(new URL('./src', import.meta.url))
+```
+
+## Validation After Changes
+
+Run the complete validation sequence after any change:
 ```bash
-npm run serve    # Development server with hot reload
-npm run build    # Production build to ./dist/
-npm run preview  # Serve production build locally
+npx tsc --noEmit        # Must produce 0 errors
+npx vitest run          # Must show 38 tests passed
+npm run build           # Must succeed
 ```
 
-### Key Application Features
-- **Multi-difficulty editing**: Supports 5 difficulty levels (RAKU, EASY, NORMAL, HARD, EXTRA)
-- **Note types**: Multiple note types including normal notes, long notes, special effects
-- **BPM and timing controls**: Real-time BPM changes, offset settings, beat subdivision
-- **Preview system**: Live preview of chart with visual note placement
-- **File operations**: JSON import/export for chart data
-- **Audio integration**: Music file upload with volume controls and playback
+### Manual Testing Scenario (after `npm run dev`)
+1. Navigate to http://localhost:5173/chart-editor/
+2. Change BPM → verify "現在のハイスピードの速度値" updates
+3. Click "ノートを仮配置" → verify note appears as "#1" in preview
+4. Click "挿入する" → verify note is committed (no Proxy DOMException in console)
+5. Switch difficulty levels (RAKU/EASY/NORMAL/HARD/EXTRA) → verify separate note tracks
 
-### Build Warnings (Expected)
-The build produces extensive Sass deprecation warnings from Vuetify components (~200+ warnings):
+## Build Warnings (Expected)
+The build produces Sass deprecation warnings from Vuetify internals. These are **harmless**:
 ```
-⚠ Module Warning: Deprecation Warning on line X: Using / for division outside of calc() is deprecated
-⚠ Module Warning: Global built-in functions are deprecated and will be removed in Dart Sass 3.0.0
+⚠ Module Warning: Deprecation Warning: Using / for division outside of calc() is deprecated
 ```
-These warnings are **EXPECTED and HARMLESS** - they come from Vuetify 2.x dependencies, not the application code. The build succeeds despite these warnings.
 
-### External Dependencies Note
-The application attempts to load external resources that may fail in restricted environments:
+## External Resources (May Fail in Restricted Environments)
+These failures do NOT break the app:
 - Google Fonts (fonts.googleapis.com)
 - Material Design Icons (cdn.jsdelivr.net)
-- Chart assets (otofuda.github.io)
+- Otofuda chart assets (otofuda.github.io)
 - Texture database (otofuda.microcms.io)
-
-These failures do NOT prevent the application from functioning - they only affect visual styling and optional features.
-
-### Browser Console Warnings (Expected)
-These console warnings are normal and do not indicate problems:
-```
-[WARNING] [Vuetify] Translation key "noDataText" not found, falling back to default
-[WARNING] [Vuetify] Translation key "badge" not found, falling back to default
-TypeError: Failed to fetch (from external API calls)
-```
-
-## Important Notes for Development
-
-### Chart Data Format
-The application works with Otofuda format charts containing:
-- Five difficulty levels: raku, easy, normal, hard, extra
-- Note timing in measures/beats with precise positioning
-- Special note types with customizable options (speed, orbit, width, etc.)
-- Chart metadata: version, BPM, beat signature, offset
-
-### Key Files for Common Changes
-- **src/App.vue**: Main application logic, chart editing, note placement (~1200 lines)
-- **src/types.d.ts**: Type definitions for chart data structures
-- **src/mixins/noteTypes.ts**: Note type configurations and options
-- **rsbuild.config.ts**: Build configuration, base path, asset handling
-- **package.json**: Dependencies, scripts, project metadata
-
-### TypeScript Configuration
-The project uses TypeScript with relaxed settings (`"strict": false`) for Vue 2.x compatibility. Type checking is available but not enforced strictly.
-
-### Vue.js Version
-Uses Vue 2.7 (latest Vue 2.x) with Composition API backport, not Vue 3. Component syntax and patterns follow Vue 2.x conventions.
 
 Always run the complete validation scenario after making any changes to ensure the chart editing functionality works correctly.

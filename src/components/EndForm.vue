@@ -1,15 +1,26 @@
 <!-- eslint-disable vue/no-mutating-props -->
 <template>
   <div class="mt-2">
-    <v-row align="center" justify="space-between">
-      <p class="mb-0">終点 #{{ index }}</p>
+    <v-row>
+      <p class="ma-0">終点 #{{ index }}</p>
+      <v-spacer />
       <div>
-        <v-btn color="primary" text dense @click="addEndToThis">
-          <v-icon left>mdi-plus-circle-outline</v-icon>
+        <v-btn
+          color="primary"
+          variant="text"
+          density="compact"
+          prepend-icon="mdi-plus-circle-outline"
+          @click="addEndToThis"
+        >
           ここに終点を追加
         </v-btn>
-        <v-btn color="error" text dense @click="deleteThisEnd">
-          <v-icon left>mdi-delete</v-icon>
+        <v-btn
+          color="error"
+          variant="text"
+          density="compact"
+          prepend-icon="mdi-delete"
+          @click="deleteThisEnd"
+        >
           この終点を削除
         </v-btn>
       </div>
@@ -18,17 +29,15 @@
       <v-col cols="12" sm="3">
         <v-select
           :items="[
-            { text: '通常', value: 1 },
-            { text: '終端なし', value: 89 }
+            { title: '通常', value: 1 },
+            { title: '終端なし', value: 89 }
           ]"
           hide-details
           label="type"
           v-model="end.type"
-          outlined
-          dense
-          :menu-props="{
-            rounded: 'lg'
-          }"
+          variant="outlined"
+          density="compact"
+          :menu-props="{}"
         ></v-select>
       </v-col>
       <!-- <v-col cols="12" sm="3">
@@ -37,19 +46,17 @@
           hide-details
           label="lane"
           v-model="end.lane"
-          outlined
-          dense
-          :menu-props="{
-            rounded: 'lg'
-          }"
+          variant="outlined"
+          density="compact"
+          :menu-props="{}"
         ></v-select>
       </v-col> -->
       <v-col cols="12" sm="3">
         <v-text-field
           v-model.number="end.measure"
           label="measure"
-          outlined
-          dense
+          variant="outlined"
+          density="compact"
           hide-details
           type="number"
           min="0"
@@ -59,12 +66,12 @@
         <v-text-field
           v-model.number="end.position"
           label="position"
-          outlined
-          dense
+          variant="outlined"
+          density="compact"
           hide-details
           min="0"
           :max="end.split - 1"
-          background-color="#f0f0b0"
+          bg-color="#ffffc0"
           @keydown.enter="placeNotes"
           @keydown.left="endToLeft"
           @keydown.right="endToRight"
@@ -77,12 +84,10 @@
           v-model.number="end.split"
           :items="[4, 8, 16, 32, 12, 24, 48]"
           label="split"
-          outlined
+          variant="outlined"
           hide-details
-          dense
-          :menu-props="{
-            rounded: 'lg'
-          }"
+          density="compact"
+          :menu-props="{}"
         ></v-combobox>
       </v-col>
     </v-row>
@@ -106,115 +111,115 @@
         :end="en"
         :parent="end"
         :index="i"
+        :max-measure="props.maxMeasure"
         @delete-end="deleteChild"
       />
     </div>
   </div>
 </template>
 
-<script lang="ts">
-import Vue, { PropType } from "vue";
+<script setup lang="ts">
+import { computed } from 'vue'
+import { type PropType } from 'vue'
+import { type LaneType, type NoteData } from 'chart-types'
 
-// import EndForm from "./EndForm.vue";
-import { LaneType, NoteData } from "chart-types";
+const props = defineProps({
+  end: {
+    type: Object as PropType<NoteData>,
+    required: true,
+  },
+  parent: {
+    type: Object as PropType<NoteData>,
+    required: true,
+  },
+  index: {
+    type: Number,
+    required: true,
+  },
+  maxMeasure: {
+    type: Number,
+    required: false,
+    default: 999,
+  },
+})
 
-export default Vue.extend({
-  name: "EndForm",
-  props: {
-    end: {
-      type: Object as PropType<NoteData>,
-      required: true
-    },
-    parent: {
-      type: Object as PropType<NoteData>,
-      required: true
-    },
-    index: {
-      type: Number,
-      required: true
-    },
-    maxMeasure: {
-      type: Number,
-      required: true
-    }
-  },
-  methods: {
-    addEndToThis(): void {
-      this.end.end.append({
-        type: 1,
-        lane: this.end.lane,
-        measure: this.end.measure,
-        position: Math.min(this.end.position + 1, this.end.split),
-        split: this.end.split,
-        option: [],
-        end: []
-      });
-    },
-    deleteThisEnd(): void {
-      this.$emit("delete-end", this.index);
-    },
-    // 再帰の場合、自分の終点リストから子を消去
-    deleteChild(index: number): void {
-      this.end.end.delete_at(index);
-    },
-    // positionにフォーカスして終点移動
-    endToLeft(): void {
-      // eslint-disable-next-line vue/no-mutating-props
-      this.end.lane = Math.max(this.end.lane - 1, 1) as LaneType;
-      this.$emit("append-to-left", this.index);
-    },
-    endToRight(): void {
-      // eslint-disable-next-line vue/no-mutating-props
-      this.end.lane = Math.min(this.end.lane + 1, 5) as LaneType;
-      this.$emit("append-to-right", this.index);
-    },
-    endToUp(event: KeyboardEvent): void {
-      const note = this.end;
-      if (note.split - 1 <= note.position) {
-        note.measure++;
-        note.position = 0;
-      } else note.position++;
-      // Shift同時押しで親も移動
-      if (event.shiftKey) this.$emit("append-to-up", this.index);
-    },
-    endToDown(event: KeyboardEvent): void {
-      const note = this.end;
-      if (note.position === 0) {
-        note.measure--;
-        note.position = note.split - 1;
-      } else note.position--;
-      // Shift同時押しで親も移動
-      if (event.shiftKey) this.$emit("append-to-down", this.index);
-    },
-    // App.vueの配置メソッドを発火
-    placeNotes(): void {
-      this.$emit("place-notes");
-    }
-  },
-  computed: {
-    // 親ノートの小節ベース座標
-    parentPosition(): number {
-      return this.parent.measure + this.parent.position / this.parent.split;
-    },
-    // 自分自身の小節ベース座標
-    selfPosition(): number {
-      return this.end.measure + this.end.position / this.end.split;
-    },
-    errors(): string[] {
-      const array = new Array<string>();
-      if (this.selfPosition <= this.parentPosition) {
-        array.append("終点が親ノートよりも手前または同じ位置にあります。");
-      }
-      if (this.end.lane !== this.parent.lane) {
-        array.append("終点と親ノートのレーン位置が異なります。");
-      }
-      if (this.end.measure > this.maxMeasure) {
-        array.append(`存在しない小節に終点を配置できません(現在、譜面は${this.maxMeasure}小節まで)`);
-      }
-      return array;
-    }
+const emit = defineEmits(['delete-end', 'append-to-left', 'append-to-right', 'append-to-up', 'append-to-down', 'place-notes'])
+
+function addEndToThis(): void {
+  props.end.end.push({
+    type: 1,
+    lane: props.end.lane,
+    measure: props.end.measure,
+    position: Math.min(props.end.position + 1, props.end.split),
+    split: props.end.split,
+    option: [],
+    end: [],
+  })
+}
+
+function deleteThisEnd(): void {
+  emit('delete-end', props.index)
+}
+
+// 再帰の場合、自分の終点リストから子を消去
+function deleteChild(index: number): void {
+  props.end.end.splice(index, 1)
+}
+
+// positionにフォーカスして終点移動
+function endToLeft(): void {
+  props.end.lane = Math.max(props.end.lane - 1, 1) as LaneType
+  emit('append-to-left', props.index)
+}
+
+function endToRight(): void {
+  props.end.lane = Math.min(props.end.lane + 1, 5) as LaneType
+  emit('append-to-right', props.index)
+}
+
+function endToUp(event: KeyboardEvent): void {
+  const note = props.end
+  if (note.split - 1 <= note.position) {
+    note.measure++
+    note.position = 0
+  } else note.position++
+  // Shift同時押しで親も移動
+  if (event.shiftKey) emit('append-to-up', props.index)
+}
+
+function endToDown(event: KeyboardEvent): void {
+  const note = props.end
+  if (note.position === 0) {
+    note.measure--
+    note.position = note.split - 1
+  } else note.position--
+  // Shift同時押しで親も移動
+  if (event.shiftKey) emit('append-to-down', props.index)
+}
+
+// App.vueの配置メソッドを発火
+function placeNotes(): void {
+  emit('place-notes')
+}
+
+// 親ノートの小節ベース座標
+const parentPosition = computed(() => props.parent.measure + props.parent.position / props.parent.split)
+// 自分自身の小節ベース座標
+const selfPosition = computed(() => props.end.measure + props.end.position / props.end.split)
+
+const errors = computed(() => {
+  const arr: string[] = []
+  if (selfPosition.value <= parentPosition.value) {
+    arr.push('終点が親ノートよりも手前または同じ位置にあります。')
   }
-});
+  if (props.end.lane !== props.parent.lane) {
+    arr.push('終点と親ノートのレーン位置が異なります。')
+  }
+  if (props.end.measure > props.maxMeasure) {
+    arr.push(`存在しない小節に終点を配置できません(現在、譜面は${props.maxMeasure}小節まで)`)
+  }
+  return arr
+})
 </script>
 
 <style lang="scss" scoped>
