@@ -104,13 +104,15 @@
 
         <v-list-item>
           <v-text-field
-            :value="note.measure"
-            @change="(value) => (note.measure = Number(value))"
+            v-model.number="localMeasure"
+            @change="note.measure = localMeasure"
             @keydown.enter.stop="menu = false"
             hide-details
             suffix="小節"
             variant="outlined"
             density="compact"
+            type="number"
+            min="0"
           ></v-text-field>
         </v-list-item>
 
@@ -207,7 +209,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, watch } from 'vue'
 import { type ExtendedNoteData, type Measure } from '@/types'
 import { noteTypes, noteOptions } from '@/composables/useNoteTypes'
 import { isDuplicated, hasError, isLanelessNote } from '@/composables/useNoteCheck'
@@ -224,6 +226,15 @@ const setAppendNoteInfo = inject(setAppendNoteInfoKey)!
 const showSnackbar = inject(showSnackbarKey)!
 
 const menu = ref(false)
+const localMeasure = ref(props.note.measure)
+
+watch(menu, (isOpen) => {
+  if (isOpen) {
+    localMeasure.value = props.note.measure
+  } else {
+    props.note.measure = localMeasure.value
+  }
+})
 
 function deleteThisNote() {
   deleteNotes(props.note.index)

@@ -197,7 +197,11 @@ export function useNoteEditor(
   /**
    * ノーツ種別変更時のオプション・終点・レーンを自動調整する
    */
-  function changeAppendNoteType(): void {
+  function changeAppendNoteType(type?: number): void {
+    if (type !== undefined) {
+      appendNote.value.type = Number(type)
+    }
+
     // end を自動生成／削除
     if (appendNote.value.type === 2) addEndToAppendNote()
     else appendNote.value.end = []

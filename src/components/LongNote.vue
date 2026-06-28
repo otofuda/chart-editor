@@ -74,12 +74,14 @@
         <v-card-text class="ml-4">始点</v-card-text>
         <v-list-item>
           <v-text-field
-            :value="note.measure"
-            @change="value => (note.measure = Number(value))"
+            v-model.number="localMeasure"
+            @change="note.measure = localMeasure"
             hide-details
             suffix="小節"
             outlined
             dense
+            type="number"
+            min="0"
           ></v-text-field>
         </v-list-item>
         <v-list-item>
@@ -123,12 +125,14 @@
           <v-card-text class="ml-4 mt-2">終点 #{{ i }}</v-card-text>
           <v-list-item>
             <v-text-field
-              :value="end.measure"
-              @change="value => (end.measure = Number(value))"
+              v-model.number="localEndMeasures[i]"
+              @change="end.measure = localEndMeasures[i]"
               hide-details
               suffix="小節"
               outlined
               dense
+              type="number"
+              min="0"
             ></v-text-field>
           </v-list-item>
           <v-list-item>
@@ -192,7 +196,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, watch } from 'vue'
 import { type ExtendedNoteData, type Measure } from '@/types'
 import { deleteNotesKey } from '@/composables/injectionKeys'
 
@@ -204,6 +208,22 @@ const props = defineProps<{
 const deleteNotes = inject(deleteNotesKey)!
 
 const menu = ref(false)
+const localMeasure = ref(props.note.measure)
+const localEndMeasures = ref<number[]>([])
+
+watch(menu, (isOpen) => {
+  if (isOpen) {
+    localMeasure.value = props.note.measure
+    localEndMeasures.value = props.note.end.map(end => end.measure)
+  } else {
+    props.note.measure = localMeasure.value
+    props.note.end.forEach((end, idx) => {
+      if (localEndMeasures.value[idx] !== undefined) {
+        end.measure = localEndMeasures.value[idx]
+      }
+    })
+  }
+})
 
 function getLeft(note: ExtendedNoteData) {
   return (note.lane - 1) * 60 + 60

@@ -27,9 +27,10 @@
           </v-alert>
 
           <v-text-field
-            :value="note.measure"
-            @change="value => (note.measure = Number(value))"
-            @keydown.enter.stop="menu = false"
+            :model-value="getLocalMeasure(note)"
+            @update:model-value="val => setLocalMeasure(note, Number(val))"
+            @change="commitMeasure(note)"
+            @keydown.enter.stop="commitMeasure(note)"
             label="小節"
             variant="outlined"
             density="compact"
@@ -140,6 +141,23 @@ const props = defineProps<{
 const menu = ref(false)
 const deleteNotes = inject(deleteNotesKey)!
 const showSnackbar = inject(showSnackbarKey)!
+
+const localMeasures = ref<Record<number, number>>({})
+
+function getLocalMeasure(note: ExtendedNoteData) {
+  if (localMeasures.value[note.index] === undefined) {
+    localMeasures.value[note.index] = note.measure
+  }
+  return localMeasures.value[note.index]
+}
+
+function setLocalMeasure(note: ExtendedNoteData, val: number) {
+  localMeasures.value[note.index] = val
+}
+
+function commitMeasure(note: ExtendedNoteData) {
+  note.measure = localMeasures.value[note.index]
+}
 
 function deleteNote(note: ExtendedNoteData) {
   deleteNotes(note.index)

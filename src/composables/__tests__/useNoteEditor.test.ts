@@ -58,3 +58,20 @@ describe('useNoteEditor - 難易度コピー', () => {
     expect(chartData.chartObject.value.hard.length).toBeGreaterThan(0)
   })
 })
+
+describe('useNoteEditor - ノーツ種別変更時のオプションリセット', () => {
+  it('changeAppendNoteTypeを引数なしで呼ぶと現在のtypeに応じたオプションがセットされる', () => {
+    const { editor } = setup()
+    editor.appendNote.value.type = 3
+    editor.changeAppendNoteType()
+    expect(editor.appendNote.value.option).toEqual(['-1'])
+  })
+
+  it('changeAppendNoteTypeに引数を渡して呼ぶと指定したtypeに変更されてオプションがリセットされる', () => {
+    const { editor } = setup()
+    editor.changeAppendNoteType(96)
+    expect(editor.appendNote.value.type).toBe(96)
+    expect(editor.appendNote.value.option).toEqual(['255', '81', '81'])
+  })
+})
+

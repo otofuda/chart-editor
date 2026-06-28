@@ -102,7 +102,7 @@
               :items="noteTypes"
               hide-details
               label="ノート種別"
-              @change="changeAppendNoteType"
+              @update:model-value="changeAppendNoteType"
               v-model="appendNote.type"
               variant="outlined"
               density="compact"

@@ -312,7 +312,7 @@
         bottom: `${Number(lift) + Number(comboOffset)}px`
       }"
     >
-      <strong ref="currentCombo">0</strong>
+      <strong ref="currentComboEl">0</strong>
       COMBO
     </div>
 
