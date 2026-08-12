@@ -44,4 +44,35 @@ describe('useSelection', () => {
     selection.selectionClear()
     expect(chartData.currentChart.value[0].isSelected).toBe(false)
   })
+
+  it('selectionAddMeasureでネスト終点の小節も再帰的に移動する', () => {
+    const { chartData, selection } = setup()
+    const nestedLN = makeNote({
+      index: 1,
+      type: 2,
+      measure: 2,
+      isSelected: true,
+      end: [
+        makeNote({
+          type: 1,
+          measure: 3,
+          end: [
+            makeNote({
+              type: 89,
+              measure: 4,
+              end: [],
+            }),
+          ],
+        }),
+      ],
+    })
+    chartData.chartObject.value.easy = [nestedLN]
+    chartData.currentDifficulty.value = 'easy'
+
+    selection.selectionAddMeasure(2)
+    const note = chartData.currentChart.value[0]
+    expect(note.measure).toBe(4)
+    expect(note.end[0].measure).toBe(5)
+    expect(note.end[0].end[0].measure).toBe(6)
+  })
 })

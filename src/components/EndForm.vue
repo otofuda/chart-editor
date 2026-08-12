@@ -1,8 +1,8 @@
 <!-- eslint-disable vue/no-mutating-props -->
 <template>
   <div class="mt-2">
-    <v-row>
-      <p class="ma-0">終点 #{{ index }}</p>
+    <v-row align="center">
+      <p class="ma-0 font-weight-medium">終点 #{{ index }}</p>
       <v-spacer />
       <div>
         <v-btn
@@ -25,8 +25,19 @@
         </v-btn>
       </div>
     </v-row>
-    <v-row class="mb-2">
-      <v-col cols="12" sm="3">
+    <v-row class="mb-2" align="center" dense>
+      <v-col cols="6" sm="4">
+        <v-text-field
+          v-model.number="end.lane"
+          label="lane"
+          variant="outlined"
+          density="compact"
+          hide-details
+          type="number"
+          step="0.1"
+        ></v-text-field>
+      </v-col>
+      <v-col cols="6" sm="4">
         <v-select
           :items="[
             { title: '通常', value: 1 },
@@ -40,18 +51,18 @@
           :menu-props="{}"
         ></v-select>
       </v-col>
-      <!-- <v-col cols="12" sm="3">
+      <v-col cols="6" sm="4">
         <v-select
-          :items="[1, 2, 3, 4, 5]"
+          :items="curveTypeOptions"
           hide-details
-          label="lane"
-          v-model="end.lane"
+          label="曲線"
+          v-model="curveType"
           variant="outlined"
           density="compact"
           :menu-props="{}"
         ></v-select>
-      </v-col> -->
-      <v-col cols="12" sm="3">
+      </v-col>
+      <v-col cols="6" sm="4">
         <v-text-field
           v-model.number="end.measure"
           label="measure"
@@ -62,7 +73,7 @@
           min="0"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" sm="3">
+      <v-col cols="6" sm="4">
         <v-text-field
           v-model.number="end.position"
           label="position"
@@ -79,7 +90,7 @@
           @keydown.down="endToDown"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" sm="3">
+      <v-col cols="6" sm="4">
         <v-combobox
           v-model.number="end.split"
           :items="[4, 8, 16, 32, 12, 24, 48]"
@@ -90,6 +101,30 @@
           :menu-props="{}"
         ></v-combobox>
       </v-col>
+      <v-col cols="6">
+        <v-text-field
+          v-model="endSpeed"
+          label="speed"
+          placeholder="1"
+          variant="outlined"
+          density="compact"
+          hide-details
+          type="number"
+          step="0.1"
+        ></v-text-field>
+      </v-col>
+      <v-col cols="6">
+        <v-text-field
+          v-model="endOrbit"
+          label="orbit"
+          placeholder="0"
+          variant="outlined"
+          density="compact"
+          hide-details
+          type="number"
+          step="0.1"
+        ></v-text-field>
+      </v-col>
     </v-row>
 
     <!-- エラー表示 -->
@@ -99,6 +134,7 @@
       v-for="error in errors"
       :key="`append_end_${index}_error${error}`"
       rounded="lg"
+      class="mb-2"
     >
       {{ error }}
     </v-alert>
@@ -113,6 +149,7 @@
         :index="i"
         :max-measure="props.maxMeasure"
         @delete-end="deleteChild"
+        @place-notes="placeNotes"
       />
     </div>
   </div>
@@ -122,6 +159,7 @@
 import { computed } from 'vue'
 import { type PropType } from 'vue'
 import { type LaneType, type NoteData } from 'chart-types'
+import { curveTypeOptions, getCurveType, type CurveType } from '@/composables/useNoteTypes'
 
 const props = defineProps({
   end: {
@@ -143,7 +181,34 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['delete-end', 'append-to-left', 'append-to-right', 'append-to-up', 'append-to-down', 'place-notes'])
+const emit = defineEmits(['delete-end', 'append-to-up', 'append-to-down', 'place-notes'])
+
+const endSpeed = computed<string>({
+  get: () => props.end.option?.[0] ?? '',
+  set: (val) => {
+    if (!props.end.option) props.end.option = []
+    while (props.end.option.length < 1) props.end.option.push('')
+    props.end.option[0] = val ?? ''
+  },
+})
+
+const endOrbit = computed<string>({
+  get: () => props.end.option?.[1] ?? '',
+  set: (val) => {
+    if (!props.end.option) props.end.option = []
+    while (props.end.option.length < 2) props.end.option.push('')
+    props.end.option[1] = val ?? ''
+  },
+})
+
+const curveType = computed<CurveType>({
+  get: () => getCurveType(props.end),
+  set: (val) => {
+    if (!props.end.option) props.end.option = []
+    while (props.end.option.length < 3) props.end.option.push('')
+    props.end.option[2] = val
+  },
+})
 
 function addEndToThis(): void {
   props.end.end.push({
@@ -152,7 +217,7 @@ function addEndToThis(): void {
     measure: props.end.measure,
     position: Math.min(props.end.position + 1, props.end.split),
     split: props.end.split,
-    option: [],
+    option: ['', '', 'linear'],
     end: [],
   })
 }
@@ -166,15 +231,13 @@ function deleteChild(index: number): void {
   props.end.end.splice(index, 1)
 }
 
-// positionにフォーカスして終点移動
+// positionにフォーカスして終点移動（その終点のみ 1.0 刻みで変更）
 function endToLeft(): void {
-  props.end.lane = Math.max(props.end.lane - 1, 1) as LaneType
-  emit('append-to-left', props.index)
+  props.end.lane = (Math.round((Number(props.end.lane ?? 1) - 1) * 10) / 10) as LaneType
 }
 
 function endToRight(): void {
-  props.end.lane = Math.min(props.end.lane + 1, 5) as LaneType
-  emit('append-to-right', props.index)
+  props.end.lane = (Math.round((Number(props.end.lane ?? 1) + 1) * 10) / 10) as LaneType
 }
 
 function endToUp(event: KeyboardEvent): void {
@@ -212,9 +275,6 @@ const errors = computed(() => {
   if (selfPosition.value <= parentPosition.value) {
     arr.push('終点が親ノートよりも手前または同じ位置にあります。')
   }
-  if (props.end.lane !== props.parent.lane) {
-    arr.push('終点と親ノートのレーン位置が異なります。')
-  }
   if (props.end.measure > props.maxMeasure) {
     arr.push(`存在しない小節に終点を配置できません(現在、譜面は${props.maxMeasure}小節まで)`)
   }
@@ -225,6 +285,7 @@ const errors = computed(() => {
 <style lang="scss" scoped>
 .recursive-end {
   border-left: 2px solid #909090;
-  padding-left: 24px;
+  padding-left: 16px;
+  margin-top: 8px;
 }
 </style>

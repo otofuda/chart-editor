@@ -113,9 +113,12 @@ export function hasError(note: NoteData): string | false {
   if (note.split <= 0) return 'splitの値は0より大きい必要があります。'
   else if (note.position < 0) return 'positionの値は0以上である必要があります。'
   else if (note.position >= note.split) return 'positionの値はsplitの値未満である必要があります。'
-  else if (![-1, 1, 2, 3, 4, 5].includes(note.lane)) return '不正なノートのレーン位置です。'
   else if (
-    ![1, 2, 3, 4, 5, 6, 7, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
+    note.lane !== -1 &&
+    (typeof note.lane !== 'number' || isNaN(note.lane) || note.lane < 0 || note.lane > 6)
+  ) return '不正なノートのレーン位置です。'
+  else if (
+    ![1, 2, 3, 4, 5, 6, 7, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
   ) return '不正なノートタイプです。'
   else return false
 }
@@ -130,12 +133,29 @@ export function getValidatedOptions(note: NoteData): string[] {
   // option: []
   if ([99].includes(note.type)) return option
 
-  // 通常／ロングの場合
+  // ロングノート始点の場合
   // option: [(speed (, orbit))]
-  else if ([1, 2].includes(note.type)) {
-    if (note.option[0]) {
+  else if (note.type === 2) {
+    if (note.option && note.option[0] !== undefined && note.option[0] !== '') {
       option.push(String(note.option[0]))
-      if (note.option[1]) option.push(String(note.option[1]))
+      if (note.option[1] !== undefined && note.option[1] !== '') option.push(String(note.option[1]))
+    }
+    return option
+  }
+
+  // 通常ノート／終点・中継点の場合
+  // option: [(speed (, orbit (, curve)))]
+  else if ([1, 89].includes(note.type)) {
+    const speed = note.option?.[0] !== undefined && note.option[0] !== null ? String(note.option[0]) : ''
+    const orbit = note.option?.[1] !== undefined && note.option[1] !== null ? String(note.option[1]) : ''
+    const curve = note.option?.[2] !== undefined && note.option[2] !== null ? String(note.option[2]) : ''
+
+    if (curve && curve !== 'linear') {
+      option.push(speed, orbit, curve)
+    } else if (orbit) {
+      option.push(speed, orbit)
+    } else if (speed) {
+      option.push(speed)
     }
     return option
   }
@@ -226,9 +246,13 @@ export function getValidatedNote(note: NoteData): NoteData {
   if (type === 5) lane = 3
   if ([96, 97, 98, 99].includes(type)) lane = -1
 
-  // ロング or ロングダミー 以外は end: []
+  // ロング、ロングダミー、または終点ネストを持つ場合は再帰的にバリデーション
   let end: NoteData[] = []
-  if (note.type === 2 || (note.type === 90 && note.option[1] === '2')) {
+  if (
+    note.type === 2 ||
+    (note.type === 90 && note.option[0] === '2') ||
+    (note.end && Array.isArray(note.end) && note.end.length > 0)
+  ) {
     end = [...note.end].map(getValidatedNote)
   }
 

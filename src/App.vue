@@ -1381,7 +1381,9 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
 
 // キャプチャ用モード
 .preview.detail.capture_mode {
-  .note {
+  .note,
+  .note-invisible-badge,
+  .note-midpoint {
     color: #a0a0a0;
     > .v-icon {
       display: none;
@@ -1408,7 +1410,9 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     .measure__number {
       visibility: hidden;
     }
-    .note {
+    .note,
+    .note-invisible-badge,
+    .note-midpoint {
       color: transparent;
       text-shadow: none;
 
@@ -1436,7 +1440,9 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     .measure > .v-btn {
       opacity: 0;
     }
-    .note {
+    .note,
+    .note-invisible-badge,
+    .note-midpoint {
       color: transparent;
       text-shadow: none;
       &.shadow,
@@ -1569,6 +1575,104 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   border-left: 4px solid #6ecc6e;
   border-right: 4px solid #6ecc6e;
   transition: 0.1s all ease;
+}
+
+// ロングノーツの帯（SVG）
+.long-note-svg {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 420px;
+  z-index: 98;
+  pointer-events: none;
+  overflow: visible;
+
+  .hold-fill {
+    fill: #ffffec;
+    fill-opacity: 0.9;
+    transition: 0.1s all ease;
+  }
+  .hold-border {
+    fill: none;
+    stroke: #6ecc6e;
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+
+  // 他難易度シャドー表示時
+  &.shadow {
+    opacity: 0.6;
+  }
+
+  // ノート仮配置時
+  &.preappend {
+    opacity: 0.85;
+  }
+}
+
+// ロングノーツのコンボ加算中点（type: 1 の中間中継点）
+.note-midpoint {
+  position: absolute;
+  z-index: 101;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #6ecc6e;
+  box-sizing: border-box;
+  transition: 0.1s all ease;
+  pointer-events: auto;
+
+  .midpoint-badges {
+    position: absolute;
+    left: 13px;
+    top: -5px;
+    white-space: nowrap;
+    line-height: 1;
+    pointer-events: none;
+
+    strong {
+      color: #a0a0a0;
+      &.speed { color: #f08080; }
+      &.orbit { color: #87cefa; margin-left: 2px; }
+    }
+  }
+
+  // 他難易度シャドー表示時
+  &.shadow {
+    opacity: 0.6;
+  }
+
+  // ノート仮配置時
+  &.preappend {
+    opacity: 0.85;
+  }
+}
+
+// 不可視ノード（type: 89）の speed / orbit バッジ表示用アンカー
+.note-invisible-badge {
+  position: absolute;
+  z-index: 100;
+  height: 4px;
+  overflow: visible;
+  text-align: right;
+  pointer-events: auto;
+
+  strong {
+    color: #a0a0a0;
+    &.speed { color: #f08080; }
+    &.orbit { color: #87cefa; margin-left: 2px; }
+  }
+
+  // 他難易度シャドー表示時
+  &.shadow {
+    opacity: 0.6;
+  }
+
+  // ノート仮配置時
+  &.preappend {
+    opacity: 0.85;
+  }
 }
 
 .message-log {
