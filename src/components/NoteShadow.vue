@@ -62,7 +62,7 @@
           preappend: isPreAppend
         }"
         :style="{
-          left: `${getAbsoluteLeft(ep.note) + 25}px`,
+          left: `${(ep.note.lane - 1) * 60 + 85}px`,
           bottom: `${getAbsoluteBottom(ep.note) - 5}px`
         }"
         :title="getNoteTooltip(ep.note)"
@@ -135,10 +135,10 @@
 
 <script setup lang="ts">
 import { computed, inject } from 'vue'
-import type { NoteData } from 'chart-types'
 import { type ExtendedNoteData, type Measure } from '@/types'
+import { type NoteData } from 'chart-types'
 import { cancelNoteKey } from '@/composables/injectionKeys'
-import { generateHoldSvgPaths, getCurveType, type CurveType } from '@/composables/useNoteTypes'
+import { getCurveType, generateHoldSvgPaths, type CurveType } from '@/composables/useNoteTypes'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -158,6 +158,7 @@ function getNoteTooltip(note: NoteData): string {
   let text = `${note.position}/${note.split}`
   if (note.option?.[0] && Number(note.option[0]) !== 1) text += ` (speed: x${note.option[0]})`
   if (note.option?.[1] && Number(note.option[1]) !== 0) text += ` (orbit: >${note.option[1]})`
+  if (note.option?.[3] && Number(note.option[3]) !== 1 && Number(note.option[3]) > 0) text += ` (width: ${note.option[3]})`
   return text
 }
 
@@ -166,11 +167,27 @@ const entireHeight = computed(() => {
   return (last?.measurePositionBottom ?? 0) + (last?.measureHeight ?? 0)
 })
 
+function getHoldNodeWidth(n: NoteData | ExtendedNoteData): number {
+  if (n.type === 2) return 1
+  const drawOptions = (n.type === 90) ? n.option.slice(1) : n.option
+  const w = Number(drawOptions?.[3])
+  if (!w || isNaN(w) || w <= 0 || w === -1) return 1
+  return w
+}
+
 function getLeft(note: NoteData | ExtendedNoteData) {
   const drawType = (note.type === 90) ? Number(note.option[0]) : note.type
   const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option
   // TAP, ロング, 終点, 区切り線, コメント
-  if ([1, 2, 89, 95, 100].includes(drawType)) return (note.lane - 1) * 60
+  if ([1, 2, 89, 95, 100].includes(drawType)) {
+    if ([1, 89].includes(drawType) && drawOptions?.[3]) {
+      let _width = Number(drawOptions[3]) || 1
+      if (_width === -1 || _width <= 0) _width = 1
+      const _center = (note.lane - 1) * 60 + 30
+      return _center - (_width / 2) * 60
+    }
+    return (note.lane - 1) * 60
+  }
   // 左右フリック, 上下フリック
   else if ([3, 4, 6, 7].includes(drawType)) {
     let _width = Number(drawOptions[0]) || 3
@@ -212,7 +229,14 @@ function getWidth(note: NoteData | ExtendedNoteData) {
   const drawType = (note.type === 90) ? Number(note.option[0]) : note.type
   const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option
   // TAP, ロング, 終点, コメント
-  if ([1, 2, 89, 100].includes(drawType)) return 60
+  if ([1, 2, 89, 100].includes(drawType)) {
+    if ([1, 89].includes(drawType) && drawOptions?.[3]) {
+      let _width = Number(drawOptions[3]) || 1
+      if (_width === -1 || _width <= 0) _width = 1
+      return 60 * _width
+    }
+    return 60
+  }
   // 左右フリック, 上下フリック
   else if ([3, 4, 6, 7].includes(drawType)) {
     let _width = Number(drawOptions[0]) || 3
@@ -270,16 +294,19 @@ const treeData = computed(() => {
         isIntermediate,
       })
 
-      const x1 = getAbsoluteLeft(parent) + 30
+      const x1 = (parent.lane - 1) * 60 + 60 + 30
       const b1 = getAbsoluteBottom(parent)
-      const x2 = getAbsoluteLeft(child) + 30
+      const x2 = (child.lane - 1) * 60 + 60 + 30
       const b2 = getAbsoluteBottom(child)
 
       const y1 = entireHeight.value - b1
       const y2 = entireHeight.value - b2
       const curveType = getCurveType(child)
 
-      const paths = generateHoldSvgPaths(x1, y1, x2, y2, curveType, 38)
+      const w1 = getHoldNodeWidth(parent) * 38
+      const w2 = getHoldNodeWidth(child) * 38
+
+      const paths = generateHoldSvgPaths(x1, y1, x2, y2, curveType, w1, w2)
       segments.push({
         id: `shadow_seg_${childId}`,
         parent,

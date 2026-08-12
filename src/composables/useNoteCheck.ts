@@ -143,14 +143,17 @@ export function getValidatedOptions(note: NoteData): string[] {
     return option
   }
 
-  // 通常ノート／終点・中継点の場合
-  // option: [(speed (, orbit (, curve)))]
+  // 通常ノート／終点・中点の場合
+  // option: [(speed (, orbit (, curve (, width))))]
   else if ([1, 89].includes(note.type)) {
     const speed = note.option?.[0] !== undefined && note.option[0] !== null ? String(note.option[0]) : ''
     const orbit = note.option?.[1] !== undefined && note.option[1] !== null ? String(note.option[1]) : ''
     const curve = note.option?.[2] !== undefined && note.option[2] !== null ? String(note.option[2]) : ''
+    const width = note.option?.[3] !== undefined && note.option[3] !== null ? String(note.option[3]) : ''
 
-    if (curve && curve !== 'linear') {
+    if (width && width !== '1' && width !== '-1') {
+      option.push(speed, orbit, curve, width)
+    } else if (curve && curve !== 'linear') {
       option.push(speed, orbit, curve)
     } else if (orbit) {
       option.push(speed, orbit)

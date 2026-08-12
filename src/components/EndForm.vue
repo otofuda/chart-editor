@@ -101,7 +101,7 @@
           :menu-props="{}"
         ></v-combobox>
       </v-col>
-      <v-col cols="6">
+      <v-col cols="6" sm="4">
         <v-text-field
           v-model="endSpeed"
           label="speed"
@@ -113,11 +113,23 @@
           step="0.1"
         ></v-text-field>
       </v-col>
-      <v-col cols="6">
+      <v-col cols="6" sm="4">
         <v-text-field
           v-model="endOrbit"
           label="orbit"
           placeholder="0"
+          variant="outlined"
+          density="compact"
+          hide-details
+          type="number"
+          step="0.1"
+        ></v-text-field>
+      </v-col>
+      <v-col cols="12" sm="4">
+        <v-text-field
+          v-model="endWidth"
+          label="width"
+          placeholder="1 (通常幅)"
           variant="outlined"
           density="compact"
           hide-details
@@ -207,6 +219,15 @@ const curveType = computed<CurveType>({
     if (!props.end.option) props.end.option = []
     while (props.end.option.length < 3) props.end.option.push('')
     props.end.option[2] = val
+  },
+})
+
+const endWidth = computed<string>({
+  get: () => props.end.option?.[3] ?? '',
+  set: (val) => {
+    if (!props.end.option) props.end.option = []
+    while (props.end.option.length < 4) props.end.option.push('')
+    props.end.option[3] = val ?? ''
   },
 })
 

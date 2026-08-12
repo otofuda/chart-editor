@@ -107,16 +107,19 @@ describe('getValidatedOptions', () => {
     expect(result).toEqual(['1.5', 'spiral'])
   })
 
-  it('type 1 / 89 の曲線オプション [speed, orbit, curve] を保持する', () => {
-    const note = makeNote({ type: 1, option: ['', '', 'ease'] })
+  it('type 1 / 89 の [speed, orbit, curve, width] オプションを保持する', () => {
+    const note = makeNote({ type: 1, option: ['', '', 'ease', '2.0'] })
     const result = getValidatedOptions(note)
-    expect(result).toEqual(['', '', 'ease'])
+    expect(result).toEqual(['', '', 'ease', '2.0'])
   })
 
-  it('type 1 / 89 で末尾のデフォルト曲線 (linear) や空文字を切り詰める', () => {
-    const note = makeNote({ type: 89, option: ['1.5', '', 'linear'] })
+  it('type 1 / 89 で末尾のデフォルト幅 (1) やデフォルト曲線 (linear) を切り詰める', () => {
+    const note = makeNote({ type: 89, option: ['1.5', '', 'linear', '1'] })
     const result = getValidatedOptions(note)
     expect(result).toEqual(['1.5'])
+
+    const note2 = makeNote({ type: 1, option: ['', '', 'ease', ''] })
+    expect(getValidatedOptions(note2)).toEqual(['', '', 'ease'])
   })
 })
 
