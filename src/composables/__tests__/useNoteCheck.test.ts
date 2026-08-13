@@ -70,7 +70,22 @@ describe('hasError', () => {
     expect(hasError(makeNote({ lane: 1.5 as any }))).toBe(false)
     expect(hasError(makeNote({ lane: 0.0 as any }))).toBe(false)
     expect(hasError(makeNote({ lane: 6.0 as any }))).toBe(false)
-    expect(hasError(makeNote({ lane: -1 }))).toBe(false)
+  })
+
+  it('レーン非使用ノート(type: 98, 96等)は lane: -1 を要求する', () => {
+    expect(hasError(makeNote({ type: 98, lane: -1 }))).toBe(false)
+    expect(hasError(makeNote({ type: 98, lane: 1 }))).toBeTruthy()
+    expect(hasError(makeNote({ type: 96, lane: -1 }))).toBe(false)
+    expect(hasError(makeNote({ type: 96, lane: 2 }))).toBeTruthy()
+  })
+
+  it('音札ノート(type: 5)は lane: 3 を要求する', () => {
+    expect(hasError(makeNote({ type: 5, lane: 3 }))).toBe(false)
+    expect(hasError(makeNote({ type: 5, lane: 1 }))).toBeTruthy()
+  })
+
+  it('通常ノート(type: 1)で lane: -1 はエラーを返す', () => {
+    expect(hasError(makeNote({ type: 1, lane: -1 }))).toBeTruthy()
   })
 
   it('splitが0のノートはエラーメッセージを返す', () => {
@@ -107,16 +122,27 @@ describe('getValidatedOptions', () => {
     expect(result).toEqual(['1.5', 'spiral'])
   })
 
-  it('type 1 / 89 の曲線オプション [speed, orbit, curve] を保持する', () => {
-    const note = makeNote({ type: 1, option: ['', '', 'ease'] })
+  it('type 1 / 89 の [speed, orbit, curve, width] オプションを保持する', () => {
+    const note = makeNote({ type: 1, option: ['', '', 'ease', '2.0'] })
     const result = getValidatedOptions(note)
-    expect(result).toEqual(['', '', 'ease'])
+    expect(result).toEqual(['', '', 'ease', '2.0'])
   })
 
-  it('type 1 / 89 で末尾のデフォルト曲線 (linear) や空文字を切り詰める', () => {
-    const note = makeNote({ type: 89, option: ['1.5', '', 'linear'] })
-    const result = getValidatedOptions(note)
-    expect(result).toEqual(['1.5'])
+  it('type 1 / 89 で末尾のデフォルト幅 (1, 1.0, -1, 0, 不正値) やデフォルト曲線 (linear) を切り詰める', () => {
+    const note1 = makeNote({ type: 89, option: ['1.5', '', 'linear', '1'] })
+    expect(getValidatedOptions(note1)).toEqual(['1.5'])
+
+    const note2 = makeNote({ type: 89, option: ['1.5', '', 'linear', '1.0'] })
+    expect(getValidatedOptions(note2)).toEqual(['1.5'])
+
+    const note3 = makeNote({ type: 89, option: ['1.5', '', 'linear', '-1'] })
+    expect(getValidatedOptions(note3)).toEqual(['1.5'])
+
+    const note4 = makeNote({ type: 89, option: ['1.5', '', 'linear', '0'] })
+    expect(getValidatedOptions(note4)).toEqual(['1.5'])
+
+    const note5 = makeNote({ type: 1, option: ['', '', 'ease', ''] })
+    expect(getValidatedOptions(note5)).toEqual(['', '', 'ease'])
   })
 })
 
@@ -149,5 +175,13 @@ describe('getValidatedNote', () => {
     expect(validated.end[0].end.length).toBe(1)
     expect(validated.end[0].end[0].lane).toBe(5)
     expect(validated.end[0].end[0].option).toEqual(['', '', 'easeIn'])
+  })
+
+  it('レーン非使用ノートや音札ノートの lane を正規化する', () => {
+    const bpmNote = makeNote({ type: 98, lane: 2 as any })
+    expect(getValidatedNote(bpmNote).lane).toBe(-1)
+
+    const otofudaNote = makeNote({ type: 5, lane: 1 as any })
+    expect(getValidatedNote(otofudaNote).lane).toBe(3)
   })
 })

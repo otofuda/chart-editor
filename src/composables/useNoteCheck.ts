@@ -114,7 +114,13 @@ export function hasError(note: NoteData): string | false {
   else if (note.position < 0) return 'positionの値は0以上である必要があります。'
   else if (note.position >= note.split) return 'positionの値はsplitの値未満である必要があります。'
   else if (
-    note.lane !== -1 &&
+    [91, 92, 93, 96, 97, 98, 99, 100].includes(note.type) && note.lane !== -1
+  ) return 'このノートタイプではレーン位置は-1である必要があります。'
+  else if (
+    note.type === 5 && note.lane !== 3
+  ) return '音札ノートのレーン位置は3である必要があります。'
+  else if (
+    ![91, 92, 93, 96, 97, 98, 99, 100, 5].includes(note.type) &&
     (typeof note.lane !== 'number' || isNaN(note.lane) || note.lane < 0 || note.lane > 6)
   ) return '不正なノートのレーン位置です。'
   else if (
@@ -143,14 +149,20 @@ export function getValidatedOptions(note: NoteData): string[] {
     return option
   }
 
-  // 通常ノート／終点・中継点の場合
-  // option: [(speed (, orbit (, curve)))]
+  // 通常ノート／終点・中点の場合
+  // option: [(speed (, orbit (, curve (, width))))]
   else if ([1, 89].includes(note.type)) {
     const speed = note.option?.[0] !== undefined && note.option[0] !== null ? String(note.option[0]) : ''
     const orbit = note.option?.[1] !== undefined && note.option[1] !== null ? String(note.option[1]) : ''
     const curve = note.option?.[2] !== undefined && note.option[2] !== null ? String(note.option[2]) : ''
+    const width = note.option?.[3] !== undefined && note.option[3] !== null ? String(note.option[3]) : ''
 
-    if (curve && curve !== 'linear') {
+    const numWidth = width !== '' ? Number(width) : null
+    const hasCustomWidth = numWidth !== null && !isNaN(numWidth) && numWidth > 0 && numWidth !== 1
+
+    if (hasCustomWidth) {
+      option.push(speed, orbit, curve, width)
+    } else if (curve && curve !== 'linear') {
       option.push(speed, orbit, curve)
     } else if (orbit) {
       option.push(speed, orbit)
@@ -241,10 +253,10 @@ export function getValidatedNote(note: NoteData): NoteData {
   const type = Number(note.type)
 
   // type: 5 は lane: 3
-  // type: 96, 97, 98, 99 は lane: -1
+  // type: 91, 92, 93, 96, 97, 98, 99, 100 は lane: -1
   let lane = Number(note.lane) as 1 | 2 | 3 | 4 | 5 | -1
   if (type === 5) lane = 3
-  if ([96, 97, 98, 99].includes(type)) lane = -1
+  if ([91, 92, 93, 96, 97, 98, 99, 100].includes(type)) lane = -1
 
   // ロング、ロングダミー、または終点ネストを持つ場合は再帰的にバリデーション
   let end: NoteData[] = []
@@ -272,5 +284,5 @@ export function getValidatedNote(note: NoteData): NoteData {
  * @param note - 検査するノート
  */
 export function isLanelessNote(note: NoteData): boolean {
-  return [5, 92, 93, 96, 97, 98, 99].includes(note.type)
+  return [91, 92, 93, 96, 97, 98, 99, 100].includes(note.type)
 }
