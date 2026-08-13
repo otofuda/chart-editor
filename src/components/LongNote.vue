@@ -132,8 +132,8 @@
                 hide-details
                 type="number"
                 step="0.1"
-                min="1"
-                max="5"
+                min="0"
+                max="6"
               ></v-text-field>
             </v-col>
             <v-col cols="6" sm="4">
@@ -158,6 +158,7 @@
                 variant="outlined"
                 density="compact"
                 hide-details
+                type="number"
                 min="0"
                 :max="note.split - 1"
               ></v-text-field>

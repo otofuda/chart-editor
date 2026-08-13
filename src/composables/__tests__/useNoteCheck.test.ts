@@ -113,13 +113,21 @@ describe('getValidatedOptions', () => {
     expect(result).toEqual(['', '', 'ease', '2.0'])
   })
 
-  it('type 1 / 89 で末尾のデフォルト幅 (1) やデフォルト曲線 (linear) を切り詰める', () => {
-    const note = makeNote({ type: 89, option: ['1.5', '', 'linear', '1'] })
-    const result = getValidatedOptions(note)
-    expect(result).toEqual(['1.5'])
+  it('type 1 / 89 で末尾のデフォルト幅 (1, 1.0, -1, 0, 不正値) やデフォルト曲線 (linear) を切り詰める', () => {
+    const note1 = makeNote({ type: 89, option: ['1.5', '', 'linear', '1'] })
+    expect(getValidatedOptions(note1)).toEqual(['1.5'])
 
-    const note2 = makeNote({ type: 1, option: ['', '', 'ease', ''] })
-    expect(getValidatedOptions(note2)).toEqual(['', '', 'ease'])
+    const note2 = makeNote({ type: 89, option: ['1.5', '', 'linear', '1.0'] })
+    expect(getValidatedOptions(note2)).toEqual(['1.5'])
+
+    const note3 = makeNote({ type: 89, option: ['1.5', '', 'linear', '-1'] })
+    expect(getValidatedOptions(note3)).toEqual(['1.5'])
+
+    const note4 = makeNote({ type: 89, option: ['1.5', '', 'linear', '0'] })
+    expect(getValidatedOptions(note4)).toEqual(['1.5'])
+
+    const note5 = makeNote({ type: 1, option: ['', '', 'ease', ''] })
+    expect(getValidatedOptions(note5)).toEqual(['', '', 'ease'])
   })
 })
 

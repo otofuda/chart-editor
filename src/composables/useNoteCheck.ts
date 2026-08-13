@@ -151,7 +151,10 @@ export function getValidatedOptions(note: NoteData): string[] {
     const curve = note.option?.[2] !== undefined && note.option[2] !== null ? String(note.option[2]) : ''
     const width = note.option?.[3] !== undefined && note.option[3] !== null ? String(note.option[3]) : ''
 
-    if (width && width !== '1' && width !== '-1') {
+    const numWidth = width !== '' ? Number(width) : null
+    const hasCustomWidth = numWidth !== null && !isNaN(numWidth) && numWidth > 0 && numWidth !== 1
+
+    if (hasCustomWidth) {
       option.push(speed, orbit, curve, width)
     } else if (curve && curve !== 'linear') {
       option.push(speed, orbit, curve)
