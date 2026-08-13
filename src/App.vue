@@ -628,34 +628,13 @@
           }}Notes / 秒
         </v-card-text>
         <v-divider></v-divider>
-        <v-sparkline
+        <DensityGraph
           v-if="dialog.analyzer"
-          :labels="analysisData.trendLabels"
-          :model-value="analysisData.trendValues"
-          :gradient="['#f72047', '#ffd200', '#1feaea']"
-          color="black"
-          line-width="2"
-          padding="10"
-          :smooth="3"
-          type="trend"
-          show-labels
-          style="width: 100%; display: block;"
-        ></v-sparkline>
-        <v-sparkline
-          v-if="dialog.analyzer"
-          :model-value="analysisData.otofudaNotes"
-          color="orange"
-          line-width="2"
-          height="10"
-          padding="0"
-          :smooth="0"
-          fill
-          type="trend"
-          style="width: 100%; display: block;"
-        ></v-sparkline>
-        <v-card-text class="mt-4">
-          ▲音札ノーツの位置
-        </v-card-text>
+          :trend-values="analysisData.trendValues"
+          :otofuda-notes="analysisData.otofudaNotes"
+          :trend-labels="analysisData.trendLabels"
+          @jump="handleJumpToMeasure"
+        />
         <v-table>
           <thead>
             <tr>
@@ -915,6 +894,7 @@ import { useGoTo } from 'vuetify'
 
 import Preview from './components/Preview.vue'
 import EndForm from './components/EndForm.vue'
+import DensityGraph from './components/DensityGraph.vue'
 
 import usageContent from '../Usage.md?raw'
 
@@ -1021,6 +1001,14 @@ function selectionDelete() {
 function analyze() {
   runAnalyze()
   dialog.value.analyzer = true
+}
+
+// 密度グラフの小節クリックでジャンプ
+function handleJumpToMeasure(measure: number) {
+  dialog.value.analyzer = false
+  setTimeout(() => {
+    scrollToMeasure(measure)
+  }, 250)
 }
 
 // Usage.md をシンプルなHTMLに変換（行ごとの状態管理パーサー）
