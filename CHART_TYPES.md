@@ -70,7 +70,7 @@ optionキーはStringの配列です。
 #### type: 1, 89（通常 / 終点・中点）
 
 ```
-option: [speed: Float, orbit: Float, curve: String]
+option: [speed: Float, orbit: Float, curve: String, width: Float]
 ```
 
 |添字|オプション名|型|必須|説明|
@@ -78,9 +78,10 @@ option: [speed: Float, orbit: Float, curve: String]
 |0|speed|Float|No|スピード|
 |1|orbit|Float|No|軌道(レーン幅/秒)|
 |2|curve|String|No|親ノードからの曲線補間タイプ (`"linear"`, `"ease"`, `"easeIn"`, `"easeOut"`)。省略時は `"linear"`|
+|3|width|Float|No|中心を基点とした横幅(単位：1レーンの幅)。省略時または-1は `1.0`|
 
-- 単体の通常ノート（`type: 1`）では `curve` は使用不可
-- `speed`, `orbit`, `curve` のいずれも省略可能
+- 単体の通常ノート（`type: 1`）では `curve`, `width` は使用不可
+- `speed`, `orbit`, `curve`, `width` のいずれも省略可能
 
 #### type: 2（ロングノート始点）
 

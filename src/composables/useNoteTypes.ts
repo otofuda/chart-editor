@@ -50,6 +50,7 @@ export function noteOptions(note: NoteData): NoteTypesOption[] {
       { label: 'speed', type: 'number', desc: 'Float型｜スピード(倍率)' },
       { label: 'orbit', type: 'number', desc: 'Float型｜軌道(レーン幅/秒)' },
       { label: 'curve', type: 'text', desc: 'String型｜親からの曲線補間 (linear, ease, easeIn, easeOut)' },
+      { label: 'width', type: 'number', desc: 'Float型｜中心を基点とした横幅(単位：1レーンの幅)' },
     ]
   else if ([3, 4, 6, 7].includes(note.type))
     return [
@@ -144,7 +145,8 @@ export function getCurveType(note: NoteData): CurveType {
  * @param x2 - 終点中心X
  * @param y2 - 終点中心Y (SVG座標系)
  * @param curveType - 曲線タイプ ('linear' | 'ease' | 'easeIn' | 'easeOut')
- * @param width - 帯の幅 (デフォルト 38px)
+ * @param startWidth - 始点の帯の幅 (デフォルト 38px)
+ * @param endWidth - 終点の帯の幅 (デフォルト 38px)
  */
 export function generateHoldSvgPaths(
   x1: number,
@@ -152,13 +154,14 @@ export function generateHoldSvgPaths(
   x2: number,
   y2: number,
   curveType: CurveType = 'linear',
-  width = 38
+  startWidth = 38,
+  endWidth = 38
 ): { fillPath: string; leftBorderPath: string; rightBorderPath: string } {
-  const hw = width / 2
-  const x1_l = x1 - hw, x1_r = x1 + hw
-  const x2_l = x2 - hw, x2_r = x2 + hw
+  const hw1 = startWidth / 2
+  const hw2 = endWidth / 2
+  const x1_l = x1 - hw1, x1_r = x1 + hw1
+  const x2_l = x2 - hw2, x2_r = x2 + hw2
   const dy = y2 - y1
-  const dx = x2 - x1
 
   if (curveType === 'ease') {
     // S字カーブ (Ease In-Out): 始点・終点は垂直に保ち、中間(35%/65%)を自然な傾斜でなめらかに繋ぐ
@@ -171,8 +174,8 @@ export function generateHoldSvgPaths(
   } else if (curveType === 'easeIn') {
     // Ease In: 始点は垂直にゆっくり出発し、終点に向かってなめらかに曲がる
     const cp1_y = y1 + dy * 0.5
-    const cp2_x_l = x1_l + dx * 0.5
-    const cp2_x_r = x1_r + dx * 0.5
+    const cp2_x_l = x1_l + (x2_l - x1_l) * 0.5
+    const cp2_x_r = x1_r + (x2_r - x1_r) * 0.5
     const cp2_y = y1 + dy * 0.85
     const leftBorderPath = `M ${x1_l} ${y1} C ${x1_l} ${cp1_y}, ${cp2_x_l} ${cp2_y}, ${x2_l} ${y2}`
     const rightBorderPath = `M ${x1_r} ${y1} C ${x1_r} ${cp1_y}, ${cp2_x_r} ${cp2_y}, ${x2_r} ${y2}`
@@ -180,8 +183,8 @@ export function generateHoldSvgPaths(
     return { fillPath, leftBorderPath, rightBorderPath }
   } else if (curveType === 'easeOut') {
     // Ease Out: 始点からなめらかに曲がり始め、終点では垂直に着地する
-    const cp1_x_l = x2_l - dx * 0.5
-    const cp1_x_r = x2_r - dx * 0.5
+    const cp1_x_l = x2_l - (x2_l - x1_l) * 0.5
+    const cp1_x_r = x2_r - (x2_r - x1_r) * 0.5
     const cp1_y = y1 + dy * 0.15
     const cp2_y = y1 + dy * 0.5
     const leftBorderPath = `M ${x1_l} ${y1} C ${cp1_x_l} ${cp1_y}, ${x2_l} ${cp2_y}, ${x2_l} ${y2}`
@@ -196,4 +199,3 @@ export function generateHoldSvgPaths(
     return { fillPath, leftBorderPath, rightBorderPath }
   }
 }
-

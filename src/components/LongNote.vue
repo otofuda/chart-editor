@@ -41,7 +41,7 @@
           v-if="ep.isIntermediate && ep.note.type === 1"
           class="note-midpoint"
           :style="{
-            left: `${getLeft(ep.note) + 25}px`,
+            left: `${getMidpointLeft(ep.note)}px`,
             bottom: `${getBottom(ep.note) - 5}px`
           }"
           :title="getNoteTooltip(ep.note)"
@@ -121,12 +121,12 @@
               prepend-icon="mdi-plus-circle-outline"
               @click="addEndToRoot"
             >
-              終点を追加
+              ここに終点を追加
             </v-btn>
           </div>
 
           <v-row class="mb-2" align="center" dense>
-            <v-col cols="6">
+            <v-col cols="6" sm="4">
               <v-text-field
                 v-model.number="note.lane"
                 label="lane"
@@ -135,21 +135,26 @@
                 hide-details
                 type="number"
                 step="0.1"
-              />
+                min="0"
+                max="6"
+              ></v-text-field>
             </v-col>
-            <v-col cols="6">
+            <v-col cols="6" sm="4">
               <v-text-field
-                v-model.number="localMeasure"
-                @change="note.measure = localMeasure"
-                hide-details
-                suffix="小節"
+                :model-value="localMeasure"
+                @update:model-value="val => localMeasure = Number(val)"
+                @change="commitRootMeasure"
+                @keydown.enter.stop="commitRootMeasure"
+                label="measure"
                 variant="outlined"
                 density="compact"
+                hide-details
                 type="number"
                 min="0"
-              />
+                :max="maxMeasure"
+              ></v-text-field>
             </v-col>
-            <v-col cols="6">
+            <v-col cols="6" sm="4">
               <v-text-field
                 v-model.number="note.position"
                 label="position"
@@ -157,19 +162,22 @@
                 density="compact"
                 hide-details
                 type="number"
-              />
+                min="0"
+                :max="note.split - 1"
+              ></v-text-field>
             </v-col>
-            <v-col cols="6">
-              <v-text-field
+            <v-col cols="6" sm="4">
+              <v-combobox
                 v-model.number="note.split"
+                :items="[4, 8, 16, 32, 12, 24, 48]"
                 label="split"
                 variant="outlined"
-                density="compact"
                 hide-details
-                type="number"
-              />
+                density="compact"
+                :menu-props="{}"
+              ></v-combobox>
             </v-col>
-            <v-col cols="6">
+            <v-col cols="6" sm="4">
               <v-text-field
                 v-model="rootSpeed"
                 label="speed"
@@ -179,9 +187,9 @@
                 hide-details
                 type="number"
                 step="0.1"
-              />
+              ></v-text-field>
             </v-col>
-            <v-col cols="6">
+            <v-col cols="6" sm="4">
               <v-text-field
                 v-model="rootOrbit"
                 label="orbit"
@@ -191,32 +199,24 @@
                 hide-details
                 type="number"
                 step="0.1"
-              />
+              ></v-text-field>
             </v-col>
           </v-row>
+        </div>
 
-          <v-divider class="my-2" />
-          <div class="text-subtitle-2 font-weight-bold mb-1">終点一覧</div>
+        <v-divider class="my-2" />
 
+        <div class="px-2">
           <EndForm
-            v-for="(end, i) in note.end"
-            :key="`longnote_end_${note.index}_${i}`"
-            :end="end"
+            v-for="(en, i) in note.end"
+            :key="`append_end_root_${i}`"
+            :end="en"
             :parent="note"
             :index="i"
             :max-measure="maxMeasure"
             @delete-end="deleteEnd(i)"
+            @place-notes="menu = false"
           />
-
-          <v-alert
-            v-if="note.end.length === 0"
-            class="my-2"
-            density="compact"
-            type="warning"
-            rounded="lg"
-          >
-            終点が1つもありません
-          </v-alert>
         </div>
       </v-list>
 
@@ -240,12 +240,17 @@ import EndForm from './EndForm.vue'
 const props = defineProps<{
   note: ExtendedNoteData
   measureData: Measure[]
+  currentDifficulty?: string
 }>()
 
 const deleteNotes = inject(deleteNotesKey)!
 
 const menu = ref(false)
 const localMeasure = ref(props.note.measure)
+
+function commitRootMeasure() {
+  props.note.measure = localMeasure.value
+}
 
 const rootSpeed = computed<string>({
   get: () => props.note.option?.[0] ?? '',
@@ -265,6 +270,13 @@ const rootOrbit = computed<string>({
   },
 })
 
+function getHoldNodeWidth(n: NoteData | ExtendedNoteData): number {
+  if (n.type === 2) return 1
+  const w = Number(n.option?.[3])
+  if (!w || isNaN(w) || w <= 0 || w === -1) return 1
+  return w
+}
+
 function hasSpeedOrOrbit(note: NoteData): boolean {
   const s = Number(note.option?.[0])
   const o = Number(note.option?.[1])
@@ -275,6 +287,7 @@ function getNoteTooltip(note: NoteData): string {
   let text = `${note.position}/${note.split}`
   if (note.option?.[0] && Number(note.option[0]) !== 1) text += ` (speed: x${note.option[0]})`
   if (note.option?.[1] && Number(note.option[1]) !== 0) text += ` (orbit: >${note.option[1]})`
+  if (note.option?.[3] && Number(note.option[3]) !== 1 && Number(note.option[3]) > 0) text += ` (width: ${note.option[3]})`
   return text
 }
 
@@ -294,7 +307,13 @@ const entireHeight = computed(() => {
 const maxMeasure = computed(() => (props.measureData.length > 0 ? props.measureData.length - 1 : 999))
 
 function getLeft(n: NoteData | ExtendedNoteData) {
-  return (n.lane - 1) * 60 + 60
+  const w = getHoldNodeWidth(n)
+  const center = (n.lane - 1) * 60 + 60 + 30
+  return center - (w / 2) * 60
+}
+
+function getMidpointLeft(n: NoteData | ExtendedNoteData) {
+  return (n.lane - 1) * 60 + 60 + 30 - 5
 }
 
 function getBottom(n: NoteData | ExtendedNoteData) {
@@ -306,8 +325,8 @@ function getBottom(n: NoteData | ExtendedNoteData) {
   )
 }
 
-function getWidth(_n: NoteData | ExtendedNoteData) {
-  return 60
+function getWidth(n: NoteData | ExtendedNoteData) {
+  return 60 * getHoldNodeWidth(n)
 }
 
 interface HoldSegment {
@@ -346,16 +365,19 @@ const treeData = computed(() => {
         isIntermediate,
       })
 
-      const x1 = getLeft(parent) + 30
+      const x1 = (parent.lane - 1) * 60 + 60 + 30
       const b1 = getBottom(parent)
-      const x2 = getLeft(child) + 30
+      const x2 = (child.lane - 1) * 60 + 60 + 30
       const b2 = getBottom(child)
 
       const y1 = entireHeight.value - b1
       const y2 = entireHeight.value - b2
       const curveType = getCurveType(child)
 
-      const paths = generateHoldSvgPaths(x1, y1, x2, y2, curveType, 38)
+      const w1 = getHoldNodeWidth(parent) * 38
+      const w2 = getHoldNodeWidth(child) * 38
+
+      const paths = generateHoldSvgPaths(x1, y1, x2, y2, curveType, w1, w2)
       segments.push({
         id: `seg_${childId}`,
         parent,
