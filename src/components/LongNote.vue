@@ -11,7 +11,10 @@
       <!-- 始点 -->
       <span
         class="note"
-        :class="`type${note.type}`"
+        :class="{
+          [`type${drawType}`]: true,
+          isDummy: note.type === 90
+        }"
         :style="{
           left: `${getLeft(note)}px`,
           bottom: `${getBottom(note)}px`,

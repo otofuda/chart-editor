@@ -557,24 +557,33 @@ function setNoteEvents(offset: number) {
           // キービームを出す
           if (isShowKeybeam.value && keybeamDOMs) {
             // 単押し
-            event.lane.forEach((num: number) => { keybeamDOMs[num].classList.add('-on') })
+            event.lane.forEach((num: number) => {
+              const idx = Math.round(num)
+              if (keybeamDOMs[idx]) keybeamDOMs[idx].classList.add('-on')
+            })
             setTimeout(() => {
-              event.lane.forEach((num: number) => { keybeamDOMs[num].classList.remove('-on') })
+              event.lane.forEach((num: number) => {
+                const idx = Math.round(num)
+                if (keybeamDOMs[idx]) keybeamDOMs[idx].classList.remove('-on')
+              })
             }, 25)
             // LN(ホールド)
             event.hold.forEach(([num, delay]: [number, number]) => {
-              keybeamDOMs[num].classList.add('-hold')
-              eventIds.value.push(
-                setTimeout(() => {
-                  keybeamDOMs[num].classList.remove('-hold')
-                  // 終点音を再生
-                  if (event.sound && isPlayKeySound.value && isPlayKeySoundEnd.value) {
-                    const keySound = new Audio('/chart-editor/guide.mp3')
-                    keySound.currentTime = 0.1
-                    keySound.play()
-                  }
-                }, delay) as unknown as number
-              )
+              const idx = Math.round(num)
+              if (keybeamDOMs[idx]) {
+                keybeamDOMs[idx].classList.add('-hold')
+                eventIds.value.push(
+                  setTimeout(() => {
+                    if (keybeamDOMs[idx]) keybeamDOMs[idx].classList.remove('-hold')
+                    // 終点音を再生
+                    if (event.sound && isPlayKeySound.value && isPlayKeySoundEnd.value) {
+                      const keySound = new Audio('/chart-editor/guide.mp3')
+                      keySound.currentTime = 0.1
+                      keySound.play()
+                    }
+                  }, delay) as unknown as number
+                )
+              }
             })
             // フリックエフェクト
             if (event.handMove && _isShowFlickEffect && event.noteObject && keybeams.value) {
@@ -738,12 +747,15 @@ const previewEvents = computed((): PreviewEvents => {
                 nodeEvent.sound = true
               }
 
-              // 始点からここまでのホールド光を追加
+              // 始点からここまでのホールド光を追加 (同一レーンは最大遅延に集約)
               if (nodeTiming > timing) {
-                events[timing].hold.push([
-                  note.lane, // 始点レーンを発光維持
-                  nodeTiming - timing // ホールドする時間(ms)
-                ])
+                const duration = nodeTiming - timing
+                const existing = events[timing].hold.find(([lane]: [number, number]) => lane === note.lane)
+                if (existing) {
+                  existing[1] = Math.max(existing[1], duration)
+                } else {
+                  events[timing].hold.push([note.lane, duration])
+                }
               }
             }
           }

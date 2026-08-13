@@ -70,7 +70,22 @@ describe('hasError', () => {
     expect(hasError(makeNote({ lane: 1.5 as any }))).toBe(false)
     expect(hasError(makeNote({ lane: 0.0 as any }))).toBe(false)
     expect(hasError(makeNote({ lane: 6.0 as any }))).toBe(false)
-    expect(hasError(makeNote({ lane: -1 }))).toBe(false)
+  })
+
+  it('レーン非使用ノート(type: 98, 96等)は lane: -1 を要求する', () => {
+    expect(hasError(makeNote({ type: 98, lane: -1 }))).toBe(false)
+    expect(hasError(makeNote({ type: 98, lane: 1 }))).toBeTruthy()
+    expect(hasError(makeNote({ type: 96, lane: -1 }))).toBe(false)
+    expect(hasError(makeNote({ type: 96, lane: 2 }))).toBeTruthy()
+  })
+
+  it('音札ノート(type: 5)は lane: 3 を要求する', () => {
+    expect(hasError(makeNote({ type: 5, lane: 3 }))).toBe(false)
+    expect(hasError(makeNote({ type: 5, lane: 1 }))).toBeTruthy()
+  })
+
+  it('通常ノート(type: 1)で lane: -1 はエラーを返す', () => {
+    expect(hasError(makeNote({ type: 1, lane: -1 }))).toBeTruthy()
   })
 
   it('splitが0のノートはエラーメッセージを返す', () => {
@@ -160,5 +175,13 @@ describe('getValidatedNote', () => {
     expect(validated.end[0].end.length).toBe(1)
     expect(validated.end[0].end[0].lane).toBe(5)
     expect(validated.end[0].end[0].option).toEqual(['', '', 'easeIn'])
+  })
+
+  it('レーン非使用ノートや音札ノートの lane を正規化する', () => {
+    const bpmNote = makeNote({ type: 98, lane: 2 as any })
+    expect(getValidatedNote(bpmNote).lane).toBe(-1)
+
+    const otofudaNote = makeNote({ type: 5, lane: 1 as any })
+    expect(getValidatedNote(otofudaNote).lane).toBe(3)
   })
 })
