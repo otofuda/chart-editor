@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import type { DifficultyString, ExtendedChartData, ExtendedNoteData } from '../types'
 import { getValidatedNote } from './useNoteCheck'
-import type { useChartData } from './useChartData'
+import { normalizeChartData, type useChartData } from './useChartData'
 
 type ChartData = ReturnType<typeof useChartData>
 
@@ -32,15 +32,7 @@ export function useFileIO(
   reader.onload = (event) => {
     if (!event.target?.result) return
     const parsed: ExtendedChartData = JSON.parse(String(event.target.result))
-    chartObject.value = parsed
-    difficulties.forEach((d: DifficultyString) => {
-      chartObject.value[d] = (chartObject.value[d] || []).map((note, index) => ({
-        // 編集用の情報を付加
-        ...note,
-        index,
-        isSelected: false,
-      }))
-    })
+    chartObject.value = normalizeChartData(parsed, difficulties)
     isLoaded.value = true
   }
 

@@ -23,11 +23,9 @@ export function useTextureDB(
    * テクスチャ DB を取得してタブを生成する
    */
   function fetchTextures(): void {
-    fetch('https://otofuda.microcms.io/api/v1/textures?limit=1000', {
-      headers: {
-        'X-API-KEY': '91c69bf8-3df5-445f-81e7-30b54ab4a7d4',
-      },
-    })
+    const endpoint = 'https://api.otofuda.com/contents/textures'
+
+    fetch(endpoint)
       .then((res) => res.json())
       .then((data: { contents: TextureObject[] }) => {
         texturePayload.value = data

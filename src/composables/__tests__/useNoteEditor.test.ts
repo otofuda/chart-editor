@@ -75,3 +75,21 @@ describe('useNoteEditor - ノーツ種別変更時のオプションリセット
   })
 })
 
+describe('useNoteEditor - 全難易度同時挿入', () => {
+  it('appendSimultaneously で全難易度にノートが追加され、index が 1 始まりで一意に採番される', () => {
+    const { chartData, editor } = setup()
+    // easy に既存ノートを配置
+    chartData.chartObject.value.easy = [
+      { index: 1, type: 1, lane: 2 as LaneType, measure: 0, position: 0, split: 8, option: [], end: [] }
+    ]
+    editor.appendSimultaneously(sampleNote)
+
+    // 空だった難易度は index: 1
+    expect(chartData.chartObject.value.normal.length).toBe(1)
+    expect(chartData.chartObject.value.normal[0].index).toBe(1)
+
+    // 既に index: 1 があった easy は index: 2
+    expect(chartData.chartObject.value.easy.length).toBe(2)
+    expect(chartData.chartObject.value.easy[1].index).toBe(2)
+  })
+})

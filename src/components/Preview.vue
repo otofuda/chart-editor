@@ -340,7 +340,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, watch, onMounted } from 'vue'
 import {
   type DifficultyString,
   type ExtendedNoteData,
@@ -400,7 +400,6 @@ const isPlayGuide = ref(false)
 const eventIds = ref<number[]>([])
 const isPlayKeySound = ref(false)
 const isPlayKeySoundEnd = ref(false)
-const guideAudio = new Audio('/chart-editor/guide.mp3')
 const defaultLEDColor = 'linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)'
 const lift = ref(Number(localStorage.getItem('chart-editor__lift')) || 0) // LIFTオプション
 const sudden = ref(Number(localStorage.getItem('chart-editor__sudden')) || 0) // SUDDENオプション
@@ -411,7 +410,56 @@ const keybeamLength = ref(100) // キービームの長さ
 const comboOpacity = ref(50) // コンボ数の透明度
 const isObjectBasedPreview = ref(false) // オブジェクト表示モード
 
-import { watch } from 'vue'
+// Web Audio API による低遅延・ゼロアロケーション再生
+const guideAudioUrl = `${import.meta.env.BASE_URL}guide.mp3`
+let audioContext: AudioContext | null = null
+let guideAudioBuffer: AudioBuffer | null = null
+
+function getAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  const AudioCtx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  if (!AudioCtx) return null
+  if (!audioContext) {
+    audioContext = new AudioCtx()
+  }
+  return audioContext
+}
+
+async function loadGuideBuffer(): Promise<void> {
+  if (guideAudioBuffer || typeof window === 'undefined') return
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const res = await fetch(guideAudioUrl)
+    const arrayBuffer = await res.arrayBuffer()
+    guideAudioBuffer = await ctx.decodeAudioData(arrayBuffer)
+  } catch {
+    // 音声ロード失敗時は非致命的
+  }
+}
+
+function playGuideSound(offsetSeconds: number = 0): void {
+  const ctx = getAudioContext()
+  if (!ctx || !guideAudioBuffer) return
+  if (ctx.state === 'suspended') {
+    ctx.resume()
+  }
+  try {
+    const source = ctx.createBufferSource()
+    source.buffer = guideAudioBuffer
+    source.connect(ctx.destination)
+    source.start(0, offsetSeconds)
+  } catch {
+    // 再生エラーは無視
+  }
+}
+
+onMounted(() => {
+  loadGuideBuffer()
+})
+
 watch(lift, (v) => localStorage.setItem('chart-editor__lift', String(v)))
 watch(sudden, (v) => localStorage.setItem('chart-editor__sudden', String(v)))
 watch(hidden, (v) => localStorage.setItem('chart-editor__hidden', String(v)))
@@ -444,34 +492,8 @@ function playFromMeasure() {
     }
   }, audioDelay)
 
-  // let index = 0;
-  // let delay = this.previewDelay;
-  // this.intervalId = setInterval(() => {
-  //   const measure = this.measureData[index] || {};
-  //   const next = this.measureData[index + 1] || {};
-  //
-  //   if (measure.measureReachTime > startOffset) {
-  //     this.timeoutIds.append(
-  //       setTimeout(() => {
-  //         this.currentMeasure = measure.measure;
-  //         this.currentPosition = next.measurePositionBottom;
-  //         this.currentBpm = measure.measureBpm;
-  //         this.currentBeat = measure.measureBeat;
-  //         const transitionTime =
-  //           next.measureReachTime - measure.measureReachTime;
-  //         this.$refs.preview.style.transition = `${transitionTime}ms all linear`;
-  //         this.$refs.preview.style.bottom = `-${this.currentPosition}px`;
-  //       }, measure.measureReachTime - index * 10 - startOffset)
-  //     );
-  //   }
-  //   index++;
-  //   delay -= 10;
-  //   console.log(delay);
-  //   if (index * 10 + 100 >= this.previewDelay)
-  //     clearInterval(this.intervalId);
-  // }, 10);
   measures.value.forEach((measure, index) => {
-      const next = measures.value[index + 1] as Measure | undefined
+    const next = measures.value[index + 1] as Measure | undefined
     if (measure.measureReachTime > _startOffset) {
       const diff = measure.measureLength === 0 ? -30 : 0
       timeoutIds.value.push(
@@ -490,8 +512,7 @@ function playFromMeasure() {
           elem.style.bottom = `-${currentPosition.value}px`
           if (isPlayGuide.value) {
             // 小節ガイド音再生
-            guideAudio.currentTime = 0
-            guideAudio.play()
+            playGuideSound(0)
           }
         }, measure.measureReachTime - _startOffset + diff) as unknown as number
       )
@@ -523,8 +544,7 @@ function playFromZero() {
         elem.style.bottom = `-${currentPosition.value}px`
         if (isPlayGuide.value) {
           // 小節ガイド音再生
-          guideAudio.currentTime = 0.1
-          guideAudio.play()
+          playGuideSound(0.1)
         }
       }, measure.measureReachTime + diff) as unknown as number
     )
@@ -550,9 +570,7 @@ function setNoteEvents(offset: number) {
         setTimeout(() => {
           // 打鍵音を再生
           if (event.sound && isPlayKeySound.value) {
-            const keySound = new Audio('/chart-editor/guide.mp3')
-            keySound.currentTime = 0.1
-            keySound.play()
+            playGuideSound(0.1)
           }
           // キービームを出す
           if (isShowKeybeam.value && keybeamDOMs) {
@@ -572,9 +590,7 @@ function setNoteEvents(offset: number) {
                   if (comboDOM) comboDOM.textContent = String(currentCombo.value)
                   // 終点音を再生
                   if (event.sound && isPlayKeySound.value && isPlayKeySoundEnd.value) {
-                    const keySound = new Audio('/chart-editor/guide.mp3')
-                    keySound.currentTime = 0.1
-                    keySound.play()
+                    playGuideSound(0.1)
                   }
                 }, delay) as unknown as number
               )
@@ -626,6 +642,10 @@ function previewStart() {
   if (!measures.value[startFrom.value]) {
     showSnackbar(`${startFrom.value}小節はありません`)
     return false
+  }
+  const ctx = getAudioContext()
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume()
   }
   returnPosition.value = window.scrollY // 停止後に戻る座標
   isPreviewing.value = true

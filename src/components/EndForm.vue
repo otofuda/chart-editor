@@ -120,28 +120,19 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { type PropType } from 'vue'
-import { type LaneType, type NoteData } from 'chart-types'
+import type { LaneType, NoteData } from 'chart-types'
 
-const props = defineProps({
-  end: {
-    type: Object as PropType<NoteData>,
-    required: true,
-  },
-  parent: {
-    type: Object as PropType<NoteData>,
-    required: true,
-  },
-  index: {
-    type: Number,
-    required: true,
-  },
-  maxMeasure: {
-    type: Number,
-    required: false,
-    default: 999,
-  },
-})
+const props = withDefaults(
+  defineProps<{
+    end: NoteData
+    parent: NoteData
+    index: number
+    maxMeasure?: number
+  }>(),
+  {
+    maxMeasure: 999,
+  }
+)
 
 const emit = defineEmits(['delete-end', 'append-to-left', 'append-to-right', 'append-to-up', 'append-to-down', 'place-notes'])
 

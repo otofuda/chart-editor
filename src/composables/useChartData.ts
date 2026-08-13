@@ -10,6 +10,41 @@ import type {
 const BEAT_HEIGHT_KEY = 'chart-editor__beat-height'
 
 /**
+ * 譜面オブジェクトを正規化し、編集に必要な index / isSelected および info を付与する
+ * @param raw - 外部またはバックアップから読み込んだ譜面データ
+ * @param difficulties - 難易度文字列配列 (デフォルト: ['raku', 'easy', 'normal', 'hard', 'extra'])
+ */
+export function normalizeChartData(
+  raw: Partial<ExtendedChartData> | null | undefined,
+  difficulties: DifficultyString[] = ['raku', 'easy', 'normal', 'hard', 'extra']
+): ExtendedChartData {
+  const result: ExtendedChartData = {
+    raku: [],
+    easy: [],
+    normal: [],
+    hard: [],
+    extra: [],
+    info: {
+      version: 2,
+      offset: 0,
+      bpm: 120,
+      beat: 4,
+      ...(raw?.info || {}),
+    },
+  }
+
+  difficulties.forEach((d: DifficultyString) => {
+    result[d] = ((raw?.[d] as ExtendedNoteData[]) || []).map((note, idx) => ({
+      ...note,
+      index: typeof note.index === 'number' ? note.index : idx,
+      isSelected: false,
+    }))
+  })
+
+  return result
+}
+
+/**
  * 譜面データ・小節情報・基本計算を管理する composable
  */
 export function useChartData() {

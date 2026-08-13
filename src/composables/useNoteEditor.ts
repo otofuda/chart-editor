@@ -160,10 +160,15 @@ export function useNoteEditor(
           showSnackbar(`${dup}個のノーツと重複しているため、${difficulty}に挿入できません`)
           return
         }
+        const index =
+          chart.length === 0
+            ? 1
+            : chart.reduce((max, n) => Math.max(max, n.index ?? 0), 0) + 1
         chart.push({
           isSelected: false,
           ...structuredClone(toRaw(note)),
-          index: chart.length,
+          index,
+          option: getValidatedOptions(note),
         })
         difficultyCount++
       })

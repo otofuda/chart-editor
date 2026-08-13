@@ -913,9 +913,6 @@
 import { ref, computed, provide, onMounted } from 'vue'
 import { useGoTo } from 'vuetify'
 
-import { type DifficultyString, type ExtendedNoteData } from './types'
-import { type NoteData, type LaneType } from 'chart-types'
-
 import Preview from './components/Preview.vue'
 import EndForm from './components/EndForm.vue'
 

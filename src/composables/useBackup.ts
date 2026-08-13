@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import type { Measure, ExtendedNoteData } from '../types'
 import { noteTypes } from './useNoteTypes'
-import type { useChartData } from './useChartData'
+import { normalizeChartData, type useChartData } from './useChartData'
 
 type ChartData = ReturnType<typeof useChartData>
 
@@ -20,7 +20,7 @@ type AnalysisData = {
  * @param chartData - useChartData の戻り値
  */
 export function useBackup(chartData: ChartData) {
-  const { chartObject, currentChart, measureData } = chartData
+  const { chartObject, currentChart, measureData, difficulties } = chartData
 
   /** スナックバーの表示状態 */
   const snackbar = ref(false)
@@ -72,8 +72,13 @@ export function useBackup(chartData: ChartData) {
     )
     const backupData = localStorage.getItem('chart-editor__backup')
     if (confirmed && backupData) {
-      chartObject.value = JSON.parse(backupData)
-      showSnackbar('バックアップから復元しました')
+      try {
+        const parsed = JSON.parse(backupData)
+        chartObject.value = normalizeChartData(parsed, difficulties)
+        showSnackbar('バックアップから復元しました')
+      } catch {
+        showSnackbar('バックアップデータの読み込みに失敗しました')
+      }
     }
   }
 
