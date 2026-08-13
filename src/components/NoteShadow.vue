@@ -1,6 +1,5 @@
 <!-- eslint-disable vue/no-mutating-props -->
 <template>
-  <!-- note/endはtype 1, 2のみ想定 -->
   <div>
     <!-- 始点 -->
     <span
@@ -46,48 +45,100 @@
         hide-details
         disabled
       ></v-textarea>
+      <strong v-if="Number(note.option?.[0]) && Number(note.option?.[0]) !== 1" class="speed">x{{ note.option[0] }}</strong>
+      <strong v-if="Number(note.option?.[1]) && Number(note.option?.[1]) !== 0" class="orbit">&gt;{{ note.option[1] }}</strong>
       {{ note.position }}/{{ note.split }}
       <span v-if="isPreAppend" class="preappend__index">#{{ note.index }}</span>
     </span>
 
-    <div v-for="(end, i) in note.end" :key="i">
-      <!-- 終点 -->
+    <!-- 終点ノーツ（再帰全ノード） -->
+    <template v-for="ep in treeData.endpoints" :key="ep.id">
+      <!-- 中継点かつ type: 1 の場合は小さな〇（コンボ加算中点） -->
       <span
+        v-if="ep.isIntermediate && ep.note.type === 1"
+        class="note-midpoint"
+        :class="{
+          shadow: !isPreAppend,
+          preappend: isPreAppend
+        }"
+        :style="{
+          left: `${getAbsoluteLeft(ep.note) + 25}px`,
+          bottom: `${getAbsoluteBottom(ep.note) - 5}px`
+        }"
+        :title="getNoteTooltip(ep.note)"
+      >
+        <span class="midpoint-badges">
+          <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
+          <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
+        </span>
+      </span>
+      <!-- 末端終点（type !== 89）の場合は通常のノートバー -->
+      <span
+        v-else-if="!ep.isIntermediate && ep.note.type !== 89"
         class="note"
         :class="{
-          [`type${end.type}`]: true,
+          [`type${ep.note.type}`]: true,
           shadow: !isPreAppend,
           preappend: isPreAppend
         }"
         :style="{
-          left: `${getAbsoluteLeft(end)}px`,
-          bottom: `${getAbsoluteBottom(end)}px`,
-          width: `${getWidth(end)}px`
+          left: `${getAbsoluteLeft(ep.note)}px`,
+          bottom: `${getAbsoluteBottom(ep.note)}px`,
+          width: `${getWidth(ep.note)}px`
         }"
+        :title="getNoteTooltip(ep.note)"
       >
-        {{ end.position }}/{{ end.split }}
+        <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
+        <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
+        {{ ep.note.position }}/{{ ep.note.split }}
       </span>
-      <!-- 帯 -->
-      <i
-        class="note-hold"
+      <!-- 不可視ノード（type: 89）だが speed または orbit が指定されている場合はバッジのみ表示 -->
+      <span
+        v-else-if="hasSpeedOrOrbit(ep.note)"
+        class="note-invisible-badge"
         :class="{
           shadow: !isPreAppend,
           preappend: isPreAppend
         }"
         :style="{
-          bottom: `${getAbsoluteBottom(note)}px`,
-          left: `${getAbsoluteLeft(end)}px`,
-          height: `${getAbsoluteBottom(end) - getAbsoluteBottom(note)}px`
+          left: `${getAbsoluteLeft(ep.note)}px`,
+          bottom: `${getAbsoluteBottom(ep.note)}px`,
+          width: `${getWidth(ep.note)}px`
         }"
-      ></i>
-    </div>
+        :title="getNoteTooltip(ep.note)"
+      >
+        <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
+        <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
+      </span>
+    </template>
+
+    <!-- 帯（SVGパス） -->
+    <svg
+      v-if="treeData.segments.length > 0"
+      class="long-note-svg"
+      :class="{
+        shadow: !isPreAppend,
+        preappend: isPreAppend
+      }"
+      :style="{
+        height: `${entireHeight}px`
+      }"
+    >
+      <g v-for="seg in treeData.segments" :key="seg.id">
+        <path :d="seg.paths.fillPath" class="hold-fill" />
+        <path :d="seg.paths.leftBorderPath" class="hold-border" />
+        <path :d="seg.paths.rightBorderPath" class="hold-border" />
+      </g>
+    </svg>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, inject } from 'vue'
+import type { NoteData } from 'chart-types'
 import { type ExtendedNoteData, type Measure } from '@/types'
 import { cancelNoteKey } from '@/composables/injectionKeys'
+import { generateHoldSvgPaths, getCurveType, type CurveType } from '@/composables/useNoteTypes'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -97,8 +148,25 @@ const props = defineProps<{
 
 const cancelNote = inject(cancelNoteKey)!
 
-function getLeft(note: ExtendedNoteData) {
-  // 引数のノートの描画用typeとoption配列を取得
+function hasSpeedOrOrbit(note: NoteData): boolean {
+  const s = Number(note.option?.[0])
+  const o = Number(note.option?.[1])
+  return Boolean((s && s !== 1) || (o && o !== 0))
+}
+
+function getNoteTooltip(note: NoteData): string {
+  let text = `${note.position}/${note.split}`
+  if (note.option?.[0] && Number(note.option[0]) !== 1) text += ` (speed: x${note.option[0]})`
+  if (note.option?.[1] && Number(note.option[1]) !== 0) text += ` (orbit: >${note.option[1]})`
+  return text
+}
+
+const entireHeight = computed(() => {
+  const last = props.measureData.at(-1)
+  return (last?.measurePositionBottom ?? 0) + (last?.measureHeight ?? 0)
+})
+
+function getLeft(note: NoteData | ExtendedNoteData) {
   const drawType = (note.type === 90) ? Number(note.option[0]) : note.type
   const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option
   // TAP, ロング, 終点, 区切り線, コメント
@@ -124,28 +192,23 @@ function getLeft(note: ExtendedNoteData) {
   else return 0
 }
 
-function getAbsoluteLeft(note: ExtendedNoteData) {
+function getAbsoluteLeft(note: NoteData | ExtendedNoteData) {
   return getLeft(note) + 60
 }
 
-function getBottom(note: ExtendedNoteData) {
-  const targetMeasure = props.measureData[note.measure] || props.measureData.at(-1)!
-  return (note.position / note.split) * targetMeasure.measureHeight
-}
-
-function getAbsoluteBottom(note: ExtendedNoteData) {
+function getAbsoluteBottom(note: NoteData | ExtendedNoteData) {
   const targetMeasure = props.measureData[note.measure]
   if (targetMeasure) {
     return targetMeasure.measurePositionBottom + (note.position / note.split) * targetMeasure.measureHeight
   } else {
-    const lastMeasure = props.measureData.at(-1)!
+    const lastMeasure = props.measureData.at(-1)
+    if (!lastMeasure) return 0
     const diff = note.measure - lastMeasure.measure
     return diff * lastMeasure.measureHeight + lastMeasure.measurePositionBottom + (note.position / note.split) * lastMeasure.measureHeight
   }
 }
 
-function getWidth(note: ExtendedNoteData) {
-  // 引数のノートの描画用typeとoption配列を取得
+function getWidth(note: NoteData | ExtendedNoteData) {
   const drawType = (note.type === 90) ? Number(note.option[0]) : note.type
   const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option
   // TAP, ロング, 終点, コメント
@@ -170,6 +233,68 @@ function getWidth(note: ExtendedNoteData) {
   // その他
   else return 300
 }
+
+interface HoldSegment {
+  id: string
+  parent: NoteData
+  child: NoteData
+  curveType: CurveType
+  paths: { fillPath: string; leftBorderPath: string; rightBorderPath: string }
+}
+
+interface EndPointNode {
+  id: string
+  note: NoteData
+  parent: NoteData
+  depth: number
+  index: number
+  isIntermediate: boolean
+}
+
+const treeData = computed(() => {
+  const segments: HoldSegment[] = []
+  const endpoints: EndPointNode[] = []
+
+  function traverse(parent: NoteData, depth: number) {
+    if (!parent.end || !Array.isArray(parent.end)) return
+
+    parent.end.forEach((child, idx) => {
+      const childId = `shadow_end_${depth}_${idx}_${child.measure}_${child.position}`
+      const isIntermediate = Boolean(child.end && Array.isArray(child.end) && child.end.length > 0)
+      endpoints.push({
+        id: childId,
+        note: child,
+        parent,
+        depth,
+        index: idx,
+        isIntermediate,
+      })
+
+      const x1 = getAbsoluteLeft(parent) + 30
+      const b1 = getAbsoluteBottom(parent)
+      const x2 = getAbsoluteLeft(child) + 30
+      const b2 = getAbsoluteBottom(child)
+
+      const y1 = entireHeight.value - b1
+      const y2 = entireHeight.value - b2
+      const curveType = getCurveType(child)
+
+      const paths = generateHoldSvgPaths(x1, y1, x2, y2, curveType, 38)
+      segments.push({
+        id: `shadow_seg_${childId}`,
+        parent,
+        child,
+        curveType,
+        paths,
+      })
+
+      traverse(child, depth + 1)
+    })
+  }
+
+  traverse(props.note, 1)
+  return { segments, endpoints }
+})
 
 function calcelThisNote() {
   if (props.isPreAppend) cancelNote(props.note.index)

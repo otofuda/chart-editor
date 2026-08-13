@@ -21,6 +21,7 @@ export const noteTypes: NoteTypeEntry[] = [
   { title: '音札', value: 5 },
   { title: '上フリック', value: 6 },
   { title: '下フリック', value: 7 },
+  { title: '中点 / 終端なし', value: 89 },
   { title: 'ダミー', value: 90 },
   { title: '特殊オブジェクト', value: 91 },
   { title: '譜面停止', value: 92 },
@@ -39,10 +40,16 @@ export const noteTypes: NoteTypeEntry[] = [
  * @param note - オプション定義を取得するノート
  */
 export function noteOptions(note: NoteData): NoteTypesOption[] {
-  if ([1, 2].includes(note.type))
+  if (note.type === 2)
     return [
       { label: 'speed', type: 'number', desc: 'Float型｜スピード(倍率)' },
       { label: 'orbit', type: 'number', desc: 'Float型｜軌道(レーン幅/秒)' },
+    ]
+  else if ([1, 89].includes(note.type))
+    return [
+      { label: 'speed', type: 'number', desc: 'Float型｜スピード(倍率)' },
+      { label: 'orbit', type: 'number', desc: 'Float型｜軌道(レーン幅/秒)' },
+      { label: 'curve', type: 'text', desc: 'String型｜親からの曲線補間 (linear, ease, easeIn, easeOut)' },
     ]
   else if ([3, 4, 6, 7].includes(note.type))
     return [
@@ -110,3 +117,83 @@ export function noteOptions(note: NoteData): NoteTypesOption[] {
     ]
   else return []
 }
+
+/** 曲線タイプの定義 */
+export type CurveType = 'linear' | 'ease' | 'easeIn' | 'easeOut'
+
+/** 曲線タイプの選択肢一覧 */
+export const curveTypeOptions: { title: string; value: CurveType }[] = [
+  { title: '直線', value: 'linear' },
+  { title: 'S字 (Ease)', value: 'ease' },
+  { title: 'Ease In', value: 'easeIn' },
+  { title: 'Ease Out', value: 'easeOut' },
+]
+
+/**
+ * ノートから曲線補間タイプを取得する（option[2]、デフォルト 'linear'）
+ * @param note - 対象ノート
+ */
+export function getCurveType(note: NoteData): CurveType {
+  return (note.option?.[2] as CurveType) || 'linear'
+}
+
+/**
+ * ロングノーツの帯のSVGパス（fill用クローズドパス、left境界線パス、right境界線パス）を計算する
+ * @param x1 - 始点中心X
+ * @param y1 - 始点中心Y (SVG座標系)
+ * @param x2 - 終点中心X
+ * @param y2 - 終点中心Y (SVG座標系)
+ * @param curveType - 曲線タイプ ('linear' | 'ease' | 'easeIn' | 'easeOut')
+ * @param width - 帯の幅 (デフォルト 38px)
+ */
+export function generateHoldSvgPaths(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  curveType: CurveType = 'linear',
+  width = 38
+): { fillPath: string; leftBorderPath: string; rightBorderPath: string } {
+  const hw = width / 2
+  const x1_l = x1 - hw, x1_r = x1 + hw
+  const x2_l = x2 - hw, x2_r = x2 + hw
+  const dy = y2 - y1
+  const dx = x2 - x1
+
+  if (curveType === 'ease') {
+    // S字カーブ (Ease In-Out): 始点・終点は垂直に保ち、中間(35%/65%)を自然な傾斜でなめらかに繋ぐ
+    const cp1_y = y1 + dy * 0.35
+    const cp2_y = y1 + dy * 0.65
+    const leftBorderPath = `M ${x1_l} ${y1} C ${x1_l} ${cp1_y}, ${x2_l} ${cp2_y}, ${x2_l} ${y2}`
+    const rightBorderPath = `M ${x1_r} ${y1} C ${x1_r} ${cp1_y}, ${x2_r} ${cp2_y}, ${x2_r} ${y2}`
+    const fillPath = `M ${x1_l} ${y1} L ${x1_r} ${y1} C ${x1_r} ${cp1_y}, ${x2_r} ${cp2_y}, ${x2_r} ${y2} L ${x2_l} ${y2} C ${x2_l} ${cp2_y}, ${x1_l} ${cp1_y}, ${x1_l} ${y1} Z`
+    return { fillPath, leftBorderPath, rightBorderPath }
+  } else if (curveType === 'easeIn') {
+    // Ease In: 始点は垂直にゆっくり出発し、終点に向かってなめらかに曲がる
+    const cp1_y = y1 + dy * 0.5
+    const cp2_x_l = x1_l + dx * 0.5
+    const cp2_x_r = x1_r + dx * 0.5
+    const cp2_y = y1 + dy * 0.85
+    const leftBorderPath = `M ${x1_l} ${y1} C ${x1_l} ${cp1_y}, ${cp2_x_l} ${cp2_y}, ${x2_l} ${y2}`
+    const rightBorderPath = `M ${x1_r} ${y1} C ${x1_r} ${cp1_y}, ${cp2_x_r} ${cp2_y}, ${x2_r} ${y2}`
+    const fillPath = `M ${x1_l} ${y1} L ${x1_r} ${y1} C ${x1_r} ${cp1_y}, ${cp2_x_r} ${cp2_y}, ${x2_r} ${y2} L ${x2_l} ${y2} C ${cp2_x_l} ${cp2_y}, ${x1_l} ${cp1_y}, ${x1_l} ${y1} Z`
+    return { fillPath, leftBorderPath, rightBorderPath }
+  } else if (curveType === 'easeOut') {
+    // Ease Out: 始点からなめらかに曲がり始め、終点では垂直に着地する
+    const cp1_x_l = x2_l - dx * 0.5
+    const cp1_x_r = x2_r - dx * 0.5
+    const cp1_y = y1 + dy * 0.15
+    const cp2_y = y1 + dy * 0.5
+    const leftBorderPath = `M ${x1_l} ${y1} C ${cp1_x_l} ${cp1_y}, ${x2_l} ${cp2_y}, ${x2_l} ${y2}`
+    const rightBorderPath = `M ${x1_r} ${y1} C ${cp1_x_r} ${cp1_y}, ${x2_r} ${cp2_y}, ${x2_r} ${y2}`
+    const fillPath = `M ${x1_l} ${y1} L ${x1_r} ${y1} C ${cp1_x_r} ${cp1_y}, ${x2_r} ${cp2_y}, ${x2_r} ${y2} L ${x2_l} ${y2} C ${x2_l} ${cp2_y}, ${cp1_x_l} ${cp1_y}, ${x1_l} ${y1} Z`
+    return { fillPath, leftBorderPath, rightBorderPath }
+  } else {
+    // 直線 (Linear): 単純な台形ポリゴン
+    const leftBorderPath = `M ${x1_l} ${y1} L ${x2_l} ${y2}`
+    const rightBorderPath = `M ${x1_r} ${y1} L ${x2_r} ${y2}`
+    const fillPath = `M ${x1_l} ${y1} L ${x1_r} ${y1} L ${x2_r} ${y2} L ${x2_l} ${y2} Z`
+    return { fillPath, leftBorderPath, rightBorderPath }
+  }
+}
+

@@ -247,10 +247,6 @@ export function useNoteEditor(
   function appendNoteToLeft(): void {
     const lane = Math.max(appendNote.value.lane - 1, 1) as LaneType
     appendNote.value.lane = lane
-    // TODO: ネスト終点に対応
-    appendNote.value.end.forEach((end) => {
-      end.lane = lane
-    })
   }
 
   /**
@@ -259,10 +255,6 @@ export function useNoteEditor(
   function appendNoteToRight(): void {
     const lane = Math.min(appendNote.value.lane + 1, 5) as LaneType
     appendNote.value.lane = lane
-    // TODO: ネスト終点に対応
-    appendNote.value.end.forEach((end) => {
-      end.lane = lane
-    })
   }
 
   /**

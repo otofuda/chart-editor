@@ -557,27 +557,33 @@ function setNoteEvents(offset: number) {
           // キービームを出す
           if (isShowKeybeam.value && keybeamDOMs) {
             // 単押し
-            event.lane.forEach((num: number) => { keybeamDOMs[num].classList.add('-on') })
+            event.lane.forEach((num: number) => {
+              const idx = Math.round(num)
+              if (keybeamDOMs[idx]) keybeamDOMs[idx].classList.add('-on')
+            })
             setTimeout(() => {
-              event.lane.forEach((num: number) => { keybeamDOMs[num].classList.remove('-on') })
+              event.lane.forEach((num: number) => {
+                const idx = Math.round(num)
+                if (keybeamDOMs[idx]) keybeamDOMs[idx].classList.remove('-on')
+              })
             }, 25)
             // LN(ホールド)
             event.hold.forEach(([num, delay]: [number, number]) => {
-              keybeamDOMs[num].classList.add('-hold')
-              eventIds.value.push(
-                setTimeout(() => {
-                  keybeamDOMs[num].classList.remove('-hold')
-                  // hold配列の分、終点時にコンボ増加
-                  currentCombo.value += 1
-                  if (comboDOM) comboDOM.textContent = String(currentCombo.value)
-                  // 終点音を再生
-                  if (event.sound && isPlayKeySound.value && isPlayKeySoundEnd.value) {
-                    const keySound = new Audio('/chart-editor/guide.mp3')
-                    keySound.currentTime = 0.1
-                    keySound.play()
-                  }
-                }, delay) as unknown as number
-              )
+              const idx = Math.round(num)
+              if (keybeamDOMs[idx]) {
+                keybeamDOMs[idx].classList.add('-hold')
+                eventIds.value.push(
+                  setTimeout(() => {
+                    if (keybeamDOMs[idx]) keybeamDOMs[idx].classList.remove('-hold')
+                    // 終点音を再生
+                    if (event.sound && isPlayKeySound.value && isPlayKeySoundEnd.value) {
+                      const keySound = new Audio('/chart-editor/guide.mp3')
+                      keySound.currentTime = 0.1
+                      keySound.play()
+                    }
+                  }, delay) as unknown as number
+                )
+              }
             })
             // フリックエフェクト
             if (event.handMove && _isShowFlickEffect && event.noteObject && keybeams.value) {
@@ -616,7 +622,7 @@ function setNoteEvents(offset: number) {
         }, time) as unknown as number
       )
     } else {
-      currentCombo.value += event.count + event.hold.length
+      currentCombo.value += event.count
       if (isSimulateLED.value && event.color) setLEDColor(event.color)
     }
   })
@@ -698,18 +704,74 @@ const previewEvents = computed((): PreviewEvents => {
         events[timing].sound = true
         events[timing].count += 1
         if (!events[timing].lane.includes(note.lane)) events[timing].lane.push(note.lane)
-      // LN(始点と終点が同レーンの前提)
+      // LN (始点レーンで発光維持、各中継点・終点到達時のコンボ・効果音処理)
       } else if (note.type === 2) {
         events[timing].sound = true
-        note.end.forEach((end: ExtendedNoteData) => {
-          const endMeasure = measures.value[end.measure]
-          if (!endMeasure) return
-          const endTiming = endMeasure.measureReachTime + (end.position / end.split) * endMeasure.measureLength
-          events[timing].hold.push([
-            note.lane, // キービームをホールドするレーン
-            endTiming - timing // ホールドする時間(ms)
-          ])
-        })
+        if (!events[timing].lane.includes(note.lane)) events[timing].lane.push(note.lane)
+
+        const ensureEvent = (t: number) => {
+          if (!events[t]) {
+            events[t] = {
+              timing: t,
+              lane: [],
+              hold: [],
+              holdEnd: [],
+              color: null,
+              count: 0,
+              sound: false,
+              handMove: null,
+              noteObject: null
+            }
+          }
+          return events[t]
+        }
+
+        const traverseEndpoints = (current: ExtendedNoteData) => {
+          const isIntermediate = Boolean(current.end && Array.isArray(current.end) && current.end.length > 0)
+          const nodeMeasure = measures.value[current.measure]
+          if (nodeMeasure) {
+            const nodeTiming = nodeMeasure.measureReachTime + (current.position / current.split) * nodeMeasure.measureLength
+
+            if (isIntermediate) {
+              // 中継点: type: 1 の場合のみコンボ+1と効果音
+              if (current.type === 1) {
+                const nodeEvent = ensureEvent(nodeTiming)
+                nodeEvent.sound = true
+                nodeEvent.count += 1
+              }
+            } else {
+              // 末端終点: type: 1 または type: 89 でコンボ+1
+              const nodeEvent = ensureEvent(nodeTiming)
+              nodeEvent.count += 1
+              if (current.type === 1) {
+                nodeEvent.sound = true
+              }
+
+              // 始点からここまでのホールド光を追加 (同一レーンは最大遅延に集約)
+              if (nodeTiming > timing) {
+                const duration = nodeTiming - timing
+                const existing = events[timing].hold.find(([lane]: [number, number]) => lane === note.lane)
+                if (existing) {
+                  existing[1] = Math.max(existing[1], duration)
+                } else {
+                  events[timing].hold.push([note.lane, duration])
+                }
+              }
+            }
+          }
+
+          if (isIntermediate) {
+            current.end.forEach((child: ExtendedNoteData) => {
+              traverseEndpoints(child)
+            })
+          }
+        }
+
+        if (note.end && Array.isArray(note.end) && note.end.length > 0) {
+          note.end.forEach((child: ExtendedNoteData) => {
+            traverseEndpoints(child)
+          })
+        }
       // フリック
       } else if ([3, 4, 6, 7].includes(note.type)) {
         events[timing].sound = true
@@ -759,7 +821,10 @@ const previewDelay = computed(() => measures.value.length * 10 + 100)
   margin-left: calc(100% - 420px);
 }
 .object-based-preview {
+  width: 420px;
+  margin-left: calc(100% - 420px);
   bottom: unset !important;
+  box-sizing: border-box;
 }
 .control {
   position: fixed;
