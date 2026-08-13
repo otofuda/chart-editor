@@ -98,10 +98,10 @@
     <div class="control">
       <v-expansion-panels accordionn tile>
         <v-expansion-panel>
-          <v-expansion-panel-header>
+          <v-expansion-panel-title>
             <v-btn
               class="mr-1"
-              outlined
+              variant="outlined"
               color="success"
               @click.stop="previewStart"
               :disabled="isPreviewing || isObjectBasedPreview"
@@ -110,15 +110,15 @@
             </v-btn>
             <v-btn
               class="ml-2 mr-2"
-              outlined
+              variant="outlined"
               color="error"
               @click.stop="previewStop"
             >
               <v-icon left>mdi-stop</v-icon> 停止
             </v-btn>
-          </v-expansion-panel-header>
+          </v-expansion-panel-title>
 
-          <v-expansion-panel-content>
+          <v-expansion-panel-text>
             <v-text-field
               class="mb-4"
               v-model.number="startFrom"
@@ -126,72 +126,76 @@
               prepend-icon="mdi-numeric-0-box-multiple-outline"
               label="再生開始小節"
               suffix="小節から"
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
             ></v-text-field>
 
-            <h4 class="my-2">
+            <h4 class="d-flex my-2">
               <v-icon>mdi-music-note</v-icon>
               表示とサウンド
             </h4>
             <v-checkbox
-              class="mt-2"
               v-model="isShowCheckbox"
               label="チェックボックスを表示"
               hide-details
+              density="compact"
             ></v-checkbox>
             <v-checkbox
-              class="mt-2"
               v-model="isPlayKeySound"
               label="打鍵音を再生 (β)"
               hide-details
+              density="compact"
             ></v-checkbox>
             <v-checkbox
-              class="mt-2"
               v-model="isPlayKeySoundEnd"
               label="LN終点音を再生 (α)"
               hide-details
+              density="compact"
             ></v-checkbox>
             <v-checkbox
-              class="mt-2"
               v-model="isShowKeybeam"
               label="キービームとコンボを表示"
+              density="compact"
               persistent-hint
               hint="以下2つはこの機能が有効でない場合効果がありません"
             ></v-checkbox>
             <v-checkbox
-              class="mt-2 ml-6"
+              class="ml-6"
               v-model="isShowFlickEffect"
               :disabled="!isShowKeybeam"
               label="フリックエフェクト (β)"
               hide-details
+              density="compact"
             ></v-checkbox>
             <v-checkbox
-              class="mt-2 ml-6"
+              class="ml-6"
               v-model="isShowHandguide"
               :disabled="!isShowKeybeam"
               label="LeapMotion補助線をシミュレート (α)"
               hide-details
+              density="compact"
             ></v-checkbox>
             <v-checkbox
-              class="mt-2"
               v-model="isSimulateLED"
               label="LED制御をシミュレート (β)"
               hide-details
+              density="compact"
             ></v-checkbox>
             <v-checkbox
-              class="mt-2"
               v-model="isPlayGuide"
               label="小節ガイド音を再生"
               hide-details
+              density="compact"
             ></v-checkbox>
 
             <v-switch
               v-model="isObjectBasedPreview"
               label="Object表示モード"
+              hide-details
+              density="compact"
             ></v-switch>
 
-            <h4 class="my-4">
+            <h4 class="d-flex my-2">
               <v-icon>mdi-tune</v-icon>
               再生オプション
             </h4>
@@ -202,8 +206,8 @@
               persistent-hint
               append-icon="mdi-arrow-collapse-up"
               label="LIFT"
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
             ></v-text-field>
             <v-text-field
               class="mb-2"
@@ -212,8 +216,8 @@
               persistent-hint
               append-icon="mdi-arrow-collapse-down"
               label="SUDDEN"
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
             ></v-text-field>
             <v-text-field
               v-model.number="hidden"
@@ -221,11 +225,11 @@
               persistent-hint
               append-icon="mdi-eye-off"
               label="HIDDEN"
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
             ></v-text-field>
 
-            <h4 class="my-4">
+            <h4 class="d-flex my-2">
               <v-icon>mdi-tune</v-icon>
               詳細設定
             </h4>
@@ -237,8 +241,8 @@
               persistent-hint
               append-icon="mdi-arrow-up"
               label="コンボ表示位置"
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
             ></v-text-field>
             <v-text-field
               class="mb-2"
@@ -247,27 +251,30 @@
               persistent-hint
               append-icon="mdi-arrow-expand-up"
               label="判定位置調整(β)"
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
             ></v-text-field>
             <v-text-field
               v-model.number="keybeamLength"
               append-icon="mdi-arrow-expand-vertical"
               label="キービームの長さ"
               suffix="px"
-              outlined
+              variant="outlined"
               hide-details
-              dense
+              density="compact"
             ></v-text-field>
-            <v-subheader>コンボ数の透明度</v-subheader>
+            <div class="my-4">
+              コンボ数の透明度
+            </div>
             <v-slider
               v-model.number="comboOpacity"
               hide-details
               max="100"
               min="0"
+              step="5"
               thumb-label="always"
             ></v-slider>
-          </v-expansion-panel-content>
+          </v-expansion-panel-text>
         </v-expansion-panel>
       </v-expansion-panels>
     </div>
@@ -305,7 +312,7 @@
         bottom: `${Number(lift) + Number(comboOffset)}px`
       }"
     >
-      <strong ref="currentCombo">0</strong>
+      <strong ref="currentComboEl">0</strong>
       COMBO
     </div>
 
@@ -332,504 +339,435 @@
   </div>
 </template>
 
-<script lang="ts">
-import "buryjs";
-import html2canvas from "html2canvas";
-import Vue, { PropType } from "vue";
+<script setup lang="ts">
+import { ref, computed, inject, watch, onMounted } from 'vue'
 import {
-  DifficultyString,
-  ExtendedNoteData,
-  Measure,
-  PreviewEvent,
-  PreviewEvents
-} from "../types";
+  type DifficultyString,
+  type ExtendedNoteData,
+  type Measure,
+  type PreviewEvent,
+  type PreviewEvents
+} from '../types'
 
-import MeasureComponent from "./Measure.vue";
-import ObjectBasedMeasure from "./ObjectBasedMeasure.vue";
-import LongNote from "./LongNote.vue";
-import NoteShadow from "./NoteShadow.vue";
+import MeasureComponent from './Measure.vue'
+import ObjectBasedMeasure from './ObjectBasedMeasure.vue'
+import LongNote from './LongNote.vue'
+import NoteShadow from './NoteShadow.vue'
+import { showSnackbarKey } from '@/composables/injectionKeys'
 
-export default Vue.extend({
-  name: "ThePreview",
-  inject: ["showSnackbar"],
-  props: {
-    currentChart: {
-      type: Array as PropType<ExtendedNoteData[]>,
-      default: () => []
-    },
-    currentDifficulty: {
-      type: String as PropType<DifficultyString>,
-      default: "easy"
-    },
-    measureData: {
-      type: Array as PropType<Measure[]>,
-      default: () => []
-    },
-    previewAudio: {
-      type: HTMLAudioElement
-    },
-    audioVolume: {
-      type: Number,
-      default: 100
-    },
-    infoObject: {
-      type: Object,
-      required: true
-    },
-    appendNote: {
-      type: Object as PropType<ExtendedNoteData>,
-      required: false,
-      default: null
-    },
-    preAppendNotes: {
-      type: Array as PropType<ExtendedNoteData[]>,
-      required: false,
-      default: null
-    },
-    isShowDetail: {
-      type: Boolean,
-      default: false
-    },
-    isCaptureMode: {
-      type: Boolean,
-      default: false
-    },
-    isPreviewMode: {
-      type: Boolean,
-      default: false
-    },
-    isImageMode: {
-      type: Boolean,
-      default: false
-    }
-  },
-  data() {
-    return {
-      isPreviewing: false,
-      returnPosition: -1, // 戻る座標
-      currentPosition: 0,
-      timeoutIds: new Array<number>(),
-      intervalId: null, // 小節プレビューセット用
-      startFrom: 0,
-      currentMeasure: 0,
-      currentBpm: 0,
-      currentBeat: 0,
-      currentCombo: 0, // プレビューするコンボ数
-      isShowCheckbox: false,
-      isShowKeybeam: false,
-      isShowHandguide: false,
-      isShowFlickEffect: false,
-      isSimulateLED: false,
-      isPlayGuide: false,
-      eventIds: new Array<number>(),
-      isPlayKeySound: false,
-      isPlayKeySoundEnd: false,
-      guideAudio: new Audio("/chart-editor/guide.mp3"),
-      defaultLEDColor: "linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)",
-      lift: Number(localStorage.getItem("chart-editor__lift")) || 0, // LIFTオプション
-      sudden: Number(localStorage.getItem("chart-editor__sudden")) || 0, // SUDDENオプション
-      hidden: Number(localStorage.getItem("chart-editor__hidden")) || 0, // HIDDENオプション
-      comboOffset: 60, // コンボ表示位置
-      drawOffset: 0, // 描画オフセット
-      keybeamLength: 100, // キービームの長さ
-      comboOpacity: 50, // コンボ数の透明度
-      isObjectBasedPreview: false // オブジェクト表示モード
-    };
-  },
-  watch: {
-    lift(value: number) { localStorage.setItem("chart-editor__lift", String(value)) },
-    sudden(value: number) { localStorage.setItem("chart-editor__sudden", String(value)) },
-    hidden(value: number) { localStorage.setItem("chart-editor__hidden", String(value)) }
-  },
-  methods: {
-    screenshot() {
-      html2canvas(document.querySelector(".preview")!, {
-        allowTaint: true
-      }).then(canvas => {
-        document.querySelector(".panel")!.appendChild(canvas);
-      });
-    },
-    // 特定小節内のノーツを取得
-    getMeasureNotes(measureNumber: number) {
-      return this.currentChart.filter(note => note.measure === measureNumber);
-    },
-    playFromMeasure() {
-      const startOffset = this.startOffset;
+const props = defineProps<{
+  currentChart?: ExtendedNoteData[]
+  currentDifficulty?: DifficultyString
+  measureData?: Measure[]
+  previewAudio?: HTMLAudioElement
+  audioVolume?: number
+  infoObject: { bpm: number; beat: number; offset: number; version: number }
+  appendNote?: ExtendedNoteData | null
+  preAppendNotes?: ExtendedNoteData[] | null
+  isShowDetail?: boolean
+  isCaptureMode?: boolean
+  isPreviewMode?: boolean
+  isImageMode?: boolean
+}>()
 
-      const audioDelay =
-        (60 / this.infoObject.bpm) * this.infoObject.beat * 1000;
+const showSnackbar = inject(showSnackbarKey)!
 
-      setTimeout(() => {
-        // eslint-disable-next-line vue/no-mutating-props
-        this.previewAudio.volume = this.audioVolume / 100;
-        // eslint-disable-next-line vue/no-mutating-props
-        this.previewAudio.currentTime = startOffset / 1000;
-        this.previewAudio.play();
-      }, audioDelay);
+// refs for DOM elements
+const preview = ref<HTMLElement | null>(null)
+const keybeams = ref<HTMLElement | null>(null)
+const currentComboEl = ref<HTMLElement | null>(null)
+const handguide = ref<HTMLElement | null>(null)
+const LEDLeft = ref<HTMLElement | null>(null)
+const LEDRight = ref<HTMLElement | null>(null)
+const LEDLeftShadow = ref<HTMLElement | null>(null)
+const LEDRightShadow = ref<HTMLElement | null>(null)
 
-      // let index = 0;
-      // let delay = this.previewDelay;
-      // this.intervalId = setInterval(() => {
-      //   const measure = this.measureData[index] || {};
-      //   const next = this.measureData[index + 1] || {};
+const isPreviewing = ref(false)
+const returnPosition = ref(-1) // 戻る座標
+const currentPosition = ref(0)
+const timeoutIds = ref<number[]>([])
+const startFrom = ref(0)
+const currentMeasure = ref(0)
+const currentBpm = ref(0)
+const currentBeat = ref(0)
+const currentCombo = ref(0) // プレビューするコンボ数
+const isShowCheckbox = ref(false)
+const isShowKeybeam = ref(false)
+const isShowHandguide = ref(false)
+const isShowFlickEffect = ref(false)
+const isSimulateLED = ref(false)
+const isPlayGuide = ref(false)
+const eventIds = ref<number[]>([])
+const isPlayKeySound = ref(false)
+const isPlayKeySoundEnd = ref(false)
+const defaultLEDColor = 'linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)'
+const lift = ref(Number(localStorage.getItem('chart-editor__lift')) || 0) // LIFTオプション
+const sudden = ref(Number(localStorage.getItem('chart-editor__sudden')) || 0) // SUDDENオプション
+const hidden = ref(Number(localStorage.getItem('chart-editor__hidden')) || 0) // HIDDENオプション
+const comboOffset = ref(60) // コンボ表示位置
+const drawOffset = ref(0) // 描画オフセット
+const keybeamLength = ref(100) // キービームの長さ
+const comboOpacity = ref(50) // コンボ数の透明度
+const isObjectBasedPreview = ref(false) // オブジェクト表示モード
 
-      //   if (measure.measureReachTime > startOffset) {
-      //     this.timeoutIds.append(
-      //       setTimeout(() => {
-      //         this.currentMeasure = measure.measure;
-      //         this.currentPosition = next.measurePositionBottom;
-      //         this.currentBpm = measure.measureBpm;
-      //         this.currentBeat = measure.measureBeat;
-      //         const transitionTime =
-      //           next.measureReachTime - measure.measureReachTime;
-      //         this.$refs.preview.style.transition = `${transitionTime}ms all linear`;
-      //         this.$refs.preview.style.bottom = `-${this.currentPosition}px`;
-      //       }, measure.measureReachTime - index * 10 - startOffset)
-      //     );
-      //   }
-      //   index++;
-      //   delay -= 10;
-      //   console.log(delay);
-      //   if (index * 10 + 100 >= this.previewDelay)
-      //     clearInterval(this.intervalId);
-      // }, 10);
+// Web Audio API による低遅延・ゼロアロケーション再生
+const guideAudioUrl = `${import.meta.env.BASE_URL}guide.mp3`
+let audioContext: AudioContext | null = null
+let guideAudioBuffer: AudioBuffer | null = null
 
-      this.measureData.forEach((measure, index) => {
-        const next = this.measureData[index + 1] || {};
-        if (measure.measureReachTime > startOffset) {
-          const diff = measure.measureLength === 0 ? -30 : 0;
-          this.timeoutIds.push(
-            setTimeout(() => {
-              this.currentPosition = next.measurePositionBottom;
-              const transitionTime =
-                next.measureReachTime - measure.measureReachTime;
-              const elem = this.$refs.preview as HTMLElement;
-              // 瞬間移動の場合
-              console.log('warp confirm', measure.measureLength);
-              if (measure.measureLength === 0) {
-                console.log('warp', this.currentPosition);
-                elem.style.transition = 'none';
-                elem.style.bottom = `-${this.currentPosition}px`;
-                return;
-              }
-              elem.style.transition = `${transitionTime}ms all linear`;
-              elem.style.bottom = `-${this.currentPosition}px`;
-              // 小節ガイド音再生
-              if (this.isPlayGuide) {
-                this.guideAudio.currentTime = 0;
-                this.guideAudio.play();
-              }
-            }, measure.measureReachTime - startOffset + diff)
-          );
-        }
-      });
-      this.setNoteEvents(startOffset);
-    },
-    playFromZero() {
-      // 拍子木分オフセット
-      setTimeout(() => {
-        // eslint-disable-next-line vue/no-mutating-props
-        this.previewAudio.currentTime = 0;
-        // eslint-disable-next-line vue/no-mutating-props
-        this.previewAudio.volume = this.audioVolume / 100;
-        this.previewAudio.play();
-      }, (60 / this.infoObject.bpm) * this.infoObject.beat * 1000);
-      // 1小節ずつプレビュー
-      const measureData = [...this.measureData];
-      measureData.forEach((measure, index) => {
-        const next = measureData[index + 1] || {};
-        const diff = measure.measureLength === 0 ? -30 : 0;
-        this.timeoutIds.append(
-          setTimeout(() => {
-            this.currentPosition = next.measurePositionBottom;
-            const transitionTime =
-              next.measureReachTime - measure.measureReachTime;
-            const elem = this.$refs.preview as HTMLElement;
-            elem.style.transition = `${transitionTime}ms all linear`;
-            elem.style.bottom = `-${this.currentPosition}px`;
-            // 小節ガイド音再生
-            if (this.isPlayGuide) {
-              this.guideAudio.currentTime = 0.1;
-              this.guideAudio.play();
-            }
-          }, measure.measureReachTime + diff)
-        );
-      });
-      this.setNoteEvents(0);
-    },
-    // NoteEvents(ノート到達時イベント)をセットする
-    setNoteEvents(offset: number) {
-      let prevMoveTiming = -500;
-      let prevMoveTimer: number | null = null;
-      const isShowFlickEffect = this.isShowFlickEffect;
-      const isShowHandguide = this.isShowHandguide;
-      Object.entries(this.previewEvents).forEach(([timing, event]: [string, PreviewEvent]) => {
-        const time = Number(timing) - offset;
-        const keybeamDOMs = (this.$refs.keybeams as HTMLElement).querySelectorAll("div");
-        const comboDOM = this.$refs.currentCombo as HTMLElement;
-        const handguideDOM = this.$refs.handguide as HTMLElement;
-        if (time > 0) {
-          this.eventIds.push(
-            setTimeout(() => {
-              // 打鍵音を再生
-              if (event.sound && this.isPlayKeySound) {
-                const keySound = new Audio("/chart-editor/guide.mp3");
-                keySound.currentTime = 0.1;
-                keySound.play();
-              }
-              // キービームを出す
-              if (this.isShowKeybeam) {
-                // 単押し
-                event.lane.each((num: number) => {
-                  keybeamDOMs[num].classList.add("-on");
-                });
-                setTimeout(() => {
-                  event.lane.each((num: number) => {
-                    keybeamDOMs[num].classList.remove("-on");
-                  });
-                }, 25);
-                // LN(ホールド)
-                event.hold.each(([num, delay]: [number, number]) => {
-                  keybeamDOMs[num].classList.add("-hold");
-                  this.eventIds.push(
-                    setTimeout(() => {
-                      keybeamDOMs[num].classList.remove("-hold");
-                      // hold配列の分、終点時にコンボ増加
-                      this.currentCombo += 1;
-                      comboDOM.textContent = String(this.currentCombo);
-                      // 終点音を再生
-                      if (
-                        event.sound &&
-                        this.isPlayKeySound &&
-                        this.isPlayKeySoundEnd
-                      ) {
-                        const keySound = new Audio("/chart-editor/guide.mp3");
-                        keySound.currentTime = 0.1;
-                        keySound.play();
-                      }
-                    }, delay)
-                  );
-                });
-                // フリックエフェクト
-                if (event.handMove && isShowFlickEffect && event.noteObject) {
-                  const effectDOM = document.createElement("div");
-                  effectDOM.classList.add("flick-effect", event.handMove);
-                  (this.$refs.keybeams as HTMLElement).appendChild(effectDOM);
-                  // 座標計算
-                  const _left = (event.noteObject.lane - 1) * 60 + 30;
-                  let _offset = 0;
-                  let _width = Number(event.noteObject.option[0]) || 3;
-                  if (event.noteObject.option[1] && event.noteObject.option[2])
-                    _offset =
-                      (Number(event.noteObject.option[1]) /
-                        Number(event.noteObject.option[2])) *
-                      60;
-                  if (_width === -1) _width = 3;
-                  effectDOM.style.left = `${_left -
-                    (_width / 2) * 60 +
-                    _offset}px`;
-                  effectDOM.style.width = `${60 * _width}px`;
-                  // 消えるタイマーのセット
-                  setTimeout(() => {
-                    (this.$refs.keybeams as HTMLElement).removeChild(effectDOM);
-                  }, 250);
-                }
-                // コンボ数
-                this.currentCombo += event.count;
-                comboDOM.textContent = String(this.currentCombo);
-              }
-              // ハンドガイド(手の動き)をシミュレート
-              if (isShowHandguide) {
-                if (event.handMove) {
-                  handguideDOM.classList.add(event.handMove);
-                  if (prevMoveTimer && Number(timing) - prevMoveTiming > 200) {
-                    clearTimeout(prevMoveTimer);
-                  }
-                  prevMoveTimer = setTimeout(() => {
-                    handguideDOM.classList.remove(event.handMove as string);
-                  }, 200);
-                  prevMoveTiming = Number(timing);
-                }
-              }
-              // LEDを指定色に変化
-              if (this.isSimulateLED && event.color) {
-                this.setLEDColor(event.color);
-              }
-            }, time)
-          );
-        } else {
-          this.currentCombo += event.count + event.hold.size;
-          if (this.isSimulateLED && event.color) this.setLEDColor(event.color);
-        }
-      });
-    },
-    previewStart() {
-      if (!this.measureData[this.startFrom]) {
-        // @ts-ignore "showSnackbar"
-        this.showSnackbar(`${this.startFrom}小節はありません`);
-        return false;
-      }
-      this.returnPosition = window.scrollY; // 停止後に戻る座標
-      this.isPreviewing = true;
-      this.currentCombo = 0;
-      (this.$refs.currentCombo as HTMLElement).textContent = String(this.currentCombo);
-      // this.$refs.preview.style.transition = `${this.measureData.first.measureReachTime}ms all linear`;
-      (this.$refs.preview as HTMLElement).style.bottom = `-${this.measureData.first.measurePositionBottom}px`;
-      (this.$refs.preview as HTMLElement).style.transition = "none";
-      if (this.startFrom === 0) this.playFromZero();
-      else this.playFromMeasure();
-    },
-    previewStop() {
-      this.previewAudio.pause();
-      this.isPreviewing = false;
-      this.currentPosition = 0;
-      this.currentBpm = 0;
-      this.currentBeat = 0;
-      this.currentCombo = 0;
-      this.setLEDColor();
-      (this.$refs.keybeams as HTMLElement)
-        ?.querySelectorAll("div")
-        .forEach(dom => dom.classList.remove("-hold"));
-      (this.$refs.handguide as HTMLElement).classList.remove("-left", "-right");
-      (this.$refs.preview as HTMLElement).style.transition = "0ms all linear";
-      (this.$refs.preview as HTMLElement).style.bottom = "0px";
-      this.timeoutIds.each((id: number) => clearInterval(id));
-      this.timeoutIds = [];
-      this.eventIds.each((id: number) => clearInterval(id));
-      this.eventIds = [];
-      if (this.returnPosition >= 0) {
-        setTimeout(() => {
-          window.scrollTo({ top: this.returnPosition, behavior: 'auto' });
-          this.returnPosition = -1;
-        }, 50);
-      }
-    },
-    setLEDColor(color?: string) {
-      (this.$refs.LEDLeft as HTMLElement).style.background = color || this.defaultLEDColor;
-      (this.$refs.LEDRight as HTMLElement).style.background = color || this.defaultLEDColor;
-
-      if (this.isPreviewMode) {
-        (this.$refs.LEDLeftShadow as HTMLElement).style.background =
-          color || this.defaultLEDColor;
-        (this.$refs.LEDRightShadow as HTMLElement).style.background =
-          color || this.defaultLEDColor;
-      }
-    }
-  },
-  computed: {
-    // 全体からロングノーツ(＋ロングのダミー)だけを取得
-    longNotes(): ExtendedNoteData[] {
-      return this.currentChart.filter(note => {
-        return note.type === 2 || (note.type === 90 && note.option[0] === "2")
-      });
-    },
-    // ノートの到達イベント情報を生成
-    previewEvents(): PreviewEvents {
-      const events: PreviewEvents = {};
-      if (this.isPlayKeySound || this.isShowKeybeam || this.isSimulateLED) {
-        this.currentChart.each((note: ExtendedNoteData) => {
-          const measure = this.measureData[note.measure];
-          const timing =
-            measure.measureReachTime +
-            (note.position / note.split) * measure.measureLength;
-          // タイミングをkeyにイベント情報をセット
-          if (!events[timing] && [1, 2, 3, 4, 5, 6, 7, 96].includes(note.type))
-            events[timing] = {
-              timing, // 到達時間(ms)
-              lane: [], // キービームを出すレーン番号
-              hold: [], // キービームを出し続けるレーン番号
-              holdEnd: [], // キービームを止めるレーン番号
-              color: null, // LED変化の色
-              count: 0, // 増加するコンボ数
-              sound: false, // 再生するタップ音
-              handMove: null, // 手の動き(LeapMotion)
-              noteObject: null // ノートのオブジェクト(Type: 3, 4のみ)
-            };
-          // 通常
-          if (note.type === 1) {
-            events[timing].sound = true;
-            events[timing].count += 1;
-            events[timing].lane = events[timing].lane.append(note.lane).uniq;
-          }
-          // LN(始点と終点が同レーンの前提)
-          else if (note.type === 2) {
-            events[timing].sound = true;
-            note.end.each((end: ExtendedNoteData) => {
-              const endMeasure = this.measureData[end.measure];
-              const endTiming =
-                endMeasure.measureReachTime +
-                (end.position / end.split) * endMeasure.measureLength;
-              events[timing].hold = events[timing].hold.append([
-                note.lane, // キービームをホールドするレーン
-                endTiming - timing // ホールドする時間(ms)
-              ]);
-            });
-          }
-          // フリック
-          else if (note.type === 3 || note.type === 4 || note.type === 6 || note.type === 7) {
-            events[timing].sound = true;
-            events[timing].count += 1;
-            events[timing].noteObject = note;
-            // 手の動き LeapMotion補助線
-            switch (note.type) {
-              case 3:
-                events[timing].handMove = "-left";
-                break;
-              case 4:
-                events[timing].handMove = "-right";
-                break;
-              case 6:
-                events[timing].handMove = "-up";
-                break;
-              case 7:
-                events[timing].handMove = "-down";
-                break;
-            }
-          }
-          // 音札
-          else if (note.type === 5) {
-            events[timing].sound = true;
-            events[timing].count += 1;
-            events[timing].lane = events[timing].lane.append(0).uniq;
-          }
-          // LED制御
-          else if (note.type === 96) {
-            // (-1, -1, -1)の時はデフォルトに戻す
-            if (
-              Number(note.option[0]) === -1 &&
-              Number(note.option[1]) === -1 &&
-              Number(note.option[2]) === -1
-            ) {
-              events[timing].color = this.defaultLEDColor;
-            } else
-              events[
-                timing
-              ].color = `rgb(${note.option[0]},${note.option[1]},${note.option[2]})`;
-          }
-        });
-      }
-      return events;
-    },
-    entireHeight(): number {
-      return (
-        this.measureData.last?.measurePositionBottom +
-        this.measureData.last?.measureHeight
-      );
-    },
-    startOffset(): number {
-      return this.measureData[this.startFrom].measureReachTime;
-    },
-    previewDelay(): number {
-      return this.measureData.size * 10 + 100;
-    }
-  },
-  components: {
-    MeasureComponent,
-    ObjectBasedMeasure,
-    LongNote,
-    NoteShadow
+function getAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  const AudioCtx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  if (!AudioCtx) return null
+  if (!audioContext) {
+    audioContext = new AudioCtx()
   }
-});
+  return audioContext
+}
+
+async function loadGuideBuffer(): Promise<void> {
+  if (guideAudioBuffer || typeof window === 'undefined') return
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const res = await fetch(guideAudioUrl)
+    const arrayBuffer = await res.arrayBuffer()
+    guideAudioBuffer = await ctx.decodeAudioData(arrayBuffer)
+  } catch {
+    // 音声ロード失敗時は非致命的
+  }
+}
+
+function playGuideSound(offsetSeconds: number = 0): void {
+  const ctx = getAudioContext()
+  if (!ctx || !guideAudioBuffer) return
+  if (ctx.state === 'suspended') {
+    ctx.resume()
+  }
+  try {
+    const source = ctx.createBufferSource()
+    source.buffer = guideAudioBuffer
+    source.connect(ctx.destination)
+    source.start(0, offsetSeconds)
+  } catch {
+    // 再生エラーは無視
+  }
+}
+
+onMounted(() => {
+  loadGuideBuffer()
+})
+
+watch(lift, (v) => localStorage.setItem('chart-editor__lift', String(v)))
+watch(sudden, (v) => localStorage.setItem('chart-editor__sudden', String(v)))
+watch(hidden, (v) => localStorage.setItem('chart-editor__hidden', String(v)))
+
+const chart = computed(() => props.currentChart ?? [])
+const measures = computed(() => props.measureData ?? [])
+
+// 特定小節内のノーツを取得
+function getMeasureNotes(measureNumber: number) {
+  return chart.value.filter(note => note.measure === measureNumber)
+}
+
+function setLEDColor(color?: string) {
+  if (LEDLeft.value) LEDLeft.value.style.background = color || defaultLEDColor
+  if (LEDRight.value) LEDRight.value.style.background = color || defaultLEDColor
+  if (props.isPreviewMode) {
+    if (LEDLeftShadow.value) LEDLeftShadow.value.style.background = color || defaultLEDColor
+    if (LEDRightShadow.value) LEDRightShadow.value.style.background = color || defaultLEDColor
+  }
+}
+
+function playFromMeasure() {
+  const _startOffset = startOffset.value
+  const audioDelay = (60 / props.infoObject.bpm) * props.infoObject.beat * 1000 // 拍子木分オフセット
+  setTimeout(() => {
+    if (props.previewAudio) {
+      props.previewAudio.volume = (props.audioVolume ?? 100) / 100
+      props.previewAudio.currentTime = _startOffset / 1000
+      props.previewAudio.play()
+    }
+  }, audioDelay)
+
+  measures.value.forEach((measure, index) => {
+    const next = measures.value[index + 1] as Measure | undefined
+    if (measure.measureReachTime > _startOffset) {
+      const diff = measure.measureLength === 0 ? -30 : 0
+      timeoutIds.value.push(
+        setTimeout(() => {
+          currentPosition.value = next?.measurePositionBottom ?? 0
+          const transitionTime = (next?.measureReachTime ?? 0) - measure.measureReachTime
+          const elem = preview.value
+          if (!elem) return
+          if (measure.measureLength === 0) {
+            // 瞬間移動の場合
+            elem.style.transition = 'none'
+            elem.style.bottom = `-${currentPosition.value}px`
+            return
+          }
+          elem.style.transition = `${transitionTime}ms all linear`
+          elem.style.bottom = `-${currentPosition.value}px`
+          if (isPlayGuide.value) {
+            // 小節ガイド音再生
+            playGuideSound(0)
+          }
+        }, measure.measureReachTime - _startOffset + diff) as unknown as number
+      )
+    }
+  })
+  setNoteEvents(_startOffset)
+}
+
+function playFromZero() {
+  setTimeout(() => {
+    if (props.previewAudio) {
+      props.previewAudio.currentTime = 0
+      props.previewAudio.volume = (props.audioVolume ?? 100) / 100
+      props.previewAudio.play()
+    }
+  }, (60 / props.infoObject.bpm) * props.infoObject.beat * 1000)
+
+  // 1小節ずつプレビュー
+  measures.value.forEach((measure, index) => {
+    const next = measures.value[index + 1] as Measure | undefined
+    const diff = measure.measureLength === 0 ? -30 : 0
+    timeoutIds.value.push(
+      setTimeout(() => {
+        currentPosition.value = next?.measurePositionBottom ?? 0
+        const transitionTime = (next?.measureReachTime ?? 0) - measure.measureReachTime
+        const elem = preview.value
+        if (!elem) return
+        elem.style.transition = `${transitionTime}ms all linear`
+        elem.style.bottom = `-${currentPosition.value}px`
+        if (isPlayGuide.value) {
+          // 小節ガイド音再生
+          playGuideSound(0.1)
+        }
+      }, measure.measureReachTime + diff) as unknown as number
+    )
+  })
+  setNoteEvents(0)
+}
+
+// NoteEvents(ノート到達時イベント)をセットする
+function setNoteEvents(offset: number) {
+  let prevMoveTiming = -500
+  let prevMoveTimer: number | null = null
+  const _isShowFlickEffect = isShowFlickEffect.value
+  const _isShowHandguide = isShowHandguide.value
+
+  Object.entries(previewEvents.value).forEach(([timing, event]: [string, PreviewEvent]) => {
+    const time = Number(timing) - offset
+    const keybeamDOMs = keybeams.value?.querySelectorAll('div')
+    const comboDOM = currentComboEl.value
+    const handguideDOM = handguide.value
+
+    if (time > 0) {
+      eventIds.value.push(
+        setTimeout(() => {
+          // 打鍵音を再生
+          if (event.sound && isPlayKeySound.value) {
+            playGuideSound(0.1)
+          }
+          // キービームを出す
+          if (isShowKeybeam.value && keybeamDOMs) {
+            // 単押し
+            event.lane.forEach((num: number) => { keybeamDOMs[num].classList.add('-on') })
+            setTimeout(() => {
+              event.lane.forEach((num: number) => { keybeamDOMs[num].classList.remove('-on') })
+            }, 25)
+            // LN(ホールド)
+            event.hold.forEach(([num, delay]: [number, number]) => {
+              keybeamDOMs[num].classList.add('-hold')
+              eventIds.value.push(
+                setTimeout(() => {
+                  keybeamDOMs[num].classList.remove('-hold')
+                  // hold配列の分、終点時にコンボ増加
+                  currentCombo.value += 1
+                  if (comboDOM) comboDOM.textContent = String(currentCombo.value)
+                  // 終点音を再生
+                  if (event.sound && isPlayKeySound.value && isPlayKeySoundEnd.value) {
+                    playGuideSound(0.1)
+                  }
+                }, delay) as unknown as number
+              )
+            })
+            // フリックエフェクト
+            if (event.handMove && _isShowFlickEffect && event.noteObject && keybeams.value) {
+              const effectDOM = document.createElement('div')
+              effectDOM.classList.add('flick-effect', event.handMove)
+              keybeams.value.appendChild(effectDOM)
+              // 座標計算
+              const _left = (event.noteObject.lane - 1) * 60 + 30
+              let _offset = 0
+              let _width = Number(event.noteObject.option[0]) || 3
+              if (event.noteObject.option[1] && event.noteObject.option[2])
+                _offset = (Number(event.noteObject.option[1]) / Number(event.noteObject.option[2])) * 60
+              if (_width === -1) _width = 3
+              effectDOM.style.left = `${_left - (_width / 2) * 60 + _offset}px`
+              effectDOM.style.width = `${60 * _width}px`
+              // 消えるタイマーのセット
+              setTimeout(() => { keybeams.value?.removeChild(effectDOM) }, 250)
+            }
+            // コンボ数
+            currentCombo.value += event.count
+            if (comboDOM) comboDOM.textContent = String(currentCombo.value)
+          }
+          // ハンドガイド(手の動き)をシミュレート
+          if (_isShowHandguide && handguideDOM) {
+            if (event.handMove) {
+              handguideDOM.classList.add(event.handMove)
+              if (prevMoveTimer && Number(timing) - prevMoveTiming > 200) clearTimeout(prevMoveTimer)
+              prevMoveTimer = setTimeout(() => {
+                handguideDOM.classList.remove(event.handMove as string)
+              }, 200) as unknown as number
+              prevMoveTiming = Number(timing)
+            }
+          }
+          // LEDを指定色に変化
+          if (isSimulateLED.value && event.color) setLEDColor(event.color)
+        }, time) as unknown as number
+      )
+    } else {
+      currentCombo.value += event.count + event.hold.length
+      if (isSimulateLED.value && event.color) setLEDColor(event.color)
+    }
+  })
+}
+
+function previewStart() {
+  if (!measures.value[startFrom.value]) {
+    showSnackbar(`${startFrom.value}小節はありません`)
+    return false
+  }
+  const ctx = getAudioContext()
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume()
+  }
+  returnPosition.value = window.scrollY // 停止後に戻る座標
+  isPreviewing.value = true
+  currentCombo.value = 0
+  if (currentComboEl.value) currentComboEl.value.textContent = String(currentCombo.value)
+  const elem = preview.value
+  if (elem) {
+    elem.style.bottom = `-${measures.value.at(0)?.measurePositionBottom ?? 0}px`
+    elem.style.transition = 'none'
+  }
+  if (startFrom.value === 0) playFromZero()
+  else playFromMeasure()
+}
+
+function previewStop() {
+  if (props.previewAudio) props.previewAudio.pause()
+  isPreviewing.value = false
+  currentPosition.value = 0
+  currentBpm.value = 0
+  currentBeat.value = 0
+  currentCombo.value = 0
+  setLEDColor()
+  keybeams.value?.querySelectorAll('div').forEach(dom => dom.classList.remove('-hold'))
+  handguide.value?.classList.remove('-left', '-right')
+  if (preview.value) {
+    preview.value.style.transition = '0ms all linear'
+    preview.value.style.bottom = '0px'
+  }
+  timeoutIds.value.forEach(id => clearInterval(id))
+  timeoutIds.value = []
+  eventIds.value.forEach(id => clearInterval(id))
+  eventIds.value = []
+  if (returnPosition.value >= 0) {
+    setTimeout(() => {
+      window.scrollTo({ top: returnPosition.value, behavior: 'auto' })
+      returnPosition.value = -1
+    }, 50)
+  }
+}
+
+// 全体からロングノーツ（＋ロングのダミー）だけを取得
+const longNotes = computed(() =>
+  chart.value.filter(note => note.type === 2 || (note.type === 90 && note.option[0] === '2'))
+)
+
+// ノートの到達イベント情報を生成
+const previewEvents = computed((): PreviewEvents => {
+  const events: PreviewEvents = {}
+  if (isPlayKeySound.value || isShowKeybeam.value || isSimulateLED.value) {
+    chart.value.forEach((note: ExtendedNoteData) => {
+      const measure = measures.value[note.measure]
+      if (!measure) return
+      const timing = measure.measureReachTime + (note.position / note.split) * measure.measureLength
+      if (!events[timing] && [1, 2, 3, 4, 5, 6, 7, 96].includes(note.type)) {
+        // タイミングをkeyにイベント情報をセット
+        events[timing] = {
+          timing, // 到達時間(ms)
+          lane: [], // キービームを出すレーン番号
+          hold: [], // キービームを出し続けるレーン番号
+          holdEnd: [], // キービームを止めるレーン番号
+          color: null, // LED変化の色
+          count: 0, // 増加するコンボ数
+          sound: false, // 再生するタップ音
+          handMove: null, // 手の動き(LeapMotion)
+          noteObject: null // ノートのオブジェクト(Type: 3, 4のみ)
+        }
+      }
+      // 通常
+      if (note.type === 1) {
+        events[timing].sound = true
+        events[timing].count += 1
+        if (!events[timing].lane.includes(note.lane)) events[timing].lane.push(note.lane)
+      // LN(始点と終点が同レーンの前提)
+      } else if (note.type === 2) {
+        events[timing].sound = true
+        note.end.forEach((end: ExtendedNoteData) => {
+          const endMeasure = measures.value[end.measure]
+          if (!endMeasure) return
+          const endTiming = endMeasure.measureReachTime + (end.position / end.split) * endMeasure.measureLength
+          events[timing].hold.push([
+            note.lane, // キービームをホールドするレーン
+            endTiming - timing // ホールドする時間(ms)
+          ])
+        })
+      // フリック
+      } else if ([3, 4, 6, 7].includes(note.type)) {
+        events[timing].sound = true
+        events[timing].count += 1
+        events[timing].noteObject = note
+        const moveMap: Record<number, '-left' | '-right' | '-up' | '-down'> = {
+          3: '-left',
+          4: '-right',
+          6: '-up',
+          7: '-down'
+        }
+        // 手の動き LeapMotion補助線
+        events[timing].handMove = moveMap[note.type]
+      // 音札
+      } else if (note.type === 5) {
+        events[timing].sound = true
+        events[timing].count += 1
+        if (!events[timing].lane.includes(0)) events[timing].lane.push(0)
+      // LED制御
+      } else if (note.type === 96) {
+        // (-1, -1, -1)の時はデフォルトに戻す
+        if (Number(note.option[0]) === -1 && Number(note.option[1]) === -1 && Number(note.option[2]) === -1) {
+          events[timing].color = defaultLEDColor
+        } else events[timing].color = `rgb(${note.option[0]},${note.option[1]},${note.option[2]})`
+      }
+    })
+  }
+  return events
+})
+
+const entireHeight = computed(() => {
+  const last = measures.value.at(-1)
+  return (last?.measurePositionBottom ?? 0) + (last?.measureHeight ?? 0)
+})
+
+const startOffset = computed(() => measures.value[startFrom.value]?.measureReachTime ?? 0)
+
+const previewDelay = computed(() => measures.value.length * 10 + 100)
 </script>
 
 <style lang="scss" scoped>
@@ -967,3 +905,4 @@ export default Vue.extend({
   }
 }
 </style>
+

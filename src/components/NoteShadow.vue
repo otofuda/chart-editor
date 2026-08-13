@@ -28,7 +28,7 @@
           : note.option[0]
         "
         :style="{
-          height: `${measureData.last.measureHeight * Number(note.option[2])}px`
+          height: `${measureData.at(-1)?.measureHeight * Number(note.option[2])}px`
         }"
         alt="texture"
       />
@@ -84,153 +84,110 @@
   </div>
 </template>
 
-<script lang="ts">
-import Vue, { PropType } from "vue";
-import { ExtendedNoteData, Measure } from '@/types';
+<script setup lang="ts">
+import { computed, inject } from 'vue'
+import { type ExtendedNoteData, type Measure } from '@/types'
+import { cancelNoteKey } from '@/composables/injectionKeys'
 
-export default Vue.extend({
-  inject: ["cancelNote"],
-  props: {
-    note: {
-      type: Object as PropType<ExtendedNoteData>,
-      required: true
-    },
-    measureData: {
-      type: Array as PropType<Measure[]>,
-      required: true
-    },
-    // 仮配置ノートかどうか
-    isPreAppend: {
-      type: Boolean,
-      default: false
-    }
-  },
-  methods: {
-    getLeft(note: ExtendedNoteData) {
-      // 引数のノートの描画用typeとoption配列を取得
-      const drawType = (note.type === 90) ? Number(note.option[0]) : note.type;
-      const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option;
+const props = defineProps<{
+  note: ExtendedNoteData
+  measureData: Measure[]
+  isPreAppend?: boolean // 仮配置ノートかどうか
+}>()
 
-      // TAP, ロング, 終点, 区切り線, コメント
-      if ([1, 2, 89, 95, 100].includes(drawType)) {
-        return (note.lane - 1) * 60;
-      }
-      // 左右フリック, 上下フリック
-      else if ([3, 4, 6, 7].includes(drawType)) {
-        let _width = Number(drawOptions[0]) || 3;
-        if (_width === -1) _width = 3;
-        let _left = (note.lane - 1) * 60 + 30;
-        let _offset = 0;
-        if (drawOptions[1] && drawOptions[2]) {
-          _offset = (Number(drawOptions[1]) / Number(drawOptions[2])) * 60;
-        }
-        return _left - (_width / 2) * 60 + _offset;
-      }
-      // テクスチャ
-      else if (drawType === 94) {
-        let _width = Number(drawOptions[1]) || 1;
-        let _left = (note.lane - 1) * 60 + 30;
-        let _offset = 0;
-        if (drawOptions[3] && drawOptions[4]) {
-          _offset = (Number(drawOptions[3]) / Number(drawOptions[4])) * 60;
-        }
-        return _left - (_width / 2) * 60 + _offset;
-      }
-      // LED制御
-      else if (drawType === 96) {
-        return -50;
-      }
-      // 音札, その他特殊ノーツ
-      else {
-        return 0;
-      }
-    },
-    getAbsoluteLeft(note: ExtendedNoteData) {
-      return this.getLeft(note) + 60;
-    },
-    getBottom(note: ExtendedNoteData) {
-      const targetMeasure =
-        this.measureData[note.measure] || this.measureData.last;
-      return (note.position / note.split) * targetMeasure.measureHeight;
-    },
-    getAbsoluteBottom(note: ExtendedNoteData) {
-      const targetMeasure = this.measureData[note.measure];
-      if (targetMeasure) {
-        return (
-          targetMeasure.measurePositionBottom +
-          (note.position / note.split) * targetMeasure.measureHeight
-        );
-      } else {
-        const lastMeasure = this.measureData.last;
-        const diff = note.measure - lastMeasure.measure;
-        return (
-          diff * lastMeasure.measureHeight +
-          lastMeasure.measurePositionBottom +
-          (note.position / note.split) * lastMeasure.measureHeight
-        );
-      }
-    },
+const cancelNote = inject(cancelNoteKey)!
 
-    getWidth(note: ExtendedNoteData) {
-      // 引数のノートの描画用typeとoption配列を取得
-      const drawType = (note.type === 90) ? Number(note.option[0]) : note.type;
-      const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option;
+function getLeft(note: ExtendedNoteData) {
+  // 引数のノートの描画用typeとoption配列を取得
+  const drawType = (note.type === 90) ? Number(note.option[0]) : note.type
+  const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option
+  // TAP, ロング, 終点, 区切り線, コメント
+  if ([1, 2, 89, 95, 100].includes(drawType)) return (note.lane - 1) * 60
+  // 左右フリック, 上下フリック
+  else if ([3, 4, 6, 7].includes(drawType)) {
+    let _width = Number(drawOptions[0]) || 3
+    if (_width === -1) _width = 3
+    const _left = (note.lane - 1) * 60 + 30
+    let _offset = 0
+    if (drawOptions[1] && drawOptions[2]) _offset = (Number(drawOptions[1]) / Number(drawOptions[2])) * 60
+    return _left - (_width / 2) * 60 + _offset
+  // テクスチャ
+  } else if (drawType === 94) {
+    let _width = Number(drawOptions[1]) || 1
+    const _left = (note.lane - 1) * 60 + 30
+    let _offset = 0
+    if (drawOptions[3] && drawOptions[4]) _offset = (Number(drawOptions[3]) / Number(drawOptions[4])) * 60
+    return _left - (_width / 2) * 60 + _offset
+  // LED制御
+  } else if (drawType === 96) return -50
+  // 音札, その他特殊ノーツ
+  else return 0
+}
 
-      // TAP, ロング, 終点, コメント
-      if ([1, 2, 89, 100].includes(drawType)) return 60;
-      // 左右フリック, 上下フリック
-      else if ([3, 4, 6, 7].includes(drawType)) {
-        let _width = Number(drawOptions[0]) || 3;
-        if (_width === -1) _width = 3;
-        return 60 * _width;
-      }
-      // テクスチャ
-      else if (drawType === 94) {
-        let _width = Number(drawOptions[1]) || 1;
-        return 60 * _width;
-      }
-      // 区切り線
-      else if (drawType === 95) {
-        let _width = Number(drawOptions[0]) || 1;
-        if (_width === -1) _width = 1;
-        if (note.position === 0) _width = 5;
-        return 60 * _width;
-      }
-      // LED制御
-      else if (drawType === 96) {
-        return 40;
-      }
-      // その他
-      else return 300;
-    },
-    calcelThisNote() {
-      // @ts-ignore "cancelNote" inject
-      if (this.isPreAppend) this.cancelNote(this.note.index);
-    }
-  },
-  computed: {
-    dispColor(): string | null {
-      if (this.note.type === 96) {
-        if (
-          Number(this.note.option[0]) === -1 &&
-          Number(this.note.option[1]) === -1 &&
-          Number(this.note.option[2]) === -1
-        ) {
-          return "linear-gradient(0deg, #ff5151 20%, #44a5ff 80%)";
-        } else
-          return `rgb(${this.note.option[0]},${this.note.option[1]},${this.note.option[2]})`;
-      }
-      return null;
-    },
-    /** 描画用のノートタイプ(ダミー時は擬態対象) */
-    drawType () {
-      if (this.note.type === 90) {
-        return Number(this.note.option[0]);
-      }
-      return this.note.type;
-    }
+function getAbsoluteLeft(note: ExtendedNoteData) {
+  return getLeft(note) + 60
+}
+
+function getBottom(note: ExtendedNoteData) {
+  const targetMeasure = props.measureData[note.measure] || props.measureData.at(-1)!
+  return (note.position / note.split) * targetMeasure.measureHeight
+}
+
+function getAbsoluteBottom(note: ExtendedNoteData) {
+  const targetMeasure = props.measureData[note.measure]
+  if (targetMeasure) {
+    return targetMeasure.measurePositionBottom + (note.position / note.split) * targetMeasure.measureHeight
+  } else {
+    const lastMeasure = props.measureData.at(-1)!
+    const diff = note.measure - lastMeasure.measure
+    return diff * lastMeasure.measureHeight + lastMeasure.measurePositionBottom + (note.position / note.split) * lastMeasure.measureHeight
   }
-});
+}
+
+function getWidth(note: ExtendedNoteData) {
+  // 引数のノートの描画用typeとoption配列を取得
+  const drawType = (note.type === 90) ? Number(note.option[0]) : note.type
+  const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option
+  // TAP, ロング, 終点, コメント
+  if ([1, 2, 89, 100].includes(drawType)) return 60
+  // 左右フリック, 上下フリック
+  else if ([3, 4, 6, 7].includes(drawType)) {
+    let _width = Number(drawOptions[0]) || 3
+    if (_width === -1) _width = 3
+    return 60 * _width
+  // テクスチャ
+  } else if (drawType === 94) {
+    let _width = Number(drawOptions[1]) || 1
+    return 60 * _width
+  // 区切り線
+  } else if (drawType === 95) {
+    let _width = Number(drawOptions[0]) || 1
+    if (_width === -1) _width = 1
+    if (note.position === 0) _width = 5
+    return 60 * _width
+  // LED制御
+  } else if (drawType === 96) return 40
+  // その他
+  else return 300
+}
+
+function calcelThisNote() {
+  if (props.isPreAppend) cancelNote(props.note.index)
+}
+
+const dispColor = computed(() => {
+  if (props.note.type === 96) {
+    if (Number(props.note.option[0]) === -1 && Number(props.note.option[1]) === -1 && Number(props.note.option[2]) === -1) {
+      return 'linear-gradient(0deg, #ff5151 20%, #44a5ff 80%)'
+    } else return `rgb(${props.note.option[0]},${props.note.option[1]},${props.note.option[2]})`
+  }
+  return null
+})
+
+const drawType = computed(() => {
+  if (props.note.type === 90) return Number(props.note.option[0])
+  return props.note.type
+})
 </script>
 
 <style lang="scss" scoped>
