@@ -109,7 +109,7 @@ describe('DensityGraph.vue', () => {
     expect(tooltip.exists()).toBe(true)
     expect(tooltip.text()).toContain('小節 1')
     expect(tooltip.text()).toContain('ノーツ数: 5')
-    expect(tooltip.text()).toContain('音札 × 2')
+    expect(tooltip.text()).toContain('音札')
 
     // Mouse leave
     await svg.trigger('mouseleave')

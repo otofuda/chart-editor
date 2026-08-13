@@ -632,7 +632,6 @@
           v-if="dialog.analyzer"
           :trend-values="analysisData.trendValues"
           :otofuda-notes="analysisData.otofudaNotes"
-          :trend-labels="analysisData.trendLabels"
           @jump="handleJumpToMeasure"
         />
         <v-table>

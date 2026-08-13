@@ -72,4 +72,28 @@ describe('useBackup', () => {
     expect(() => backup.restoreBackup()).not.toThrow()
     expect(backup.snackbarText.value).toBe('バックアップデータの読み込みに失敗しました')
   })
+
+  it('analyze でノーツ数・小節ごとの密度・音札数・種別数が正しく計算される', () => {
+    const chartData = useChartData()
+    const backup = useBackup(chartData)
+
+    chartData.chartObject.value.easy = [
+      { index: 1, type: 1, lane: 1, measure: 0, position: 0, split: 8, option: [], end: [] },
+      { index: 2, type: 5, lane: 2, measure: 0, position: 2, split: 8, option: [], end: [] },
+      { index: 3, type: 2, lane: 3, measure: 1, position: 0, split: 8, option: [], end: [] },
+      { index: 4, type: 94, lane: -1, measure: 1, position: 0, split: 8, option: ['url', '1'], end: [] }, // テクスチャ (非ノーツオブジェクト)
+    ]
+
+    backup.analyze()
+
+    expect(backup.analysisData.value.notesCount).toBe(3) // type 1, 5, 2
+    expect(backup.analysisData.value.trendValues[0]).toBe(2) // 0小節に2ノーツ
+    expect(backup.analysisData.value.trendValues[1]).toBe(1) // 1小節に1ノーツ
+    expect(backup.analysisData.value.otofudaNotes[0]).toBe(1) // 0小節に音札1個
+    expect(backup.analysisData.value.otofudaNotes[1]).toBe(0)
+    expect(backup.analysisData.value.typeCount[1]).toBe(1)
+    expect(backup.analysisData.value.typeCount[5]).toBe(1)
+    expect(backup.analysisData.value.typeCount[2]).toBe(1)
+    expect(backup.analysisData.value.typeCount[94]).toBe(1)
+  })
 })

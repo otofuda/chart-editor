@@ -202,12 +202,10 @@ const props = withDefaults(
   defineProps<{
     trendValues?: number[]
     otofudaNotes?: number[]
-    trendLabels?: string[]
   }>(),
   {
     trendValues: () => [],
     otofudaNotes: () => [],
-    trendLabels: () => [],
   }
 )
 
