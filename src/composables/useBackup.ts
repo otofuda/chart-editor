@@ -10,7 +10,6 @@ type LogEntry = { message: string; type: string; date: Date }
 type AnalysisData = {
   notesCount: number
   trendValues: number[]
-  trendLabels: string[]
   otofudaNotes: number[]
   typeCount: Record<number, number>
 }
@@ -35,7 +34,6 @@ export function useBackup(chartData: ChartData) {
   const analysisData = ref<AnalysisData>({
     notesCount: 0,
     trendValues: [],
-    trendLabels: [],
     otofudaNotes: [],
     typeCount: {},
   })
@@ -87,18 +85,14 @@ export function useBackup(chartData: ChartData) {
    */
   function analyze(): void {
     // 分析データを初期化
-    analysisData.value.trendLabels = []
     analysisData.value.trendValues = []
     analysisData.value.otofudaNotes = []
     analysisData.value.notesCount = 0
     noteTypes.forEach((type) => {
       analysisData.value.typeCount[type.value] = 0
     })
-    // ラベルとデータ配列を初期化
-    measureData.value.forEach((m: Measure) => {
-      if (m.measure % 10 === 0)
-        analysisData.value.trendLabels.push(String(m.measure))
-      else analysisData.value.trendLabels.push(' ')
+    // データ配列を初期化
+    measureData.value.forEach(() => {
       analysisData.value.trendValues.push(0)
       analysisData.value.otofudaNotes.push(0)
     })
