@@ -24,14 +24,14 @@ describe('noteTypes', () => {
 })
 
 describe('noteOptions', () => {
-  it('type 1 / 89 は speed, orbit, curve の3つのオプションを返す', () => {
+  it('type 1 / 89 は speed, orbit, curve, width の4つのオプションを返す', () => {
     const result1 = noteOptions({ ...baseNote, type: 1 })
-    expect(result1.length).toBe(3)
-    expect(result1.map(o => o.label)).toEqual(['speed', 'orbit', 'curve'])
+    expect(result1.length).toBe(4)
+    expect(result1.map(o => o.label)).toEqual(['speed', 'orbit', 'curve', 'width'])
 
     const result89 = noteOptions({ ...baseNote, type: 89 })
-    expect(result89.length).toBe(3)
-    expect(result89.map(o => o.label)).toEqual(['speed', 'orbit', 'curve'])
+    expect(result89.length).toBe(4)
+    expect(result89.map(o => o.label)).toEqual(['speed', 'orbit', 'curve', 'width'])
   })
 
   it('type 2 (ロング始点) は speed, orbit の2つのオプションを返す', () => {
@@ -64,8 +64,8 @@ describe('curveTypeOptions & generateHoldSvgPaths & getCurveType', () => {
     expect(getCurveType({ ...baseNote, option: [] })).toBe('linear')
   })
 
-  it('直線(linear)のSVGパスを生成できる', () => {
-    const paths = generateHoldSvgPaths(90, 100, 210, 0, 'linear', 38)
+  it('直線(linear)のSVGパスを生成できる（異なる始点・終点幅対応）', () => {
+    const paths = generateHoldSvgPaths(90, 100, 210, 0, 'linear', 38, 76)
     expect(paths.fillPath).toContain('M')
     expect(paths.fillPath).toContain('Z')
     expect(paths.leftBorderPath).toContain('M')
@@ -73,15 +73,15 @@ describe('curveTypeOptions & generateHoldSvgPaths & getCurveType', () => {
   })
 
   it('S字カーブ(ease)のSVGパスをベジェ曲線(C)で生成できる', () => {
-    const paths = generateHoldSvgPaths(90, 100, 210, 0, 'ease', 38)
+    const paths = generateHoldSvgPaths(90, 100, 210, 0, 'ease', 38, 76)
     expect(paths.fillPath).toContain('C')
     expect(paths.leftBorderPath).toContain('C')
     expect(paths.rightBorderPath).toContain('C')
   })
 
   it('Ease In / Ease Out のSVGパスを生成できる', () => {
-    const easeIn = generateHoldSvgPaths(90, 100, 210, 0, 'easeIn', 38)
-    const easeOut = generateHoldSvgPaths(90, 100, 210, 0, 'easeOut', 38)
+    const easeIn = generateHoldSvgPaths(90, 100, 210, 0, 'easeIn', 38, 76)
+    const easeOut = generateHoldSvgPaths(90, 100, 210, 0, 'easeOut', 38, 76)
     expect(easeIn.fillPath).toContain('C')
     expect(easeOut.fillPath).toContain('C')
   })
