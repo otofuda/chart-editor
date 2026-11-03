@@ -9,6 +9,7 @@ import Preview from '../Preview.vue'
 import { useChartData } from '../../composables/useChartData'
 import { useFileIO } from '../../composables/useFileIO'
 import { ControlledFileReader } from '../../composables/__tests__/controlledFileReader'
+import { FakeAudioContext } from '../../composables/__tests__/fakeAudioContext'
 
 function note(overrides: Partial<ExtendedNoteData> = {}): ExtendedNoteData {
   return { index: 1, type: 1, lane: 1, measure: 0, position: 0, split: 4, option: [], end: [], ...overrides }
@@ -74,17 +75,13 @@ describe('ロングノートの編集・描画', () => {
 })
 
 describe('Previewとの接続と後始末', () => {
-  const audioInstances: { play: ReturnType<typeof vi.fn>; pause: ReturnType<typeof vi.fn> }[] = []
+  const soundCount = () => FakeAudioContext.instances.reduce((count, context) =>
+    count + context.sources.reduce((n, source) => n + source.start.mock.calls.length, 0), 0)
   beforeEach(() => {
     vi.useFakeTimers()
-    audioInstances.length = 0
-    vi.stubGlobal('Audio', class {
-      currentTime = 0
-      volume = 1
-      play = vi.fn().mockResolvedValue(undefined)
-      pause = vi.fn()
-      constructor() { audioInstances.push(this) }
-    })
+    FakeAudioContext.instances = []
+    vi.stubGlobal('AudioContext', FakeAudioContext)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) }))
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   })
   afterEach(() => {
@@ -115,8 +112,9 @@ describe('Previewとの接続と後始末', () => {
       await wrapper.get('input[aria-label="打鍵音を再生 (β)"]').setValue(true)
       await wrapper.get('input[aria-label="LN終点音を再生 (α)"]').setValue(true)
       await wrapper.findAll('button').find(button => button.text().endsWith('再生'))!.trigger('click')
+      await flushMedia()
       vi.advanceTimersByTime(1000)
-      expect(audioInstances.reduce((count, audio) => count + audio.play.mock.calls.length, 0)).toBe(3)
+      expect(soundCount()).toBe(3)
       expect(wrapper.get('.combo strong').text()).toBe('2')
     } finally { wrapper.unmount() }
     expect(vi.getTimerCount()).toBe(0)
@@ -131,6 +129,7 @@ describe('Previewとの接続と後始末', () => {
     const start = wrapper.findAll('button').find(button => button.text().endsWith('再生'))!
     const stop = wrapper.findAll('button').find(button => button.text().endsWith('停止'))!
     await start.trigger('click')
+    await flushMedia()
     vi.advanceTimersByTime(112)
     const beam = wrapper.get('.keybeams').element.children[1]
     expect(beam.classList.contains('-hold')).toBe(true)
@@ -139,6 +138,7 @@ describe('Previewとの接続と後始末', () => {
     vi.advanceTimersByTime(1000)
     expect(track.play).not.toHaveBeenCalled()
     await start.trigger('click')
+    await flushMedia()
     vi.advanceTimersByTime(112)
     expect(beam.classList.contains('-hold')).toBe(true)
     wrapper.unmount()
@@ -148,7 +148,7 @@ describe('Previewとの接続と後始末', () => {
     expect(track.play).not.toHaveBeenCalled()
   })
 
-  const flushMedia = async () => { for (let i = 0; i < 8; i++) await Promise.resolve() }
+  const flushMedia = async () => { for (let i = 0; i < 16; i++) await Promise.resolve() }
   function loadedTrack() {
     return Object.assign(new EventTarget(), {
       src: 'blob:track', currentSrc: 'blob:track', currentTime: 0, duration: 60,
@@ -160,6 +160,85 @@ describe('Previewとの接続と後始末', () => {
     measure, measureBeat: 4, measureBpm: 120, measureHeight: 400,
     measureLength: 2000, measurePositionBottom: measure * 400, measureReachTime: measure * 2000,
   }))
+
+  it('初回の補助音読み込み中に停止しても、準備完了後に旧再生が始まらない', async () => {
+    let resolve!: (response: unknown) => void
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise(done => { resolve = done }) as Promise<Response>)
+    const track = loadedTrack()
+    const wrapper = setup({ previewAudio: track, measureData: realMeasures, currentChart: [note({ measure: 1 })] })
+    const start = wrapper.findAll('button').find(button => button.text().endsWith('再生'))!
+    try {
+      await wrapper.get('input[aria-label="打鍵音を再生 (β)"]').setValue(true)
+      await start.trigger('click')
+      vi.advanceTimersByTime(3000)
+      expect(track.play).not.toHaveBeenCalled()
+      expect(soundCount()).toBe(0)
+      wrapper.vm.stop()
+      expect(vi.getTimerCount()).toBe(0)
+      resolve({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) })
+      await flushMedia()
+      vi.advanceTimersByTime(5000)
+      expect(track.play).not.toHaveBeenCalled()
+      expect(soundCount()).toBe(0)
+      expect(vi.getTimerCount()).toBe(0)
+      await start.trigger('click')
+      await flushMedia()
+      vi.advanceTimersByTime(2100)
+      await flushMedia()
+      vi.advanceTimersByTime(16)
+      expect(track.play).toHaveBeenCalledOnce()
+      expect(soundCount()).toBe(1)
+      expect(fetch).toHaveBeenCalledOnce()
+    } finally { wrapper.unmount() }
+    const context = FakeAudioContext.instances[0]
+    expect(context.close).toHaveBeenCalledOnce()
+    context.sources.forEach(source => expect(source.stop).toHaveBeenCalledOnce())
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('補助音の準備失敗を通知して停止し、再操作で先頭から発音できる', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response)
+    const track = loadedTrack()
+    const showSnackbar = vi.fn()
+    const wrapper = setup({ previewAudio: track, measureData: realMeasures, currentChart: [note({ measure: 1 })] }, showSnackbar)
+    const start = wrapper.findAll('button').find(button => button.text().endsWith('再生'))!
+    try {
+      await wrapper.get('input[aria-label="打鍵音を再生 (β)"]').setValue(true)
+      await start.trigger('click')
+      await flushMedia()
+      vi.advanceTimersByTime(3000)
+      expect(track.play).not.toHaveBeenCalled()
+      expect(showSnackbar).toHaveBeenCalledWith(expect.stringContaining('補助音を読み込めませんでした'))
+      expect((wrapper.get('.preview').element as HTMLElement).style.position).not.toBe('fixed')
+      await start.trigger('click')
+      await flushMedia()
+      vi.advanceTimersByTime(2100)
+      await flushMedia()
+      vi.advanceTimersByTime(16)
+      expect(track.play).toHaveBeenCalledOnce()
+      expect(soundCount()).toBe(1)
+    } finally { wrapper.unmount() }
+  })
+
+  it.each([false, true])('打鍵音OFFでも小節ガイド音を再生できる（途中で有効化=%s）', async enableLater => {
+    const wrapper = setup({ measureData: realMeasures, currentChart: [] })
+    try {
+      const guide = wrapper.get('input[aria-label="小節ガイド音を再生"]')
+      if (!enableLater) await guide.setValue(true)
+      await wrapper.findAll('button').find(button => button.text().endsWith('再生'))!.trigger('click')
+      await flushMedia()
+      vi.advanceTimersByTime(112)
+      if (enableLater) {
+        expect(FakeAudioContext.instances).toHaveLength(0)
+        await guide.setValue(true)
+        await flushMedia()
+      }
+      vi.advanceTimersByTime(2000)
+      expect(soundCount()).toBe(enableLater ? 1 : 2)
+      expect(FakeAudioContext.instances[0].decodeAudioData).toHaveBeenCalledOnce()
+    } finally { wrapper.unmount() }
+    expect(vi.getTimerCount()).toBe(0)
+  })
 
   function setupLiveSettings(notes = [note({ measure: 1 }), note({ type: 99, measure: 5 })]) {
     const data = useChartData()
@@ -196,7 +275,7 @@ describe('Previewとの接続と後始末', () => {
       await flushMedia()
     }
     const position = () => Number.parseFloat((view.get('.preview-content').element as HTMLElement).style.transform.split(',')[1] ?? '0')
-    const sounds = () => audioInstances.reduce((count, audio) => count + audio.play.mock.calls.length, 0)
+    const sounds = soundCount
     const isPlaying = () => (view.get('.preview').element as HTMLElement).style.position === 'fixed'
     return { data, volume, track, wrapper, view, start, begin, at, position, sounds, isPlaying }
   }
@@ -465,7 +544,7 @@ describe('Previewとの接続と後始末', () => {
         expect(wrapper.get('.keybeams').element.children[1].className).toBe('')
         expect((wrapper.get('.preview-content').element as HTMLElement).style.transform).toBe('')
         const plays = track.play.mock.calls.length
-        const sounds = audioInstances.reduce((count, audio) => count + audio.play.mock.calls.length, 0)
+        const sounds = soundCount()
 
         resolveOldPlay?.()
         track.readyState = 4
@@ -474,7 +553,7 @@ describe('Previewとの接続と後始末', () => {
         await flushMedia()
         vi.advanceTimersByTime(5000)
         expect(track.play).toHaveBeenCalledTimes(plays)
-        expect(audioInstances.reduce((count, audio) => count + audio.play.mock.calls.length, 0)).toBe(sounds)
+        expect(soundCount()).toBe(sounds)
         expect(vi.getTimerCount()).toBe(0)
 
         track.play.mockResolvedValue(undefined)
@@ -503,7 +582,7 @@ describe('Previewとの接続と後始末', () => {
       await flushMedia()
       vi.advanceTimersByTime(2600)
       expect(track.play).toHaveBeenCalledOnce()
-      expect(audioInstances.reduce((n, audio) => n + audio.play.mock.calls.length, 0)).toBe(0)
+      expect(soundCount()).toBe(0)
       expect(Number.parseFloat((wrapper.get('.preview-content').element as HTMLElement).style.transform.split(',')[1]?.trim())).toBeLessThan(400)
       resolve()
       await flushMedia()
@@ -513,7 +592,7 @@ describe('Previewとの接続と後始末', () => {
       expect((wrapper.get('.preview-content').element as HTMLElement).style.transform).toContain('translate3d')
       expect((wrapper.get('.preview-content').element as HTMLElement).style.willChange).toBe('transform')
       expect(wrapper.get('.combo strong').text()).toBe('1')
-      expect(audioInstances.reduce((n, audio) => n + audio.play.mock.calls.length, 0)).toBe(1)
+      expect(soundCount()).toBe(1)
       track.currentTime = 0.5
       vi.advanceTimersByTime(16)
       expect((wrapper.get('.preview-content').element as HTMLElement).style.transform.split(',')[1]?.trim()).toBe('500px')

@@ -11,6 +11,7 @@ type PlaybackOptions = {
 
 type PlaybackInput = {
   audio?: HTMLAudioElement
+  prepare?: () => Promise<void>
   measures: Measure[]
   startMeasure: number
   countInMs: number
@@ -76,7 +77,7 @@ function waitForMedia(audio: HTMLAudioElement, ready: () => boolean, signal: Abo
   })
 }
 
-function waitForPlay(promise: Promise<void>, signal: AbortSignal) {
+function waitForOperation(promise: Promise<void>, signal: AbortSignal, timeoutMessage: string) {
   return new Promise<void>((resolve, reject) => {
     const cleanup = () => {
       clearTimeout(timeout)
@@ -88,7 +89,7 @@ function waitForPlay(promise: Promise<void>, signal: AbortSignal) {
       else resolve()
     }
     const abort = () => finish(new DOMException('再生を中止しました', 'AbortError'))
-    const timeout = setTimeout(() => finish(new Error('音源を再生開始できませんでした')), PREPARATION_TIMEOUT)
+    const timeout = setTimeout(() => finish(new Error(timeoutMessage)), PREPARATION_TIMEOUT)
     signal.addEventListener('abort', abort, { once: true })
     promise.then(() => finish(), finish)
     if (signal.aborted) abort()
@@ -146,6 +147,10 @@ export function createPreviewPlayback(options: PlaybackOptions) {
     options.onFrame(from)
 
     try {
+      if (input.prepare) {
+        await waitForOperation(input.prepare(), session.controller.signal, '補助音の準備がタイムアウトしました')
+        if (!active()) return
+      }
       if (audio) {
         const source = audio.src
         const sourceChanged = () => {
@@ -198,7 +203,7 @@ export function createPreviewPlayback(options: PlaybackOptions) {
       const beginAudio = async () => {
         phase = 'starting'
         try {
-          await waitForPlay(audio!.play(), session.controller.signal)
+          await waitForOperation(audio!.play(), session.controller.signal, '音源を再生開始できませんでした')
           if (active()) {
             clock.reset()
             phase = 'playing'

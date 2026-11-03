@@ -60,6 +60,72 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('音源を基準にしたプレビュー再生', () => {
+  it('補助音の初回準備が終わるまで譜面も音源も進めない', async () => {
+    const s = setup()
+    let resolve!: () => void
+    const prepare = vi.fn(() => new Promise<void>(done => { resolve = done }))
+    const pending = s.start({ prepare })
+    expect(prepare).toHaveBeenCalledOnce()
+    frame(1000)
+    expect(s.playback.phase).toBe('preparing')
+    expect(s.onFrame.mock.calls).toEqual([[0]])
+    expect(s.audio.play).not.toHaveBeenCalled()
+    resolve()
+    await pending
+    frame(1999)
+    expect(s.audio.play).not.toHaveBeenCalled()
+    frame(1)
+    await flush()
+    expect(s.audio.play).toHaveBeenCalledOnce()
+    s.playback.stop()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it.each(['resolve', 'reject'])('停止した補助音準備の%sが次の再生に混入しない', async result => {
+    const s = setup()
+    let resolve!: () => void
+    let reject!: (error: Error) => void
+    const first = s.start({ prepare: () => new Promise<void>((done, fail) => { resolve = done; reject = fail }) })
+    s.playback.stop()
+    await first
+    expect(vi.getTimerCount()).toBe(0)
+    await s.start()
+    if (result === 'resolve') resolve()
+    else reject(new Error('load failed'))
+    await flush()
+    frame(2000)
+    await flush()
+    expect(s.audio.play).toHaveBeenCalledOnce()
+    expect(s.onError).not.toHaveBeenCalled()
+    expect(s.playback.phase).toBe('playing')
+    s.playback.stop()
+  })
+
+  it('補助音の準備失敗は停止表示へ戻し、再操作を可能にする', async () => {
+    const s = setup()
+    await s.start({ prepare: () => Promise.reject(new Error('補助音を読み込めませんでした')) })
+    expect(s.playback.phase).toBe('idle')
+    expect(s.onError).toHaveBeenCalledOnce()
+    expect(frames.size).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+    await s.start({ prepare: () => Promise.resolve() })
+    frame(2000)
+    await flush()
+    expect(s.audio.play).toHaveBeenCalledOnce()
+    s.playback.stop()
+  })
+
+  it('補助音の準備タイムアウトでも予約を解除する', async () => {
+    const s = setup()
+    const pending = s.start({ prepare: () => new Promise<void>(() => {}) })
+    frame(15000)
+    await pending
+    expect(s.playback.phase).toBe('idle')
+    expect(s.onError).toHaveBeenCalledWith(new Error('補助音の準備がタイムアウトしました'))
+    expect(frames.size).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('初回のメタデータとデコードを待ってからカウントインする', async () => {
     const s = setup()
     s.audio.readyState = 0

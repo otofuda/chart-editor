@@ -362,6 +362,7 @@ import NoteShadow from './NoteShadow.vue'
 import { showSnackbarKey } from '@/composables/injectionKeys'
 import { buildPreviewEvents, createPreviewEventPlayer } from '@/composables/usePreviewEvents'
 import { createPreviewPlayback, getPreviewMeasureIndex, getPreviewPosition } from '@/composables/usePreviewPlayback'
+import { createPreviewSounds } from '@/composables/usePreviewSounds'
 
 const props = defineProps<{
   currentChart?: ExtendedNoteData[]
@@ -407,10 +408,8 @@ let noteEventPlayer: ReturnType<typeof createPreviewEventPlayer> | undefined
 const isPlayKeySound = ref(false)
 const isPlayKeySoundEnd = ref(false)
 const guideSource = new URL('guide.mp3', document.baseURI).href
-const guideAudio = new Audio(guideSource)
-guideAudio.preload = 'auto'
-const keySounds: HTMLAudioElement[] = []
-let keySoundIndex = 0
+// 従来と同じ音源内の開始位置を、デコード済みバッファに適用する。
+const previewSounds = createPreviewSounds(guideSource, 0.1)
 let playbackMeasures: Measure[] = []
 let playbackOffset = 0
 let eventOffset = 0
@@ -462,14 +461,6 @@ function setLEDColor(color?: string) {
   }
 }
 
-// 補助音は事前に読み込んで再利用し、停止時にまとめて止める。
-function playSound(audio: HTMLAudioElement, offset: number) {
-  try {
-    audio.currentTime = offset
-    void audio.play()?.catch(() => {})
-  } catch { /* 補助音の準備失敗で楽曲と譜面の再生は止めない。 */ }
-}
-
 function updatePreview(time: number) {
   lastChartTime = time
   const liveMeasures = measures.value
@@ -498,7 +489,7 @@ function updatePreview(time: number) {
   const index = getPreviewMeasureIndex(liveMeasures, time)
   const measure = liveMeasures[index]
   if (index > previousGuideMeasure && measure && time >= measure.measureReachTime) {
-    if (isPlayGuide.value && time - measure.measureReachTime <= 50) playSound(guideAudio, 0.1)
+    if (isPlayGuide.value && time - measure.measureReachTime <= 50) previewSounds.play()
     previousGuideMeasure = index
   }
 }
@@ -518,13 +509,6 @@ function setNoteEvents(offset: number) {
   noteEventOffset = offset
   noteEventsStarted = false
   eventsForPlayback = previewEvents.value
-  if (isPlayKeySound.value && keySounds.length === 0) {
-    for (let i = 0; i < 8; i++) {
-      const audio = new Audio(guideSource)
-      audio.preload = 'auto'
-      keySounds.push(audio)
-    }
-  }
   let prevMoveTiming = -500
   let prevMoveTimer: number | null = null
   const _isShowFlickEffect = isShowFlickEffect.value
@@ -536,10 +520,7 @@ function setNoteEvents(offset: number) {
     isShowKeybeam: () => isShowKeybeam.value,
     isPlayKeySound: () => isPlayKeySound.value,
     isPlayKeySoundEnd: () => isPlayKeySoundEnd.value,
-    playSound: () => {
-      const audio = keySounds[keySoundIndex++ % keySounds.length]
-      if (audio) playSound(audio, 0.1)
-    },
+    playSound: previewSounds.play,
     onEvent: event => {
       // フリックエフェクト
       if (isShowKeybeam.value && event.handMove && _isShowFlickEffect && event.noteObject && keybeams.value) {
@@ -596,8 +577,7 @@ function clearPlayback() {
   playback.stop()
   noteEventPlayer?.stop()
   noteEventsStarted = false
-  guideAudio.pause()
-  keySounds.forEach(audio => audio.pause())
+  previewSounds.stop()
   timeoutIds.value.forEach(id => clearTimeout(id))
   timeoutIds.value = []
   clearNoteEffects()
@@ -616,7 +596,6 @@ function previewStart() {
   currentCombo.value = 0
   if (currentComboEl.value) currentComboEl.value.textContent = '0'
   setLEDColor()
-  keySoundIndex = 0
   previousGuideMeasure = -1
   includeStartEvent = startFrom.value !== 0
   playbackMeasures = measures.value.map(measure => ({ ...measure }))
@@ -625,6 +604,7 @@ function previewStart() {
   setNoteEvents(startFrom.value === 0 ? 0 : selected.measureReachTime)
   void playback.start({
     audio: props.previewAudio,
+    prepare: isPlayKeySound.value || isPlayGuide.value ? previewSounds.prepare : undefined,
     measures: playbackMeasures,
     startMeasure: startFrom.value,
     countInMs,
@@ -681,6 +661,19 @@ watch([() => props.previewAudio, () => props.audioVolume], () => {
   if (props.previewAudio) props.previewAudio.volume = musicVolume.value
 }, { immediate: true })
 
+// 再生途中でガイド音を有効にした場合にも、次の小節までに音を準備する。
+watch(isPlayGuide, (enabled, _, onCleanup) => {
+  if (!enabled || !isPreviewing.value) return
+  const player = noteEventPlayer
+  let cancelled = false
+  onCleanup(() => { cancelled = true })
+  void previewSounds.prepare().catch(error => {
+    if (!cancelled && isPreviewing.value && noteEventPlayer === player) {
+      showSnackbar(`補助音を再生できませんでした: ${error.message}`)
+    }
+  })
+})
+
 // ファイル選択時はデータの変更通知を待たず、スクロール予約も残さずに終了する。
 defineExpose({ stop: () => previewStop(false) })
 
@@ -698,6 +691,7 @@ const previewEvents = computed((): PreviewEvents =>
 
 onBeforeUnmount(() => {
   clearPlayback()
+  previewSounds.dispose()
 })
 
 const entireHeight = computed(() => {
