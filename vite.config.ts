@@ -14,6 +14,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  optimizeDeps: {
+    exclude: ['chart-types'],
+  },
   server: {
     port: 3000,
   },

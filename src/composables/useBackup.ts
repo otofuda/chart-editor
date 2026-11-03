@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import type { Measure, ExtendedNoteData } from '../types'
 import { noteTypes } from './useNoteTypes'
-import type { useChartData } from './useChartData'
+import { normalizeChartData, type useChartData } from './useChartData'
 
 type ChartData = ReturnType<typeof useChartData>
 
@@ -10,7 +10,6 @@ type LogEntry = { message: string; type: string; date: Date }
 type AnalysisData = {
   notesCount: number
   trendValues: number[]
-  trendLabels: string[]
   otofudaNotes: number[]
   typeCount: Record<number, number>
 }
@@ -20,7 +19,7 @@ type AnalysisData = {
  * @param chartData - useChartData の戻り値
  */
 export function useBackup(chartData: ChartData) {
-  const { chartObject, currentChart, measureData } = chartData
+  const { chartObject, currentChart, measureData, difficulties } = chartData
 
   /** スナックバーの表示状態 */
   const snackbar = ref(false)
@@ -35,7 +34,6 @@ export function useBackup(chartData: ChartData) {
   const analysisData = ref<AnalysisData>({
     notesCount: 0,
     trendValues: [],
-    trendLabels: [],
     otofudaNotes: [],
     typeCount: {},
   })
@@ -72,8 +70,13 @@ export function useBackup(chartData: ChartData) {
     )
     const backupData = localStorage.getItem('chart-editor__backup')
     if (confirmed && backupData) {
-      chartObject.value = JSON.parse(backupData)
-      showSnackbar('バックアップから復元しました')
+      try {
+        const parsed = JSON.parse(backupData)
+        chartObject.value = normalizeChartData(parsed, difficulties)
+        showSnackbar('バックアップから復元しました')
+      } catch {
+        showSnackbar('バックアップデータの読み込みに失敗しました')
+      }
     }
   }
 
@@ -82,18 +85,14 @@ export function useBackup(chartData: ChartData) {
    */
   function analyze(): void {
     // 分析データを初期化
-    analysisData.value.trendLabels = []
     analysisData.value.trendValues = []
     analysisData.value.otofudaNotes = []
     analysisData.value.notesCount = 0
     noteTypes.forEach((type) => {
       analysisData.value.typeCount[type.value] = 0
     })
-    // ラベルとデータ配列を初期化
-    measureData.value.forEach((m: Measure) => {
-      if (m.measure % 10 === 0)
-        analysisData.value.trendLabels.push(String(m.measure))
-      else analysisData.value.trendLabels.push(' ')
+    // データ配列を初期化
+    measureData.value.forEach(() => {
       analysisData.value.trendValues.push(0)
       analysisData.value.otofudaNotes.push(0)
     })

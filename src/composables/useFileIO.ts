@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import type { DifficultyString, ExtendedChartData, ExtendedNoteData } from '../types'
 import { getValidatedNote } from './useNoteCheck'
-import type { useChartData } from './useChartData'
+import { normalizeChartData, type useChartData } from './useChartData'
 
 type ChartData = ReturnType<typeof useChartData>
 
@@ -62,14 +62,7 @@ export function useFileIO(
       if (reader !== next) return
       let parsed: ExtendedChartData
       try {
-        parsed = JSON.parse(String(event.target?.result))
-        difficulties.forEach((d: DifficultyString) => {
-          parsed[d] = (parsed[d] || []).map((note, index) => ({
-            ...note,
-            index,
-            isSelected: false,
-          }))
-        })
+        parsed = normalizeChartData(JSON.parse(String(event.target?.result)), difficulties)
       } catch { fail(); return }
       cancelRead()
       // 読み込み待ちの間に再生し直した場合も、適用前に終了する。

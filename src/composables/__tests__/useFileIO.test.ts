@@ -103,6 +103,41 @@ describe('ファイル変更時の再生停止と読み込みの競合', () => {
     expect(s.io.isLoaded.value).toBe(true)
   })
 
+  it('読み込み時にinfoと編集情報を正規化し、LNのcurveとwidthを保持する', () => {
+    const s = setupChange()
+    const end = { type: 89, lane: 2, measure: 1, position: 0, split: 4, option: ['1', '0', 'ease', '2'], end: [] }
+    const hold = { index: 8, isSelected: true, type: 2, lane: 1, measure: 0, position: 0, split: 4, option: ['1', '0'], end: [end] }
+    const raw = {
+      info: { bpm: 180, offset: 250 },
+      easy: [hold, { type: 1, lane: 3, measure: 1, position: 1, split: 4, option: [], end: [] }],
+    }
+    s.io.readFile(new File([''], 'partial.json'))
+    s.beforeChange.mockImplementation(() => expect(s.chartData.chartObject.value.info.bpm).toBe(120))
+    ControlledFileReader.instances[0].complete(JSON.stringify(raw))
+    const loaded = s.chartData.chartObject.value
+    expect(s.beforeChange).toHaveBeenCalledTimes(2)
+    expect(loaded.info).toEqual({ version: 2, bpm: 180, beat: 4, offset: 250 })
+    expect(loaded.easy[0]).toEqual({ ...hold, isSelected: false })
+    expect(loaded.easy[1]).toEqual({ ...raw.easy[1], index: 1, isSelected: false })
+    for (const difficulty of ['raku', 'normal', 'hard', 'extra'] as const) expect(loaded[difficulty]).toEqual([])
+    expect(s.io.isLoaded.value).toBe(true)
+  })
+
+  it('正規化中のエラーでも現在の譜面を維持し、次の読み込みを妨げない', () => {
+    const s = setupChange()
+    const original = s.chartData.chartObject.value
+    s.io.readFile(new File([''], 'invalid-notes.json'))
+    ControlledFileReader.instances[0].complete(JSON.stringify({ easy: {} }))
+    expect(s.chartData.chartObject.value).toBe(original)
+    expect(s.beforeChange).toHaveBeenCalledOnce()
+    expect(s.showSnackbar).toHaveBeenCalledWith(expect.stringContaining('読み込めませんでした'))
+    expect(s.io.isLoaded.value).toBe(false)
+    s.io.readFile(new File([''], 'retry.json'))
+    ControlledFileReader.instances[1].complete(JSON.stringify({ info: { bpm: 220 } }))
+    expect(s.chartData.chartObject.value.info).toEqual({ version: 2, bpm: 220, beat: 4, offset: 0 })
+    expect(s.io.isLoaded.value).toBe(true)
+  })
+
   it('連続選択では前の読み込みを中断し、遅いload通知も新しい譜面を上書きしない', () => {
     const s = setupChange()
     s.io.readFile(new File([''], 'first.json'))

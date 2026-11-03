@@ -115,6 +115,9 @@ describe('Previewとの接続と後始末', () => {
       await flushMedia()
       vi.advanceTimersByTime(1000)
       expect(soundCount()).toBe(3)
+      const context = FakeAudioContext.instances[0]
+      expect(context.resume).toHaveBeenCalledOnce()
+      context.sources.forEach(source => expect(source.start).toHaveBeenCalledExactlyOnceWith(0, 0.1))
       expect(wrapper.get('.combo strong').text()).toBe('2')
     } finally { wrapper.unmount() }
     expect(vi.getTimerCount()).toBe(0)
@@ -144,7 +147,9 @@ describe('Previewとの接続と後始末', () => {
     wrapper.unmount()
     expect(beam.className).toBe('')
     expect(vi.getTimerCount()).toBe(0)
+    const soundsBefore = soundCount()
     vi.advanceTimersByTime(5000)
+    expect(soundCount()).toBe(soundsBefore)
     expect(track.play).not.toHaveBeenCalled()
   })
 
