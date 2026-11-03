@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import type { ExtendedNoteData, Measure } from '../../types'
 import { deleteNotesKey, showSnackbarKey } from '../../composables/injectionKeys'
 import EndForm from '../EndForm.vue'
@@ -71,17 +71,29 @@ describe('ロングノートの編集・描画', () => {
 })
 
 describe('Previewとの接続と後始末', () => {
-  const audioInstances: { play: ReturnType<typeof vi.fn>; pause: ReturnType<typeof vi.fn> }[] = []
+  const sourceStarts: ReturnType<typeof vi.fn>[] = []
+  const resumeAudio = vi.fn()
   beforeEach(() => {
     vi.useFakeTimers()
-    audioInstances.length = 0
-    vi.stubGlobal('Audio', class {
-      currentTime = 0
-      volume = 1
-      play = vi.fn().mockResolvedValue(undefined)
-      pause = vi.fn()
-      constructor() { audioInstances.push(this) }
+    sourceStarts.length = 0
+    resumeAudio.mockReset()
+    vi.stubGlobal('AudioContext', class {
+      state = 'suspended'
+      destination = {}
+      resume = resumeAudio.mockImplementation(() => {
+        this.state = 'running'
+        return Promise.resolve()
+      })
+      decodeAudioData = vi.fn().mockResolvedValue({})
+      createBufferSource() {
+        const start = vi.fn()
+        sourceStarts.push(start)
+        return { buffer: null, connect: vi.fn(), start }
+      }
     })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    }))
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   })
   afterEach(() => {
@@ -91,8 +103,8 @@ describe('Previewとの接続と後始末', () => {
     vi.unstubAllGlobals()
   })
 
-  function setup() {
-    return mount(Preview, {
+  async function setup() {
+    const wrapper = mount(Preview, {
       props: {
         currentChart: [note({ type: 2, end: [note({ position: 1 }), note({ position: 3 })] })],
         measureData: measures,
@@ -103,23 +115,27 @@ describe('Previewとの接続と後始末', () => {
         provide: { [showSnackbarKey as symbol]: vi.fn() },
       },
     })
+    await flushPromises()
+    return wrapper
   }
 
   it('発光をOFFにしても、打鍵音と終点音をそれぞれ1回ずつ再生する', async () => {
-    const wrapper = setup()
+    const wrapper = await setup()
     try {
       await wrapper.get('input[aria-label="打鍵音を再生 (β)"]').setValue(true)
       await wrapper.get('input[aria-label="LN終点音を再生 (α)"]').setValue(true)
       await wrapper.findAll('button').find(button => button.text().endsWith('再生'))!.trigger('click')
       vi.advanceTimersByTime(1000)
-      expect(audioInstances.reduce((count, audio) => count + audio.play.mock.calls.length, 0)).toBe(3)
+      expect(resumeAudio).toHaveBeenCalledOnce()
+      expect(sourceStarts).toHaveLength(3)
+      sourceStarts.forEach(start => expect(start).toHaveBeenCalledExactlyOnceWith(0, 0.1))
       expect(wrapper.get('.combo strong').text()).toBe('2')
     } finally { wrapper.unmount() }
     expect(vi.getTimerCount()).toBe(0)
   })
 
   it('停止とアンマウントで発光と予約音を解除し、再再生にタイマーを残さない', async () => {
-    const wrapper = setup()
+    const wrapper = await setup()
     const track = { play: vi.fn(), pause: vi.fn(), currentTime: 0, volume: 1 }
     await wrapper.setProps({ previewAudio: track as unknown as HTMLAudioElement })
     await wrapper.get('input[aria-label="キービームとコンボを表示"]').setValue(true)
@@ -140,7 +156,9 @@ describe('Previewとの接続と後始末', () => {
     wrapper.unmount()
     expect(beam.className).toBe('')
     expect(vi.getTimerCount()).toBe(0)
+    const soundCount = sourceStarts.length
     vi.advanceTimersByTime(5000)
+    expect(sourceStarts).toHaveLength(soundCount)
     expect(track.play).not.toHaveBeenCalled()
   })
 })
