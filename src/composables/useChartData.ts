@@ -10,7 +10,7 @@ import type {
 const BEAT_HEIGHT_KEY = 'chart-editor__beat-height'
 
 /**
- * 譜面オブジェクトを正規化し、編集に必要な index / isSelected および info を付与する
+ * 譜面オブジェクトを正規化し、一意な index / isSelected および info を付与する
  * @param raw - 外部またはバックアップから読み込んだ譜面データ
  * @param difficulties - 難易度文字列配列 (デフォルト: ['raku', 'easy', 'normal', 'hard', 'extra'])
  */
@@ -34,11 +34,23 @@ export function normalizeChartData(
   }
 
   difficulties.forEach((d: DifficultyString) => {
-    result[d] = ((raw?.[d] as ExtendedNoteData[]) || []).map((note, idx) => ({
-      ...note,
-      index: typeof note.index === 'number' ? note.index : idx,
-      isSelected: false,
-    }))
+    const notes = (raw?.[d] as ExtendedNoteData[]) || []
+    // 後続ノーツの既存番号も予約し、補完した番号との衝突を防ぐ。
+    const reservedIndices = new Set(notes.map(note => note.index))
+    const usedIndices = new Set<number>()
+    let nextIndex = 0
+
+    result[d] = notes.map((note, idx) => {
+      let index = note.index
+      if (typeof index !== 'number' || !Number.isFinite(index) || usedIndices.has(index)) {
+        nextIndex = Math.max(nextIndex, idx)
+        while (reservedIndices.has(nextIndex)) nextIndex++
+        index = nextIndex++
+        reservedIndices.add(index)
+      }
+      usedIndices.add(index)
+      return { ...note, index, isSelected: false }
+    })
   })
 
   return result
@@ -73,7 +85,10 @@ export function useChartData() {
 
   const musicBpm = computed(() => chartObject.value.info.bpm)
   const musicBeat = computed(() => chartObject.value.info.beat)
-  const musicOffset = computed(() => chartObject.value.info.offset)
+  const musicOffset = computed(() => {
+    const offset = Number(chartObject.value.info.offset)
+    return Number.isFinite(offset) ? offset : 0
+  })
 
   /** 譜面中の最大小節番号 */
   const maxMeasure = computed(() => {

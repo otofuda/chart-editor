@@ -46,6 +46,13 @@ describe('useChartData', () => {
     const data = useChartData()
     expect(data.beatHeight.value).toBeGreaterThan(0)
   })
+
+  it.each(['', '-', 'abc', NaN, Infinity])('オフセット編集中の%sを0として計算し、NaNの座標を生成しない', value => {
+    const data = useChartData()
+    data.chartObject.value.info.offset = value as any
+    expect(data.musicOffset.value).toBe(0)
+    expect(data.measureData.value.every(measure => Number.isFinite(measure.measureReachTime) && Number.isFinite(measure.measurePositionBottom))).toBe(true)
+  })
 })
 
 describe('normalizeChartData', () => {
@@ -87,5 +94,32 @@ describe('normalizeChartData', () => {
     const normalized = normalizeChartData(raw as any)
     expect(normalized.hard[0].index).toBe(5)
     expect(normalized.hard[0].isSelected).toBe(false)
+  })
+
+  it.each([
+    { indices: [1, 1] },
+    { indices: [undefined, 0] },
+    { indices: [0, undefined, 2] },
+    { indices: [5, 5, undefined, 0] },
+    { indices: [NaN, Infinity, -Infinity] },
+  ])('indexの重複や欠落を解消し、後続ノーツの既存番号と衝突しない: $indices', ({ indices }) => {
+    const raw = {
+      easy: indices.map((index, measure) => ({
+        index, type: 1, lane: 1 as const, measure, position: 0, split: 8, option: [], end: [],
+      })),
+    }
+    const original = structuredClone(raw)
+    const normalized = normalizeChartData(raw)
+
+    expect(new Set(normalized.easy.map(note => note.index)).size).toBe(indices.length)
+    normalized.easy.forEach((note, i) => {
+      expect(Number.isFinite(note.index)).toBe(true)
+      expect(note).toEqual({ ...raw.easy[i], index: note.index, isSelected: false })
+      const index = indices[i]
+      if (Number.isFinite(index) && indices.indexOf(index) === i) {
+        expect(note.index).toBe(index)
+      }
+    })
+    expect(raw).toEqual(original)
   })
 })

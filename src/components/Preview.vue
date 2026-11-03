@@ -24,6 +24,7 @@
       ref="preview"
       :style="{
         position: isPreviewing ? 'fixed' : 'relative',
+        bottom: '0px',
         height: `${entireHeight}px`,
         marginBottom: `${lift}px`,
         transform: drawOffset === 0 ? null : `translateY(${drawOffset}px)`
@@ -36,39 +37,45 @@
         checkbox: isShowCheckbox
       }"
     >
-      <!-- 各小節 -->
-      <MeasureComponent
-        v-for="measure in measureData"
-        :key="`measure_${measure.measure}`"
-        :measure="measure"
-        :notes="getMeasureNotes(measure.measure)"
-        :currentDifficulty="currentDifficulty"
-      />
+      <div
+        ref="previewContent"
+        class="preview-content"
+        :style="{ height: `${entireHeight}px`, willChange: isPreviewing ? 'transform' : null }"
+      >
+        <!-- 各小節 -->
+        <MeasureComponent
+          v-for="measure in measureData"
+          :key="`measure_${measure.measure}`"
+          :measure="measure"
+          :notes="getMeasureNotes(measure.measure)"
+          :currentDifficulty="currentDifficulty"
+        />
 
-      <!-- ロングノーツ -->
-      <!-- FIXME: 多分負荷でかい -->
-      <LongNote
-        v-for="(note, i) in longNotes"
-        :key="`longnote_${i}`"
-        :note="note"
-        :measureData="measureData"
-      />
+        <!-- ロングノーツ -->
+        <!-- FIXME: 多分負荷でかい -->
+        <LongNote
+          v-for="(note, i) in longNotes"
+          :key="`longnote_${i}`"
+          :note="note"
+          :measureData="measureData"
+        />
 
-      <!-- 配置前のシャドー -->
-      <NoteShadow
-        v-if="appendNote"
-        :note="appendNote"
-        :measureData="measureData"
-      />
+        <!-- 配置前のシャドー -->
+        <NoteShadow
+          v-if="appendNote"
+          :note="appendNote"
+          :measureData="measureData"
+        />
 
-      <!-- 仮配置ノーツ -->
-      <NoteShadow
-        v-for="(note, i) in preAppendNotes"
-        :key="`shadow_${note.measure}_${i}`"
-        :note="note"
-        :measureData="measureData"
-        :isPreAppend="true"
-      />
+        <!-- 仮配置ノーツ -->
+        <NoteShadow
+          v-for="(note, i) in preAppendNotes"
+          :key="`shadow_${note.measure}_${i}`"
+          :note="note"
+          :measureData="measureData"
+          :isPreAppend="true"
+        />
+      </div>
     </div>
 
     <!-- LED -->
@@ -112,7 +119,7 @@
               class="ml-2 mr-2"
               variant="outlined"
               color="error"
-              @click.stop="previewStop"
+              @click.stop="previewStop()"
             >
               <v-icon left>mdi-stop</v-icon> 停止
             </v-btn>
@@ -340,7 +347,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, onBeforeUnmount, watch } from 'vue'
 import {
   type DifficultyString,
   type ExtendedNoteData,
@@ -354,6 +361,8 @@ import LongNote from './LongNote.vue'
 import NoteShadow from './NoteShadow.vue'
 import { showSnackbarKey } from '@/composables/injectionKeys'
 import { buildPreviewEvents, createPreviewEventPlayer } from '@/composables/usePreviewEvents'
+import { createPreviewPlayback, getPreviewMeasureIndex, getPreviewPosition } from '@/composables/usePreviewPlayback'
+import { createPreviewSounds } from '@/composables/usePreviewSounds'
 
 const props = defineProps<{
   currentChart?: ExtendedNoteData[]
@@ -374,6 +383,7 @@ const showSnackbar = inject(showSnackbarKey)!
 
 // refs for DOM elements
 const preview = ref<HTMLElement | null>(null)
+const previewContent = ref<HTMLElement | null>(null)
 const keybeams = ref<HTMLElement | null>(null)
 const currentComboEl = ref<HTMLElement | null>(null)
 const handguide = ref<HTMLElement | null>(null)
@@ -384,12 +394,8 @@ const LEDRightShadow = ref<HTMLElement | null>(null)
 
 const isPreviewing = ref(false)
 const returnPosition = ref(-1) // 戻る座標
-const currentPosition = ref(0)
 const timeoutIds = ref<number[]>([])
 const startFrom = ref(0)
-const currentMeasure = ref(0)
-const currentBpm = ref(0)
-const currentBeat = ref(0)
 const currentCombo = ref(0) // プレビューするコンボ数
 const isShowCheckbox = ref(false)
 const isShowKeybeam = ref(false)
@@ -401,6 +407,18 @@ const eventIds = ref<number[]>([])
 let noteEventPlayer: ReturnType<typeof createPreviewEventPlayer> | undefined
 const isPlayKeySound = ref(false)
 const isPlayKeySoundEnd = ref(false)
+const guideSource = new URL('guide.mp3', document.baseURI).href
+// 従来と同じ音源内の開始位置を、デコード済みバッファに適用する。
+const previewSounds = createPreviewSounds(guideSource, 0.1)
+let playbackMeasures: Measure[] = []
+let playbackOffset = 0
+let eventOffset = 0
+let lastChartTime = 0
+let previousGuideMeasure = -1
+let noteEventOffset = 0
+let noteEventsStarted = false
+let includeStartEvent = false
+let eventsForPlayback: PreviewEvents = {}
 const defaultLEDColor = 'linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)'
 const lift = ref(Number(localStorage.getItem('chart-editor__lift')) || 0) // LIFTオプション
 const sudden = ref(Number(localStorage.getItem('chart-editor__sudden')) || 0) // SUDDENオプション
@@ -411,62 +429,23 @@ const keybeamLength = ref(100) // キービームの長さ
 const comboOpacity = ref(50) // コンボ数の透明度
 const isObjectBasedPreview = ref(false) // オブジェクト表示モード
 
-// Web Audio API による低遅延・ゼロアロケーション再生
-const guideAudioUrl = `${import.meta.env.BASE_URL}guide.mp3`
-let audioContext: AudioContext | null = null
-let guideAudioBuffer: AudioBuffer | null = null
-
-function getAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null
-  const AudioCtx =
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-  if (!AudioCtx) return null
-  if (!audioContext) {
-    audioContext = new AudioCtx()
-  }
-  return audioContext
-}
-
-async function loadGuideBuffer(): Promise<void> {
-  if (guideAudioBuffer || typeof window === 'undefined') return
-  try {
-    const ctx = getAudioContext()
-    if (!ctx) return
-    const res = await fetch(guideAudioUrl)
-    const arrayBuffer = await res.arrayBuffer()
-    guideAudioBuffer = await ctx.decodeAudioData(arrayBuffer)
-  } catch {
-    // 音声ロード失敗時は非致命的
-  }
-}
-
-function playGuideSound(offsetSeconds: number = 0): void {
-  const ctx = getAudioContext()
-  if (!ctx || !guideAudioBuffer) return
-  if (ctx.state === 'suspended') {
-    ctx.resume()
-  }
-  try {
-    const source = ctx.createBufferSource()
-    source.buffer = guideAudioBuffer
-    source.connect(ctx.destination)
-    source.start(0, offsetSeconds)
-  } catch {
-    // 再生エラーは無視
-  }
-}
-
-onMounted(() => {
-  loadGuideBuffer()
-})
-
 watch(lift, (v) => localStorage.setItem('chart-editor__lift', String(v)))
 watch(sudden, (v) => localStorage.setItem('chart-editor__sudden', String(v)))
 watch(hidden, (v) => localStorage.setItem('chart-editor__hidden', String(v)))
 
 const chart = computed(() => props.currentChart ?? [])
 const measures = computed(() => props.measureData ?? [])
+// 選択状態などの編集用情報を除き、再生内容の変更だけを監視する。
+const playbackChartSignature = computed(() => JSON.stringify(chart.value, (key, value) =>
+  key === 'index' || key === 'isSelected' ? undefined : value))
+const musicOffset = computed(() => {
+  const offset = Number(props.infoObject.offset)
+  return Number.isFinite(offset) ? offset : 0
+})
+const musicVolume = computed(() => {
+  const volume = Number(props.audioVolume ?? 100)
+  return Number.isFinite(volume) ? Math.max(0, Math.min(1, volume / 100)) : 1
+})
 
 // 特定小節内のノーツを取得
 function getMeasureNotes(measureNumber: number) {
@@ -482,94 +461,66 @@ function setLEDColor(color?: string) {
   }
 }
 
-function playFromMeasure() {
-  const _startOffset = startOffset.value
-  const audioDelay = (60 / props.infoObject.bpm) * props.infoObject.beat * 1000 // 拍子木分オフセット
-  timeoutIds.value.push(setTimeout(() => {
-    if (props.previewAudio) {
-      props.previewAudio.volume = (props.audioVolume ?? 100) / 100
-      props.previewAudio.currentTime = _startOffset / 1000
-      props.previewAudio.play()
+function updatePreview(time: number) {
+  lastChartTime = time
+  const liveMeasures = measures.value
+  if (previewContent.value) {
+    const transform = `translate3d(0, ${getPreviewPosition(liveMeasures, time)}px, 0)`
+    if (previewContent.value.style.transform !== transform) previewContent.value.style.transform = transform
+  }
+  if (playback.phase === 'preparing' || playback.phase === 'starting') return
+  const eventTime = time - (musicOffset.value - playbackOffset)
+  if (eventOffset !== musicOffset.value) {
+    if (noteEventsStarted) {
+      clearNoteEffects()
+      noteEventPlayer?.seek(eventTime)
     }
-  }, audioDelay) as unknown as number)
-
-  measures.value.forEach((measure, index) => {
-    const next = measures.value[index + 1] as Measure | undefined
-    if (measure.measureReachTime > _startOffset) {
-      const diff = measure.measureLength === 0 ? -30 : 0
-      timeoutIds.value.push(
-        setTimeout(() => {
-          currentPosition.value = next?.measurePositionBottom ?? 0
-          const transitionTime = (next?.measureReachTime ?? 0) - measure.measureReachTime
-          const elem = preview.value
-          if (!elem) return
-          if (measure.measureLength === 0) {
-            // 瞬間移動の場合
-            elem.style.transition = 'none'
-            elem.style.bottom = `-${currentPosition.value}px`
-            return
-          }
-          elem.style.transition = `${transitionTime}ms all linear`
-          elem.style.bottom = `-${currentPosition.value}px`
-          if (isPlayGuide.value) {
-            // 小節ガイド音再生
-            playGuideSound(0)
-          }
-        }, measure.measureReachTime - _startOffset + diff) as unknown as number
-      )
-    }
-  })
-  setNoteEvents(_startOffset)
+    previousGuideMeasure = Math.max(previousGuideMeasure, getPreviewMeasureIndex(liveMeasures, time))
+    eventOffset = musicOffset.value
+  }
+  if (!noteEventsStarted && eventTime >= noteEventOffset) {
+    noteEventPlayer?.start(eventsForPlayback, noteEventOffset, { includeStart: includeStartEvent })
+    noteEventsStarted = true
+  }
+  if (noteEventsStarted) noteEventPlayer?.update(eventTime)
+  if (currentComboEl.value && currentComboEl.value.textContent !== String(currentCombo.value)) {
+    currentComboEl.value.textContent = String(currentCombo.value)
+  }
+  const index = getPreviewMeasureIndex(liveMeasures, time)
+  const measure = liveMeasures[index]
+  if (index > previousGuideMeasure && measure && time >= measure.measureReachTime) {
+    if (isPlayGuide.value && time - measure.measureReachTime <= 50) previewSounds.play()
+    previousGuideMeasure = index
+  }
 }
 
-function playFromZero() {
-  timeoutIds.value.push(setTimeout(() => {
-    if (props.previewAudio) {
-      props.previewAudio.currentTime = 0
-      props.previewAudio.volume = (props.audioVolume ?? 100) / 100
-      props.previewAudio.play()
-    }
-  }, (60 / props.infoObject.bpm) * props.infoObject.beat * 1000) as unknown as number)
-
-  // 1小節ずつプレビュー
-  measures.value.forEach((measure, index) => {
-    const next = measures.value[index + 1] as Measure | undefined
-    const diff = measure.measureLength === 0 ? -30 : 0
-    timeoutIds.value.push(
-      setTimeout(() => {
-        currentPosition.value = next?.measurePositionBottom ?? 0
-        const transitionTime = (next?.measureReachTime ?? 0) - measure.measureReachTime
-        const elem = preview.value
-        if (!elem) return
-        elem.style.transition = `${transitionTime}ms all linear`
-        elem.style.bottom = `-${currentPosition.value}px`
-        if (isPlayGuide.value) {
-          // 小節ガイド音再生
-          playGuideSound(0.1)
-        }
-      }, measure.measureReachTime + diff) as unknown as number
-    )
-  })
-  setNoteEvents(0)
-}
+const playback = createPreviewPlayback({
+  onFrame: updatePreview,
+  onEnd: () => previewStop(),
+  onError(error) {
+    previewStop()
+    showSnackbar(`プレビューを再生できませんでした: ${error.message}`)
+  },
+})
 
 // NoteEvents(ノート到達時イベント)をセットする
 function setNoteEvents(offset: number) {
   noteEventPlayer?.stop()
+  noteEventOffset = offset
+  noteEventsStarted = false
+  eventsForPlayback = previewEvents.value
   let prevMoveTiming = -500
   let prevMoveTimer: number | null = null
   const _isShowFlickEffect = isShowFlickEffect.value
   const _isShowHandguide = isShowHandguide.value
+  const beamElements = keybeams.value?.querySelectorAll<HTMLElement>(':scope > div:not(.flick-effect)')
 
   noteEventPlayer = createPreviewEventPlayer({
-    getKeybeams: () => keybeams.value?.querySelectorAll<HTMLElement>(':scope > div:not(.flick-effect)'),
+    getKeybeams: () => beamElements,
     isShowKeybeam: () => isShowKeybeam.value,
     isPlayKeySound: () => isPlayKeySound.value,
     isPlayKeySoundEnd: () => isPlayKeySoundEnd.value,
-    playSound: () => {
-      // 打鍵音を再生
-      playGuideSound(0.1)
-    },
+    playSound: previewSounds.play,
     onEvent: event => {
       // フリックエフェクト
       if (isShowKeybeam.value && event.handMove && _isShowFlickEffect && event.noteObject && keybeams.value) {
@@ -611,65 +562,120 @@ function setNoteEvents(offset: number) {
       currentCombo.value += event.count
       if (isSimulateLED.value && event.color) setLEDColor(event.color)
     },
+    onSeek: color => { if (isSimulateLED.value) setLEDColor(color ?? undefined) },
   })
-  noteEventPlayer.start(previewEvents.value, offset)
-  if (currentComboEl.value) currentComboEl.value.textContent = String(currentCombo.value)
 }
 
-function clearPlayback() {
-  noteEventPlayer?.stop()
-  timeoutIds.value.forEach(id => clearTimeout(id))
-  timeoutIds.value = []
+function clearNoteEffects() {
   eventIds.value.forEach(id => clearTimeout(id))
   eventIds.value = []
   keybeams.value?.querySelectorAll('.flick-effect').forEach(element => element.remove())
   handguide.value?.classList.remove('-left', '-right', '-up', '-down')
 }
 
+function clearPlayback() {
+  playback.stop()
+  noteEventPlayer?.stop()
+  noteEventsStarted = false
+  previewSounds.stop()
+  timeoutIds.value.forEach(id => clearTimeout(id))
+  timeoutIds.value = []
+  clearNoteEffects()
+}
+
 function previewStart() {
-  if (!measures.value[startFrom.value]) {
+  const selected = measures.value[startFrom.value]
+  if (!selected) {
     showSnackbar(`${startFrom.value}小節はありません`)
     return false
   }
   clearPlayback()
-  const ctx = getAudioContext()
-  if (ctx && ctx.state === 'suspended') {
-    ctx.resume()
-  }
   returnPosition.value = window.scrollY // 停止後に戻る座標
   isPreviewing.value = true
+  if (preview.value) preview.value.style.transition = 'none'
   currentCombo.value = 0
-  if (currentComboEl.value) currentComboEl.value.textContent = String(currentCombo.value)
-  const elem = preview.value
-  if (elem) {
-    elem.style.bottom = `-${measures.value.at(0)?.measurePositionBottom ?? 0}px`
-    elem.style.transition = 'none'
-  }
-  if (startFrom.value === 0) playFromZero()
-  else playFromMeasure()
+  if (currentComboEl.value) currentComboEl.value.textContent = '0'
+  setLEDColor()
+  previousGuideMeasure = -1
+  includeStartEvent = startFrom.value !== 0
+  playbackMeasures = measures.value.map(measure => ({ ...measure }))
+  playbackOffset = eventOffset = musicOffset.value
+  const countInMs = (60 / props.infoObject.bpm) * props.infoObject.beat * 1000
+  setNoteEvents(startFrom.value === 0 ? 0 : selected.measureReachTime)
+  void playback.start({
+    audio: props.previewAudio,
+    prepare: isPlayKeySound.value || isPlayGuide.value ? previewSounds.prepare : undefined,
+    measures: playbackMeasures,
+    startMeasure: startFrom.value,
+    countInMs,
+    volume: musicVolume.value,
+    getEndTime: () => {
+      const last = measures.value.at(-1)!
+      return last.measureReachTime + last.measureLength
+    },
+  })
 }
 
-function previewStop() {
-  if (props.previewAudio) props.previewAudio.pause()
+function previewStop(restoreScroll = true) {
+  const position = returnPosition.value
+  returnPosition.value = -1
   isPreviewing.value = false
-  currentPosition.value = 0
-  currentBpm.value = 0
-  currentBeat.value = 0
   currentCombo.value = 0
+  if (currentComboEl.value) currentComboEl.value.textContent = '0'
   setLEDColor()
   clearPlayback()
   if (preview.value) {
-    preview.value.style.transition = '0ms all linear'
+    preview.value.style.transition = 'none'
     preview.value.style.bottom = '0px'
   }
 
-  if (returnPosition.value >= 0) {
+  previewContent.value?.style.removeProperty('transform')
+
+  if (restoreScroll && position >= 0) {
     timeoutIds.value.push(setTimeout(() => {
-      window.scrollTo({ top: returnPosition.value, behavior: 'auto' })
-      returnPosition.value = -1
+      window.scrollTo({ top: position, behavior: 'auto' })
     }, 50) as unknown as number)
   }
 }
+
+// srcはDOMの非リアクティブな属性。変更はファイル選択とメディアイベントで検知する。
+watch([() => props.previewAudio, () => props.currentChart, playbackChartSignature, () => props.currentDifficulty,
+  () => props.infoObject.bpm, () => props.infoObject.beat], () => {
+  if (isPreviewing.value) previewStop(false)
+})
+
+watch([() => props.measureData, musicOffset], () => {
+  if (!isPreviewing.value) return
+  const offsetChange = musicOffset.value - playbackOffset
+  const sameTimeline = measures.value.length === playbackMeasures.length && measures.value.every((measure, index) => {
+    const original = playbackMeasures[index]
+    return measure.measure === original.measure && measure.measureBpm === original.measureBpm &&
+      measure.measureBeat === original.measureBeat && measure.measureLength === original.measureLength &&
+      Math.abs(measure.measureReachTime - original.measureReachTime - offsetChange) < 0.001
+  })
+  if (sameTimeline) updatePreview(lastChartTime)
+  else previewStop(false)
+})
+
+watch([() => props.previewAudio, () => props.audioVolume], () => {
+  if (props.previewAudio) props.previewAudio.volume = musicVolume.value
+}, { immediate: true })
+
+// 再生途中でガイド音を有効にした場合にも、次の小節までに音を準備する。
+watch(isPlayGuide, (enabled, _, onCleanup) => {
+  if (!enabled || !isPreviewing.value) return
+  const player = noteEventPlayer
+  let cancelled = false
+  onCleanup(() => { cancelled = true })
+  void previewSounds.prepare().catch(error => {
+    if (!cancelled && isPreviewing.value && noteEventPlayer === player) {
+      showSnackbar(`補助音を再生できませんでした: ${error.message}`)
+    }
+  })
+})
+
+// ファイル選択時はデータの変更通知を待たず、スクロール予約も残さずに終了する。
+defineExpose({ stop: () => previewStop(false) })
 
 // 全体からロングノーツ（＋ロングのダミー）だけを取得
 const longNotes = computed(() =>
@@ -685,7 +691,7 @@ const previewEvents = computed((): PreviewEvents =>
 
 onBeforeUnmount(() => {
   clearPlayback()
-  props.previewAudio?.pause()
+  previewSounds.dispose()
 })
 
 const entireHeight = computed(() => {
@@ -693,12 +699,12 @@ const entireHeight = computed(() => {
   return (last?.measurePositionBottom ?? 0) + (last?.measureHeight ?? 0)
 })
 
-const startOffset = computed(() => measures.value[startFrom.value]?.measureReachTime ?? 0)
-
-const previewDelay = computed(() => measures.value.length * 10 + 100)
 </script>
 
 <style lang="scss" scoped>
+.preview-content {
+  position: relative;
+}
 .preview {
   background: #202020;
   width: 100%;

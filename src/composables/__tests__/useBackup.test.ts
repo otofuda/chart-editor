@@ -62,6 +62,25 @@ describe('useBackup', () => {
     expect(chartData.chartObject.value.easy.length).toBe(0)
   })
 
+  it('番号が重複した古いバックアップを復元してLEDを削除しても、通常・ロングノーツは残る', () => {
+    const chartData = useChartData()
+    const backup = useBackup(chartData)
+    const tap = { index: 1, type: 1, lane: 1, measure: 0, position: 0, split: 8, option: [], end: [] }
+    const hold = { ...tap, index: 2, type: 2, measure: 1, end: [{ ...tap, measure: 2 }] }
+    const led = { ...tap, type: 96, lane: -1, measure: 3, option: ['255', '0', '0'] }
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    localStorage.setItem('chart-editor__backup', JSON.stringify({ easy: [tap, hold, led] }))
+
+    backup.restoreBackup()
+    expect(chartData.currentChart.value).toHaveLength(3)
+    chartData.deleteNotes(chartData.currentChart.value.find(note => note.type === 96)!.index!)
+
+    expect(chartData.currentChart.value).toEqual([
+      { ...tap, isSelected: false },
+      { ...hold, isSelected: false },
+    ])
+  })
+
   it('不正な JSON 文字列の場合はクラッシュせずにエラー通知を行う', () => {
     const chartData = useChartData()
     const backup = useBackup(chartData)

@@ -18,14 +18,26 @@ function setupPlayback(settings = { beam: true, sound: true, endSound: true }) {
   const playSound = vi.fn()
   const onEvent = vi.fn()
   const onPastEvent = vi.fn()
-  const player = createPreviewEventPlayer({
+  const onSeek = vi.fn()
+  const controller = createPreviewEventPlayer({
     getKeybeams: () => elements,
     isShowKeybeam: () => settings.beam,
     isPlayKeySound: () => settings.sound,
     isPlayKeySoundEnd: () => settings.endSound,
-    playSound, onEvent, onPastEvent,
+    playSound, onEvent, onPastEvent, onSeek,
   })
-  return { elements, playSound, onEvent, onPastEvent, player }
+  let time = 0
+  const player = {
+    ...controller,
+    start(...args: Parameters<typeof controller.start>) { time = args[1]; controller.start(...args) },
+  }
+  const advance = (milliseconds: number) => {
+    for (let i = 0; i < milliseconds; i++) {
+      vi.advanceTimersByTime(1)
+      player.update(++time)
+    }
+  }
+  return { elements, playSound, onEvent, onPastEvent, onSeek, player, advance }
 }
 
 describe('buildPreviewEvents', () => {
@@ -79,75 +91,151 @@ describe('プレビュー再生', () => {
   afterEach(() => { vi.clearAllTimers(); vi.useRealTimers() })
 
   it('分岐の短い終点では消灯せず、最長の終点で消灯する', () => {
-    const { elements, player } = setupPlayback()
+    const { elements, player, advance } = setupPlayback()
     player.start(build([branch()]), 0)
-    vi.advanceTimersByTime(100)
+    advance(100)
     expect(elements[1].classList.contains('-hold')).toBe(true)
-    vi.advanceTimersByTime(250)
+    advance(250)
     expect(elements[1].classList.contains('-hold')).toBe(true)
-    vi.advanceTimersByTime(500)
+    advance(500)
     expect(elements[1].classList.contains('-hold')).toBe(false)
   })
 
   it('小数レーン1.1と1.4が同じ発光先に丸められても、最後のLNまで維持する', () => {
-    const { elements, player } = setupPlayback()
+    const { elements, player, advance } = setupPlayback()
     player.start(build([
       note({ type: 2, lane: 1.1 as any, end: [note({ position: 1 })] }),
       note({ type: 2, lane: 1.4 as any, end: [note({ position: 3 })] }),
     ]), 0)
-    vi.advanceTimersByTime(350)
+    advance(350)
     expect(elements[1].classList.contains('-hold')).toBe(true)
-    vi.advanceTimersByTime(500)
+    advance(500)
     expect(elements[1].classList.contains('-hold')).toBe(false)
   })
 
   it.each([[2, 3], [3, 2]])('開始時刻が異なるLNを保持する（先行終点%s・後続終点%s）', (firstEnd, secondEnd) => {
-    const { elements, player } = setupPlayback()
+    const { elements, player, advance } = setupPlayback()
     player.start(build([
       note({ type: 2, end: [note({ position: firstEnd })] }),
       note({ type: 2, position: 1, end: [note({ position: secondEnd })] }),
     ]), 0)
-    vi.advanceTimersByTime(600)
+    advance(600)
     expect(elements[1].classList.contains('-hold')).toBe(true)
-    vi.advanceTimersByTime(250)
+    advance(250)
     expect(elements[1].classList.contains('-hold')).toBe(false)
   })
 
   it('途中再生では継続中のホールドだけを復元し、過去の音を鳴らさない', () => {
-    const { elements, player, playSound, onPastEvent } = setupPlayback()
+    const { elements, player, playSound, onPastEvent, advance } = setupPlayback()
     player.start(build([branch()]), 500)
     expect(elements[1].classList.contains('-hold')).toBe(true)
     expect(elements[1].classList.contains('-on')).toBe(false)
     expect(onPastEvent).toHaveBeenCalledTimes(2)
     expect(playSound).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(349)
+    advance(349)
     expect(elements[1].classList.contains('-hold')).toBe(true)
-    vi.advanceTimersByTime(1)
+    advance(1)
     expect(elements[1].classList.contains('-hold')).toBe(false)
     expect(playSound).toHaveBeenCalledTimes(1)
   })
 
   it('再生位置ですでに終了したホールドを点灯しない', () => {
-    const { elements, player, playSound } = setupPlayback()
+    const { elements, player, playSound, advance } = setupPlayback()
     player.start(build([branch()]), 850)
     expect(elements.every(element => element.className === '')).toBe(true)
-    vi.runAllTimers()
+    advance(1000)
     expect(playSound).not.toHaveBeenCalled()
   })
 
-  it('停止で発光と予約イベントを解除し、再再生に古い終了タイマーを持ち越さない', () => {
-    const { elements, player, playSound, onEvent } = setupPlayback()
+  it('音源が待機している間はホールドとコンボが進まない', () => {
+    const { player, elements, playSound, onEvent } = setupPlayback()
     player.start(build([branch()]), 0)
-    vi.advanceTimersByTime(100)
+    player.update(100)
+    vi.advanceTimersByTime(5000)
+    player.update(100)
+    expect(elements[1].classList.contains('-hold')).toBe(true)
+    expect(playSound).toHaveBeenCalledOnce()
+    expect(onEvent).toHaveBeenCalledOnce()
+    player.stop()
+  })
+
+  it('描画が長く止まった後は過去の音を鳴らさず、コンボ・LED・ホールドを復元する', () => {
+    const { player, elements, playSound, onPastEvent } = setupPlayback()
+    player.start(build([branch(), note({ type: 96, position: 1, option: ['255', '0', '0'] })]), 0)
+    player.update(600)
+    expect(playSound).not.toHaveBeenCalled()
+    expect(onPastEvent).toHaveBeenCalledTimes(2)
+    expect(onPastEvent.mock.calls[1][0]).toMatchObject({ color: 'rgb(255,0,0)' })
+    expect(elements[1].classList.contains('-hold')).toBe(true)
+    player.update(850)
+    expect(playSound).toHaveBeenCalledOnce()
+    expect(elements[1].classList.contains('-hold')).toBe(false)
+  })
+
+  it('指定小節の頭ちょうどのイベントも1回再生する', () => {
+    const { player, playSound } = setupPlayback()
+    player.start(build([note()]), 100, { includeStart: true })
+    player.update(100)
+    player.update(100)
+    expect(playSound).toHaveBeenCalledOnce()
+  })
+
+  it('オフセットを戻して到達済みイベントを通過し直しても、音・コンボを再実行しない', () => {
+    const { player, elements, playSound, onEvent, onPastEvent } = setupPlayback()
+    player.start(build([branch()]), 0)
+    player.update(100)
+    player.update(350)
+    expect(playSound).toHaveBeenCalledTimes(2)
+    player.seek(50)
+    expect(elements[1].classList.contains('-hold')).toBe(false)
+    player.update(100)
+    expect(elements[1].classList.contains('-hold')).toBe(true)
+    player.update(350)
+    expect(playSound).toHaveBeenCalledTimes(2)
+    player.update(850)
+    expect(playSound).toHaveBeenCalledTimes(3)
+    expect(elements[1].classList.contains('-hold')).toBe(false)
+    player.seek(500)
+    expect(elements[1].classList.contains('-hold')).toBe(true)
+    player.update(850)
+    expect(playSound).toHaveBeenCalledTimes(3)
+    expect(onEvent).toHaveBeenCalledTimes(3)
+    expect(onPastEvent).not.toHaveBeenCalled()
+  })
+
+  it('オフセット変更で飛び越えたイベントは状態だけ反映し、LEDも新しい位置へ戻す', () => {
+    const { player, elements, playSound, onPastEvent, onSeek } = setupPlayback()
+    player.start(build([branch(), note({ type: 96, position: 1, option: ['255', '0', '0'] })]), 0)
+    player.seek(600)
+    expect(onPastEvent).toHaveBeenCalledTimes(2)
+    expect(playSound).not.toHaveBeenCalled()
+    expect(onSeek).toHaveBeenLastCalledWith('rgb(255,0,0)')
+    expect(elements[1].classList.contains('-hold')).toBe(true)
+    player.seek(50)
+    expect(onSeek).toHaveBeenLastCalledWith(null)
+    expect(elements[1].classList.contains('-hold')).toBe(false)
+    player.update(100)
+    player.update(350)
+    expect(onPastEvent).toHaveBeenCalledTimes(2)
+    expect(playSound).not.toHaveBeenCalled()
+    expect(onSeek).toHaveBeenLastCalledWith('rgb(255,0,0)')
+    player.update(850)
+    expect(playSound).toHaveBeenCalledOnce()
+  })
+
+  it('停止で発光と予約イベントを解除し、再再生に古い終了タイマーを持ち越さない', () => {
+    const { elements, player, playSound, onEvent, advance } = setupPlayback()
+    player.start(build([branch()]), 0)
+    advance(100)
     expect(elements[1].classList.contains('-on')).toBe(true)
     player.stop()
     expect(elements[1].className).toBe('')
     expect(vi.getTimerCount()).toBe(0)
-    vi.advanceTimersByTime(100)
+    advance(100)
     player.start(build([branch()]), 0)
-    vi.advanceTimersByTime(650)
+    advance(650)
     expect(elements[1].classList.contains('-hold')).toBe(true)
-    vi.advanceTimersByTime(200)
+    advance(200)
     expect(elements[1].classList.contains('-hold')).toBe(false)
     expect(playSound).toHaveBeenCalledTimes(4)
     expect(onEvent).toHaveBeenCalledTimes(4)
@@ -156,18 +244,18 @@ describe('プレビュー再生', () => {
   it.each([
     [false, false, 0], [false, true, 0], [true, false, 1], [true, true, 3],
   ])('打鍵音=%s・終点音=%s の条件に従い二重再生しない', (sound, endSound, expected) => {
-    const { player, playSound } = setupPlayback({ beam: false, sound, endSound })
+    const { player, playSound, advance } = setupPlayback({ beam: false, sound, endSound })
     player.start(build([branch()]), 0)
-    vi.runAllTimers()
+    advance(1000)
     expect(playSound).toHaveBeenCalledTimes(expected)
   })
 
   it.each([false, true])('終点音=%sでも通常中点は鳴り、type89の末端は無音になる', endSound => {
-    const { player, playSound } = setupPlayback({ beam: true, sound: true, endSound })
+    const { player, playSound, advance } = setupPlayback({ beam: true, sound: true, endSound })
     player.start(build([note({ type: 2, end: [
       note({ position: 1, end: [note({ type: 89, position: 3 })] }),
     ] })]), 0)
-    vi.runAllTimers()
+    advance(1000)
     expect(playSound).toHaveBeenCalledTimes(2)
   })
 
@@ -182,7 +270,8 @@ describe('プレビュー再生', () => {
       note({ type: 2, end: [note({ position: 3 }), note({ position: 3 })] }),
       note({ position: 3 }),
     ]), 0)
-    vi.runAllTimers()
+    player.update(100)
+    player.update(850)
     expect(playSound).toHaveBeenCalledTimes(2)
   })
 
@@ -192,11 +281,13 @@ describe('プレビュー再生', () => {
     expect(() => {
       for (const lane of [0, 1.5, 6, -100, 99, NaN]) {
         beams.pulse(lane)
-        beams.hold(lane, 100)
+        beams.setHolds([lane])
       }
     }).not.toThrow()
+    beams.setHolds([0, 1.5, 6, -100, 99, NaN])
     expect(elements[0].classList.contains('-hold')).toBe(true)
     expect(elements[2].classList.contains('-hold')).toBe(true)
+    beams.setHolds([])
     vi.runAllTimers()
     expect(elements.every(element => element.className === '')).toBe(true)
     expect(vi.getTimerCount()).toBe(0)

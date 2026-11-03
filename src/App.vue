@@ -1,6 +1,7 @@
 <template>
   <v-app id="app">
     <Preview
+      ref="previewRef"
       :currentChart="currentChart"
       :currentDifficulty="currentDifficulty"
       :infoObject="chartInfo"
@@ -948,7 +949,8 @@ const {
   selectionChangeType, selectionChangeLane, selectionAddLane, selectionAddMeasure, batchSelect,
 } = selection
 
-const fileIO = useFileIO(chartData, showSnackbar)
+const previewRef = ref<InstanceType<typeof Preview> | null>(null)
+const fileIO = useFileIO(chartData, showSnackbar, () => previewRef.value?.stop())
 const { fileName, isLoaded, previewAudio, audioVolume, readFile, newFile, saveFile, readAudioFile } = fileIO
 
 const textureDB = useTextureDB(appendNote, showSnackbar)

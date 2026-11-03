@@ -102,4 +102,46 @@ describe('useNoteEditor - 全難易度同時挿入', () => {
     expect(chartData.chartObject.value.easy.length).toBe(2)
     expect(chartData.chartObject.value.easy[1].index).toBe(2)
   })
+
+  it.each([1, 2])('通常挿入したtype:%sのノーツは、同時挿入したLEDを削除しても残る', type => {
+    const { chartData, editor } = setup()
+    const end = type === 2 ? [{ ...sampleNote, measure: 1 }] : []
+    editor.appendNotes({ ...sampleNote, type, end })
+    const original = JSON.parse(JSON.stringify(chartData.currentChart.value[0]))
+
+    editor.appendSimultaneously({ ...sampleNote, type: 96, lane: -1, measure: 2, option: ['255', '0', '0'] })
+    const led = chartData.currentChart.value.find(note => note.type === 96)!
+    chartData.deleteNotes(led.index!)
+
+    expect(chartData.currentChart.value).toEqual([original])
+    expect(chartData.chartObject.value.hard).toHaveLength(1)
+    expect(chartData.chartObject.value.hard[0].type).toBe(96)
+  })
+
+  it('削除で欠番ができた各難易度でも、複数のLEDを同時挿入して削除すると既存ノーツが残る', () => {
+    const { chartData, editor } = setup()
+    const originals = chartData.difficulties.map((difficulty, i) => {
+      chartData.currentDifficulty.value = difficulty
+      chartData.chartObject.value[difficulty] = Array.from({ length: i + 3 }, (_, index) => ({
+        ...sampleNote, index, measure: index,
+      }))
+      chartData.deleteNotes(0)
+      return chartData.currentChart.value.slice()
+    })
+
+    editor.appendSimultaneously(
+      { ...sampleNote, type: 96, lane: -1, measure: 10, option: ['255', '0', '0'] },
+      { ...sampleNote, type: 96, lane: -1, measure: 11, option: ['0', '0', '255'] },
+    )
+
+    chartData.difficulties.forEach((difficulty, i) => {
+      chartData.currentDifficulty.value = difficulty
+      const chart = chartData.currentChart.value
+      expect(chart).toHaveLength(originals[i].length + 2)
+      expect(new Set(chart.map(note => note.index)).size).toBe(chart.length)
+      const leds = chart.filter(note => note.type === 96)
+      chartData.deleteNotes(...leds.map(note => note.index!))
+      expect(chartData.currentChart.value).toEqual(originals[i])
+    })
+  })
 })
