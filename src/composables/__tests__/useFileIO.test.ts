@@ -138,6 +138,20 @@ describe('ファイル変更時の再生停止と読み込みの競合', () => {
     expect(s.io.isLoaded.value).toBe(true)
   })
 
+  it('番号が重複した譜面を読み込んでLEDを削除しても他のノーツは残る', () => {
+    const s = setupChange()
+    const tap = { index: 1, type: 1, lane: 1, measure: 0, position: 0, split: 8, option: [], end: [] }
+    const led = { ...tap, type: 96, lane: -1, measure: 1, option: ['255', '0', '0'] }
+    s.io.readFile(new File([''], 'duplicate-index.json'))
+    ControlledFileReader.instances[0].complete(JSON.stringify({ easy: [tap, led] }))
+
+    expect(s.io.isLoaded.value).toBe(true)
+    expect(s.chartData.currentChart.value).toHaveLength(2)
+    s.chartData.deleteNotes(s.chartData.currentChart.value.find(note => note.type === 96)!.index!)
+
+    expect(s.chartData.currentChart.value).toEqual([{ ...tap, isSelected: false }])
+  })
+
   it('連続選択では前の読み込みを中断し、遅いload通知も新しい譜面を上書きしない', () => {
     const s = setupChange()
     s.io.readFile(new File([''], 'first.json'))
