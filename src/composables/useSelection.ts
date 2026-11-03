@@ -133,6 +133,13 @@ export function useSelection(
     }
   }
 
+  function shiftMeasureRecursive(note: NoteData, diff: number): void {
+    note.measure = Math.max(note.measure + diff, 0)
+    if (note.end && Array.isArray(note.end)) {
+      note.end.forEach((end: NoteData) => shiftMeasureRecursive(end, diff))
+    }
+  }
+
   /**
    * 選択ノーツの小節を加算または減算する
    * @param diff - 加算/減算する値
@@ -143,11 +150,7 @@ export function useSelection(
       (note) => note.isSelected
     )
     targets.forEach((note: NoteData) => {
-      note.measure = Math.max(note.measure + d, 0)
-      // TODO: ネスト終点に対応
-      note.end.forEach((end: NoteData) => {
-        end.measure = Math.max(end.measure + d, 0)
-      })
+      shiftMeasureRecursive(note, d)
     })
     showSnackbar(`小節位置 ${d} 一括処理を実行しました`)
   }

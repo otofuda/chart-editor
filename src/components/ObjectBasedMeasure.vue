@@ -1,5 +1,5 @@
 <template>
-  <div class="object-based-measure">
+  <div class="object-based-measure" :class="{ 'is-child': isChild }">
     <h3>
       {{ measure.measure }}小節
       <span>
@@ -9,10 +9,11 @@
     <v-expansion-panels theme="dark">
       <v-expansion-panel
         v-for="(note, i) in notes"
-        :key="`note_${measure.measure}_${i}`"
+        :key="`note_${measure.measure}_${getNoteKey(note, i)}`"
       >
         <v-expansion-panel-title>
-          #{{ note.index }} {{ noteTypeName(note) }}
+          <template v-if="note.index !== undefined">#{{ note.index }} </template>
+          {{ noteTypeName(note) }}
           <span>（{{ note.position }}/{{ note.split }}）</span>
           <template v-if="hasError(note)" v-slot:actions>
             <v-icon color="error">
@@ -22,15 +23,15 @@
         </v-expansion-panel-title>
 
         <v-expansion-panel-text>
-          <v-alert type="error" v-if="hasError(note)">
+          <v-alert type="error" v-if="hasError(note)" class="mb-3">
             {{ hasError(note) }}
           </v-alert>
 
           <v-text-field
-            :model-value="getLocalMeasure(note)"
-            @update:model-value="val => setLocalMeasure(note, Number(val))"
-            @change="commitMeasure(note)"
-            @keydown.enter.stop="commitMeasure(note)"
+            :model-value="getLocalMeasure(note, i)"
+            @update:model-value="val => setLocalMeasure(note, i, Number(val))"
+            @change="commitMeasure(note, i)"
+            @keydown.enter.stop="commitMeasure(note, i)"
             label="小節"
             variant="outlined"
             density="compact"
@@ -58,6 +59,7 @@
                 density="compact"
                 hide-details
                 type="number"
+                step="0.1"
               ></v-text-field>
             </v-col>
           </v-row>
@@ -85,9 +87,9 @@
             </v-col>
           </v-row>
 
-          <v-row v-for="(opt, i) in noteOptions(note)" :key="`option_${i}`" class="my-0">
+          <v-row v-for="(opt, optIdx) in noteOptions(note)" :key="`option_${optIdx}`" class="my-0">
             <v-text-field
-              v-model="note.option[i]"
+              v-model="note.option[optIdx]"
               hide-details
               :label="opt.label"
               :type="opt.type"
@@ -97,11 +99,12 @@
             ></v-text-field>
           </v-row>
 
-          <!-- ロングノーツの時、終点を表示 -->
-          <div class="object-based-measure__children" v-if="note.type === 2">
+          <!-- ロングノーツまたは終点ネストを持つ時、終点を表示 -->
+          <div class="object-based-measure__children" v-if="note.type === 2 || (note.end && note.end.length > 0)">
             <ObjectBasedMeasure
-              :measure="({ ...measure, measure: '[終点]', measureBeat: '-', measureBpm: '-' } as any)"
+              :measure="({ ...measure, measure: '[終点・中点]', measureBeat: '-', measureBpm: '-' } as any)"
               :notes="note.end"
+              :is-child="true"
             ></ObjectBasedMeasure>
           </div>
 
@@ -136,31 +139,40 @@ const props = defineProps<{
   measure: Measure
   measureData?: any[]
   currentDifficulty?: DifficultyString
+  isChild?: boolean
 }>()
 
-const menu = ref(false)
 const deleteNotes = inject(deleteNotesKey)!
 const showSnackbar = inject(showSnackbarKey)!
 
-const localMeasures = ref<Record<number, number>>({})
+const localMeasures = ref<Record<string, number>>({})
 
-function getLocalMeasure(note: ExtendedNoteData) {
-  if (localMeasures.value[note.index] === undefined) {
-    localMeasures.value[note.index] = note.measure
+function getNoteKey(note: ExtendedNoteData, index: number): string {
+  return note.index !== undefined ? String(note.index) : `${props.measure.measure}_${note.position}_${index}`
+}
+
+function getLocalMeasure(note: ExtendedNoteData, index: number) {
+  const key = getNoteKey(note, index)
+  if (localMeasures.value[key] === undefined) {
+    localMeasures.value[key] = note.measure
   }
-  return localMeasures.value[note.index]
+  return localMeasures.value[key]
 }
 
-function setLocalMeasure(note: ExtendedNoteData, val: number) {
-  localMeasures.value[note.index] = val
+function setLocalMeasure(note: ExtendedNoteData, index: number, val: number) {
+  const key = getNoteKey(note, index)
+  localMeasures.value[key] = val
 }
 
-function commitMeasure(note: ExtendedNoteData) {
-  note.measure = localMeasures.value[note.index]
+function commitMeasure(note: ExtendedNoteData, index: number) {
+  const key = getNoteKey(note, index)
+  note.measure = localMeasures.value[key]
 }
 
 function deleteNote(note: ExtendedNoteData) {
-  deleteNotes(note.index)
+  if (note.index !== undefined) {
+    deleteNotes(note.index)
+  }
 }
 
 function noteTypeName(note: ExtendedNoteData) {
@@ -175,20 +187,33 @@ function noteTypeName(note: ExtendedNoteData) {
 <style lang="scss" scoped>
 .object-based-measure {
   color: #f0f0f0;
-  margin-left: calc(100% - 420px);
-  max-width: 100%;
-  min-width: 200px;
+  width: 100%;
+  box-sizing: border-box;
+
   h3 {
-    padding: 8px;
+    padding: 8px 4px;
+    font-size: 1.1rem;
     span {
       color: #909090;
-      font-size: 16px;
+      font-size: 0.9rem;
       font-weight: normal;
     }
   }
+
   &__children {
-    position: relative;
-    left: 80px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    padding-left: 8px;
+    border-left: 2px solid rgba(255, 255, 255, 0.2);
+  }
+
+  :deep(.v-expansion-panel-text__wrapper) {
+    padding: 8px 8px;
+  }
+
+  :deep(.v-expansion-panel-title) {
+    padding: 8px 12px;
+    min-height: 40px;
   }
 }
 </style>

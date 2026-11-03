@@ -340,12 +340,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, watch, onMounted } from 'vue'
+import { ref, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
 import {
   type DifficultyString,
   type ExtendedNoteData,
   type Measure,
-  type PreviewEvent,
   type PreviewEvents
 } from '../types'
 
@@ -354,6 +353,7 @@ import ObjectBasedMeasure from './ObjectBasedMeasure.vue'
 import LongNote from './LongNote.vue'
 import NoteShadow from './NoteShadow.vue'
 import { showSnackbarKey } from '@/composables/injectionKeys'
+import { buildPreviewEvents, createPreviewEventPlayer } from '@/composables/usePreviewEvents'
 
 const props = defineProps<{
   currentChart?: ExtendedNoteData[]
@@ -398,6 +398,7 @@ const isShowFlickEffect = ref(false)
 const isSimulateLED = ref(false)
 const isPlayGuide = ref(false)
 const eventIds = ref<number[]>([])
+let noteEventPlayer: ReturnType<typeof createPreviewEventPlayer> | undefined
 const isPlayKeySound = ref(false)
 const isPlayKeySoundEnd = ref(false)
 const defaultLEDColor = 'linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)'
@@ -484,13 +485,13 @@ function setLEDColor(color?: string) {
 function playFromMeasure() {
   const _startOffset = startOffset.value
   const audioDelay = (60 / props.infoObject.bpm) * props.infoObject.beat * 1000 // 拍子木分オフセット
-  setTimeout(() => {
+  timeoutIds.value.push(setTimeout(() => {
     if (props.previewAudio) {
       props.previewAudio.volume = (props.audioVolume ?? 100) / 100
       props.previewAudio.currentTime = _startOffset / 1000
       props.previewAudio.play()
     }
-  }, audioDelay)
+  }, audioDelay) as unknown as number)
 
   measures.value.forEach((measure, index) => {
     const next = measures.value[index + 1] as Measure | undefined
@@ -522,13 +523,13 @@ function playFromMeasure() {
 }
 
 function playFromZero() {
-  setTimeout(() => {
+  timeoutIds.value.push(setTimeout(() => {
     if (props.previewAudio) {
       props.previewAudio.currentTime = 0
       props.previewAudio.volume = (props.audioVolume ?? 100) / 100
       props.previewAudio.play()
     }
-  }, (60 / props.infoObject.bpm) * props.infoObject.beat * 1000)
+  }, (60 / props.infoObject.bpm) * props.infoObject.beat * 1000) as unknown as number)
 
   // 1小節ずつプレビュー
   measures.value.forEach((measure, index) => {
@@ -554,88 +555,75 @@ function playFromZero() {
 
 // NoteEvents(ノート到達時イベント)をセットする
 function setNoteEvents(offset: number) {
+  noteEventPlayer?.stop()
   let prevMoveTiming = -500
   let prevMoveTimer: number | null = null
   const _isShowFlickEffect = isShowFlickEffect.value
   const _isShowHandguide = isShowHandguide.value
 
-  Object.entries(previewEvents.value).forEach(([timing, event]: [string, PreviewEvent]) => {
-    const time = Number(timing) - offset
-    const keybeamDOMs = keybeams.value?.querySelectorAll('div')
-    const comboDOM = currentComboEl.value
-    const handguideDOM = handguide.value
+  noteEventPlayer = createPreviewEventPlayer({
+    getKeybeams: () => keybeams.value?.querySelectorAll<HTMLElement>(':scope > div:not(.flick-effect)'),
+    isShowKeybeam: () => isShowKeybeam.value,
+    isPlayKeySound: () => isPlayKeySound.value,
+    isPlayKeySoundEnd: () => isPlayKeySoundEnd.value,
+    playSound: () => {
+      // 打鍵音を再生
+      playGuideSound(0.1)
+    },
+    onEvent: event => {
+      // フリックエフェクト
+      if (isShowKeybeam.value && event.handMove && _isShowFlickEffect && event.noteObject && keybeams.value) {
+        const effectDOM = document.createElement('div')
+        effectDOM.classList.add('flick-effect', event.handMove)
+        keybeams.value.appendChild(effectDOM)
+        // 座標計算
+        const left = (event.noteObject.lane - 1) * 60 + 30
+        let offset = 0
+        let width = Number(event.noteObject.option[0]) || 3
+        if (event.noteObject.option[1] && event.noteObject.option[2]) {
+          offset = (Number(event.noteObject.option[1]) / Number(event.noteObject.option[2])) * 60
+        }
+        if (width === -1) width = 3
+        effectDOM.style.left = `${left - (width / 2) * 60 + offset}px`
+        effectDOM.style.width = `${60 * width}px`
+        // 消えるタイマーのセット
+        eventIds.value.push(setTimeout(() => effectDOM.remove(), 250) as unknown as number)
+      }
+      // コンボ数
+      currentCombo.value += event.count
+      if (currentComboEl.value) currentComboEl.value.textContent = String(currentCombo.value)
 
-    if (time > 0) {
-      eventIds.value.push(
-        setTimeout(() => {
-          // 打鍵音を再生
-          if (event.sound && isPlayKeySound.value) {
-            playGuideSound(0.1)
-          }
-          // キービームを出す
-          if (isShowKeybeam.value && keybeamDOMs) {
-            // 単押し
-            event.lane.forEach((num: number) => { keybeamDOMs[num].classList.add('-on') })
-            setTimeout(() => {
-              event.lane.forEach((num: number) => { keybeamDOMs[num].classList.remove('-on') })
-            }, 25)
-            // LN(ホールド)
-            event.hold.forEach(([num, delay]: [number, number]) => {
-              keybeamDOMs[num].classList.add('-hold')
-              eventIds.value.push(
-                setTimeout(() => {
-                  keybeamDOMs[num].classList.remove('-hold')
-                  // hold配列の分、終点時にコンボ増加
-                  currentCombo.value += 1
-                  if (comboDOM) comboDOM.textContent = String(currentCombo.value)
-                  // 終点音を再生
-                  if (event.sound && isPlayKeySound.value && isPlayKeySoundEnd.value) {
-                    playGuideSound(0.1)
-                  }
-                }, delay) as unknown as number
-              )
-            })
-            // フリックエフェクト
-            if (event.handMove && _isShowFlickEffect && event.noteObject && keybeams.value) {
-              const effectDOM = document.createElement('div')
-              effectDOM.classList.add('flick-effect', event.handMove)
-              keybeams.value.appendChild(effectDOM)
-              // 座標計算
-              const _left = (event.noteObject.lane - 1) * 60 + 30
-              let _offset = 0
-              let _width = Number(event.noteObject.option[0]) || 3
-              if (event.noteObject.option[1] && event.noteObject.option[2])
-                _offset = (Number(event.noteObject.option[1]) / Number(event.noteObject.option[2])) * 60
-              if (_width === -1) _width = 3
-              effectDOM.style.left = `${_left - (_width / 2) * 60 + _offset}px`
-              effectDOM.style.width = `${60 * _width}px`
-              // 消えるタイマーのセット
-              setTimeout(() => { keybeams.value?.removeChild(effectDOM) }, 250)
-            }
-            // コンボ数
-            currentCombo.value += event.count
-            if (comboDOM) comboDOM.textContent = String(currentCombo.value)
-          }
-          // ハンドガイド(手の動き)をシミュレート
-          if (_isShowHandguide && handguideDOM) {
-            if (event.handMove) {
-              handguideDOM.classList.add(event.handMove)
-              if (prevMoveTimer && Number(timing) - prevMoveTiming > 200) clearTimeout(prevMoveTimer)
-              prevMoveTimer = setTimeout(() => {
-                handguideDOM.classList.remove(event.handMove as string)
-              }, 200) as unknown as number
-              prevMoveTiming = Number(timing)
-            }
-          }
-          // LEDを指定色に変化
-          if (isSimulateLED.value && event.color) setLEDColor(event.color)
-        }, time) as unknown as number
-      )
-    } else {
-      currentCombo.value += event.count + event.hold.length
+      // ハンドガイド(手の動き)をシミュレート
+      if (_isShowHandguide && handguide.value && event.handMove) {
+        const handguideDOM = handguide.value
+        handguideDOM.classList.add(event.handMove)
+        if (prevMoveTimer && event.timing - prevMoveTiming > 200) clearTimeout(prevMoveTimer)
+        prevMoveTimer = setTimeout(() => {
+          handguideDOM.classList.remove(event.handMove as string)
+        }, 200) as unknown as number
+        eventIds.value.push(prevMoveTimer)
+        prevMoveTiming = event.timing
+      }
+      // LEDを指定色に変化
       if (isSimulateLED.value && event.color) setLEDColor(event.color)
-    }
+    },
+    onPastEvent: event => {
+      currentCombo.value += event.count
+      if (isSimulateLED.value && event.color) setLEDColor(event.color)
+    },
   })
+  noteEventPlayer.start(previewEvents.value, offset)
+  if (currentComboEl.value) currentComboEl.value.textContent = String(currentCombo.value)
+}
+
+function clearPlayback() {
+  noteEventPlayer?.stop()
+  timeoutIds.value.forEach(id => clearTimeout(id))
+  timeoutIds.value = []
+  eventIds.value.forEach(id => clearTimeout(id))
+  eventIds.value = []
+  keybeams.value?.querySelectorAll('.flick-effect').forEach(element => element.remove())
+  handguide.value?.classList.remove('-left', '-right', '-up', '-down')
 }
 
 function previewStart() {
@@ -643,6 +631,7 @@ function previewStart() {
     showSnackbar(`${startFrom.value}小節はありません`)
     return false
   }
+  clearPlayback()
   const ctx = getAudioContext()
   if (ctx && ctx.state === 'suspended') {
     ctx.resume()
@@ -668,21 +657,17 @@ function previewStop() {
   currentBeat.value = 0
   currentCombo.value = 0
   setLEDColor()
-  keybeams.value?.querySelectorAll('div').forEach(dom => dom.classList.remove('-hold'))
-  handguide.value?.classList.remove('-left', '-right')
+  clearPlayback()
   if (preview.value) {
     preview.value.style.transition = '0ms all linear'
     preview.value.style.bottom = '0px'
   }
-  timeoutIds.value.forEach(id => clearInterval(id))
-  timeoutIds.value = []
-  eventIds.value.forEach(id => clearInterval(id))
-  eventIds.value = []
+
   if (returnPosition.value >= 0) {
-    setTimeout(() => {
+    timeoutIds.value.push(setTimeout(() => {
       window.scrollTo({ top: returnPosition.value, behavior: 'auto' })
       returnPosition.value = -1
-    }, 50)
+    }, 50) as unknown as number)
   }
 }
 
@@ -692,72 +677,15 @@ const longNotes = computed(() =>
 )
 
 // ノートの到達イベント情報を生成
-const previewEvents = computed((): PreviewEvents => {
-  const events: PreviewEvents = {}
-  if (isPlayKeySound.value || isShowKeybeam.value || isSimulateLED.value) {
-    chart.value.forEach((note: ExtendedNoteData) => {
-      const measure = measures.value[note.measure]
-      if (!measure) return
-      const timing = measure.measureReachTime + (note.position / note.split) * measure.measureLength
-      if (!events[timing] && [1, 2, 3, 4, 5, 6, 7, 96].includes(note.type)) {
-        // タイミングをkeyにイベント情報をセット
-        events[timing] = {
-          timing, // 到達時間(ms)
-          lane: [], // キービームを出すレーン番号
-          hold: [], // キービームを出し続けるレーン番号
-          holdEnd: [], // キービームを止めるレーン番号
-          color: null, // LED変化の色
-          count: 0, // 増加するコンボ数
-          sound: false, // 再生するタップ音
-          handMove: null, // 手の動き(LeapMotion)
-          noteObject: null // ノートのオブジェクト(Type: 3, 4のみ)
-        }
-      }
-      // 通常
-      if (note.type === 1) {
-        events[timing].sound = true
-        events[timing].count += 1
-        if (!events[timing].lane.includes(note.lane)) events[timing].lane.push(note.lane)
-      // LN(始点と終点が同レーンの前提)
-      } else if (note.type === 2) {
-        events[timing].sound = true
-        note.end.forEach((end: ExtendedNoteData) => {
-          const endMeasure = measures.value[end.measure]
-          if (!endMeasure) return
-          const endTiming = endMeasure.measureReachTime + (end.position / end.split) * endMeasure.measureLength
-          events[timing].hold.push([
-            note.lane, // キービームをホールドするレーン
-            endTiming - timing // ホールドする時間(ms)
-          ])
-        })
-      // フリック
-      } else if ([3, 4, 6, 7].includes(note.type)) {
-        events[timing].sound = true
-        events[timing].count += 1
-        events[timing].noteObject = note
-        const moveMap: Record<number, '-left' | '-right' | '-up' | '-down'> = {
-          3: '-left',
-          4: '-right',
-          6: '-up',
-          7: '-down'
-        }
-        // 手の動き LeapMotion補助線
-        events[timing].handMove = moveMap[note.type]
-      // 音札
-      } else if (note.type === 5) {
-        events[timing].sound = true
-        events[timing].count += 1
-        if (!events[timing].lane.includes(0)) events[timing].lane.push(0)
-      // LED制御
-      } else if (note.type === 96) {
-        // (-1, -1, -1)の時はデフォルトに戻す
-        if (Number(note.option[0]) === -1 && Number(note.option[1]) === -1 && Number(note.option[2]) === -1) {
-          events[timing].color = defaultLEDColor
-        } else events[timing].color = `rgb(${note.option[0]},${note.option[1]},${note.option[2]})`
-      }
-    })
-  }
-  return events
+const previewEvents = computed((): PreviewEvents =>
+  isPlayKeySound.value || isShowKeybeam.value || isSimulateLED.value
+    ? buildPreviewEvents(chart.value, measures.value, defaultLEDColor)
+    : {}
+)
+
+onBeforeUnmount(() => {
+  clearPlayback()
+  props.previewAudio?.pause()
 })
 
 const entireHeight = computed(() => {
@@ -779,7 +707,10 @@ const previewDelay = computed(() => measures.value.length * 10 + 100)
   margin-left: calc(100% - 420px);
 }
 .object-based-preview {
+  width: 420px;
+  margin-left: calc(100% - 420px);
   bottom: unset !important;
+  box-sizing: border-box;
 }
 .control {
   position: fixed;

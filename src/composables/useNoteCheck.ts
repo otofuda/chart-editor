@@ -113,9 +113,18 @@ export function hasError(note: NoteData): string | false {
   if (note.split <= 0) return 'splitの値は0より大きい必要があります。'
   else if (note.position < 0) return 'positionの値は0以上である必要があります。'
   else if (note.position >= note.split) return 'positionの値はsplitの値未満である必要があります。'
-  else if (![-1, 1, 2, 3, 4, 5].includes(note.lane)) return '不正なノートのレーン位置です。'
   else if (
-    ![1, 2, 3, 4, 5, 6, 7, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
+    [91, 92, 93, 96, 97, 98, 99, 100].includes(note.type) && note.lane !== -1
+  ) return 'このノートタイプではレーン位置は-1である必要があります。'
+  else if (
+    note.type === 5 && note.lane !== 3
+  ) return '音札ノートのレーン位置は3である必要があります。'
+  else if (
+    ![91, 92, 93, 96, 97, 98, 99, 100, 5].includes(note.type) &&
+    (typeof note.lane !== 'number' || isNaN(note.lane) || note.lane < 0 || note.lane > 6)
+  ) return '不正なノートのレーン位置です。'
+  else if (
+    ![1, 2, 3, 4, 5, 6, 7, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100].includes(note.type)
   ) return '不正なノートタイプです。'
   else return false
 }
@@ -125,92 +134,77 @@ export function hasError(note: NoteData): string | false {
  * @param note - バリデーションするノート
  */
 export function getValidatedOptions(note: NoteData): string[] {
-  const option: string[] = [] // optionはStringの配列
-
+  const type = Number(note.type)
+  // optionはStringの配列
+  const option = Array.from(note.option ?? [], value => value == null ? '' : String(value))
   // option: []
-  if ([99].includes(note.type)) return option
+  if (type === 99) return []
 
-  // 通常／ロングの場合
+  if (type === 90) {
+    const targetType = Number(option[0] || '1')
+    // 未対応の擬態先も保持するが、自分自身を擬態する不正値では再帰しない。
+    if ([1, 2, 3, 4, 5].includes(targetType) && option.some(value => value !== '')) {
+      return [
+        option[0] || '1',
+        ...getValidatedOptions({ ...note, type: targetType, option: option.slice(1) }),
+      ]
+    }
+  }
+
+  // 末尾のデフォルト曲線・幅の省略を維持する。先に省略してから途中の空欄を補う。
+  if ([1, 89].includes(type)) {
+    const width = Number(option[3])
+    if (option.length > 3 && (!Number.isFinite(width) || width <= 0 || width === 1)) option[3] = ''
+    if (option[2] === 'linear' && !option.slice(3).some(value => value !== '')) option[2] = ''
+  }
+  if (type === 95 && Number(note.position) === 0) option[0] = '-1'
+
+  // 不明なtypeでも入力済みの値と添字を保持し、Stringの配列として返す。
+  const { defaults = [], required = 0 } = optionDefaults[type] ?? {}
+  while (option.length > required && option.at(-1) === '') option.pop()
+  return Array.from({ length: Math.max(required, option.length) }, (_, index) =>
+    option[index] === undefined || option[index] === ''
+      ? defaults[index] ?? ''
+      : option[index]
+  )
+}
+
+/** 必須の先頭項目は従来どおり出力し、それ以降は後続入力があるときだけ補完する。 */
+const optionDefaults: Record<number, { defaults: string[]; required?: number }> = {
+  // 通常ノート／終点・中点の場合（type: 89も同じ並び）
+  // option: [(speed (, orbit (, curve (, width))))]
+  1: { defaults: ['1', '0', 'linear', '1'] },
+  // ロングノート始点の場合
   // option: [(speed (, orbit))]
-  else if ([1, 2].includes(note.type)) {
-    if (note.option[0]) {
-      option.push(String(note.option[0]))
-      if (note.option[1]) option.push(String(note.option[1]))
-    }
-    return option
-  }
-
-  // フリックの場合
+  2: { defaults: ['1', '0'] },
+  // フリックの場合（type: 3, 4, 6, 7）
   // option: [width (, offsetNumer, offsetDenom (, speed (, orbit)))]
-  else if ([3, 4, 6, 7].includes(note.type)) {
-    option.push(note.option[0] ? String(note.option[0]) : '-1')
-    if (note.option[1] && note.option[2]) {
-      option.push(String(note.option[1]), String(note.option[2]))
-      if (note.option[3]) {
-        option.push(String(note.option[3]))
-        if (note.option[4]) option.push(String(note.option[4]))
-      }
-    }
-    return option
-  }
-
+  3: { defaults: ['-1', '0', '1', '1', '0'], required: 1 },
+  4: { defaults: ['-1', '0', '1', '1', '0'], required: 1 },
   // 音札の場合
   // option: [(speed)]
-  else if ([5].includes(note.type)) {
-    if (note.option[0]) option.push(String(note.option[0]))
-    return option
-  }
-
+  5: { defaults: ['1'] },
+  6: { defaults: ['-1', '0', '1', '1', '0'], required: 1 },
+  7: { defaults: ['-1', '0', '1', '1', '0'], required: 1 },
+  89: { defaults: ['1', '0', 'linear', '1'] },
+  90: { defaults: ['1'] },
+  91: { defaults: ['', '', ''] },
+  93: { defaults: ['4'] },
   // テクスチャの場合
   // option: [source, width, height (, offsetNumer, offsetDenom (, speed (, orbit)))]
-  else if ([94].includes(note.type)) {
-    option.push((note.option[0] as string) || 'texture/202020.png')
-    option.push(note.option[1] ? String(note.option[1]) : '1')   // type94 テクスチャのデフォルト幅は 1
-    option.push(note.option[2] ? String(note.option[2]) : '0.25') // type94 テクスチャのデフォルト高さは 0.25
-    // offsetNumer, offsetDenom
-    if (note.option[3] && note.option[4]) {
-      option.push(String(note.option[3]), String(note.option[4]))
-      if (note.option[5] !== undefined) {
-        option.push(String(note.option[5]))
-        if (note.option[6] !== undefined) option.push(String(note.option[6]))
-      }
-    }
-    return option
-  }
-
+  // type94 テクスチャのデフォルト幅は 1、高さは 0.25、offsetNumer / offsetDenom は 0 / 1
+  94: { defaults: ['texture/202020.png', '1', '0.25', '0', '1', '1', '0'], required: 3 },
   // 区切り線の場合
   // option: [length (, speed (, orbit))]
-  else if ([95].includes(note.type)) {
-    if (note.type === 95 && note.position === 0) return ['-1']
-    option.push(note.option[0] ? String(note.option[0]) : '1')
-    if (note.option[1]) {
-      option.push(String(note.option[1]))
-      if (note.option[2]) option.push(String(note.option[2]))
-    }
-    return option
-  }
-
-  // 拍子変化、BPM変化の場合
-  else if ([97, 98].includes(note.type)) {
-    option.push(note.option[0] ? String(note.option[0]) : '-1')
-    return option
-  }
-
+  95: { defaults: ['1', '1', '0'], required: 1 },
   // LED制御の場合
   // option: [r, g, b]
-  else if ([96].includes(note.type)) {
-    option.push(String(note.option[0]), String(note.option[1]), String(note.option[2]))
-    return option
-  }
-
+  96: { defaults: ['0', '0', '0'], required: 3 },
+  // 拍子変化、BPM変化の場合
+  97: { defaults: ['-1'], required: 1 },
+  98: { defaults: ['-1'], required: 1 },
   // コメントの場合
-  else if ([100].includes(note.type)) {
-    option.push(note.option?.[0] ? String(note.option[0]) : '')
-    return option
-  }
-
-  // 不明なtypeの時は全部Stringにしてそのまま返す
-  else return [...note.option].map(opt => String(opt))
+  100: { defaults: [''], required: 1 },
 }
 
 /**
@@ -218,19 +212,25 @@ export function getValidatedOptions(note: NoteData): string[] {
  * @param note - バリデーションするノート
  */
 export function getValidatedNote(note: NoteData): NoteData {
+  return normalizeNote(note, false)
+}
+
+function normalizeNote(note: NoteData, isEndpoint: boolean): NoteData {
   const type = Number(note.type)
+  const option = getValidatedOptions(note)
 
   // type: 5 は lane: 3
-  // type: 96, 97, 98, 99 は lane: -1
-  let lane = Number(note.lane) as 1 | 2 | 3 | 4 | 5 | -1
+  // type: 91, 92, 93, 96, 97, 98, 99, 100 は lane: -1
+  let lane = Number(note.lane) as NoteData['lane']
   if (type === 5) lane = 3
-  if ([96, 97, 98, 99].includes(type)) lane = -1
+  if ([91, 92, 93, 96, 97, 98, 99, 100].includes(type)) lane = -1
 
-  // ロング or ロングダミー 以外は end: []
-  let end: NoteData[] = []
-  if (note.type === 2 || (note.type === 90 && note.option[1] === '2')) {
-    end = [...note.end].map(getValidatedNote)
-  }
+  // ロング、ロングダミー、またはロング内の終点ネストは再帰的にバリデーション
+  const isLongRoot = !isEndpoint && (type === 2 || (type === 90 && option[0] === '2'))
+  const canHaveEnd = isLongRoot || (isEndpoint && [1, 89].includes(type))
+  const end = canHaveEnd && Array.isArray(note.end)
+    ? note.end.map(child => normalizeNote(child, true))
+    : []
 
   return {
     type,
@@ -238,7 +238,7 @@ export function getValidatedNote(note: NoteData): NoteData {
     lane,
     position: Number(note.position),
     split: Number(note.split),
-    option: getValidatedOptions(note),
+    option,
     end,
   }
 }
@@ -248,5 +248,5 @@ export function getValidatedNote(note: NoteData): NoteData {
  * @param note - 検査するノート
  */
 export function isLanelessNote(note: NoteData): boolean {
-  return [5, 92, 93, 96, 97, 98, 99].includes(note.type)
+  return [91, 92, 93, 96, 97, 98, 99, 100].includes(note.type)
 }
