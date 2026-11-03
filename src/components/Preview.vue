@@ -363,6 +363,7 @@ import { showSnackbarKey } from '@/composables/injectionKeys'
 import { buildPreviewEvents, createPreviewEventPlayer } from '@/composables/usePreviewEvents'
 import { createPreviewPlayback, getPreviewMeasureIndex, getPreviewPosition } from '@/composables/usePreviewPlayback'
 import { createPreviewSounds } from '@/composables/usePreviewSounds'
+import { readLegacyNumber, usePersistedRef, writeLegacyNumber } from '@/composables/usePersistedRef'
 
 const props = defineProps<{
   currentChart?: ExtendedNoteData[]
@@ -397,16 +398,18 @@ const returnPosition = ref(-1) // 戻る座標
 const timeoutIds = ref<number[]>([])
 const startFrom = ref(0)
 const currentCombo = ref(0) // プレビューするコンボ数
-const isShowCheckbox = ref(false)
-const isShowKeybeam = ref(false)
-const isShowHandguide = ref(false)
-const isShowFlickEffect = ref(false)
-const isSimulateLED = ref(false)
-const isPlayGuide = ref(false)
+
+// 表示とサウンドの設定は、次回の起動時にも復元する。
+const isShowCheckbox = usePersistedRef('chart-editor__show-checkbox', false)
+const isShowKeybeam = usePersistedRef('chart-editor__show-keybeam', false)
+const isShowHandguide = usePersistedRef('chart-editor__show-handguide', false)
+const isShowFlickEffect = usePersistedRef('chart-editor__show-flick-effect', false)
+const isSimulateLED = usePersistedRef('chart-editor__simulate-led', false)
+const isPlayGuide = usePersistedRef('chart-editor__play-guide', false)
 const eventIds = ref<number[]>([])
 let noteEventPlayer: ReturnType<typeof createPreviewEventPlayer> | undefined
-const isPlayKeySound = ref(false)
-const isPlayKeySoundEnd = ref(false)
+const isPlayKeySound = usePersistedRef('chart-editor__play-key-sound', false)
+const isPlayKeySoundEnd = usePersistedRef('chart-editor__play-key-sound-end', false)
 const guideSource = new URL('guide.mp3', document.baseURI).href
 // 従来と同じ音源内の開始位置を、デコード済みバッファに適用する。
 const previewSounds = createPreviewSounds(guideSource, 0.1)
@@ -420,18 +423,24 @@ let noteEventsStarted = false
 let includeStartEvent = false
 let eventsForPlayback: PreviewEvents = {}
 const defaultLEDColor = 'linear-gradient(0deg, #ff5151 30%, #44a5ff 70%)'
-const lift = ref(Number(localStorage.getItem('chart-editor__lift')) || 0) // LIFTオプション
-const sudden = ref(Number(localStorage.getItem('chart-editor__sudden')) || 0) // SUDDENオプション
-const hidden = ref(Number(localStorage.getItem('chart-editor__hidden')) || 0) // HIDDENオプション
-const comboOffset = ref(60) // コンボ表示位置
-const drawOffset = ref(0) // 描画オフセット
-const keybeamLength = ref(100) // キービームの長さ
-const comboOpacity = ref(50) // コンボ数の透明度
-const isObjectBasedPreview = ref(false) // オブジェクト表示モード
+const lift = ref(readLegacyNumber('chart-editor__lift', 0)) // LIFTオプション
+const sudden = ref(readLegacyNumber('chart-editor__sudden', 0)) // SUDDENオプション
+const hidden = ref(readLegacyNumber('chart-editor__hidden', 0)) // HIDDENオプション
 
-watch(lift, (v) => localStorage.setItem('chart-editor__lift', String(v)))
-watch(sudden, (v) => localStorage.setItem('chart-editor__sudden', String(v)))
-watch(hidden, (v) => localStorage.setItem('chart-editor__hidden', String(v)))
+// 詳細設定は数値として保存し、透明度のみ画面の範囲に制限する。
+const comboOffset = usePersistedRef('chart-editor__combo-offset', 60) // コンボ表示位置
+const drawOffset = usePersistedRef('chart-editor__draw-offset', 0) // 描画オフセット
+const keybeamLength = usePersistedRef('chart-editor__keybeam-length', 100) // キービームの長さ
+const comboOpacity = usePersistedRef('chart-editor__combo-opacity', 50, {
+  min: 0,
+  max: 100,
+}) // コンボ数の透明度
+const isObjectBasedPreview = usePersistedRef('chart-editor__object-based-preview', false)
+
+// LIFT・SUDDEN・HIDDEN は、既存の保存形式との互換性を保つ。
+watch(lift, (v) => writeLegacyNumber('chart-editor__lift', v))
+watch(sudden, (v) => writeLegacyNumber('chart-editor__sudden', v))
+watch(hidden, (v) => writeLegacyNumber('chart-editor__hidden', v))
 
 const chart = computed(() => props.currentChart ?? [])
 const measures = computed(() => props.measureData ?? [])

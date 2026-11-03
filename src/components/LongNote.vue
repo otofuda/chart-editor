@@ -90,7 +90,7 @@
           height: `${entireHeight}px`
         }"
       >
-        <g v-for="seg in treeData.segments" :key="seg.id">
+        <g v-for="seg in treeData.segments" :key="seg.id" @click.stop="menu = true">
           <path :d="seg.paths.fillPath" class="hold-fill" />
           <path :d="seg.paths.leftBorderPath" class="hold-border" />
           <path :d="seg.paths.rightBorderPath" class="hold-border" />
@@ -110,7 +110,7 @@
           </template>
         </v-list-item>
 
-        <div class="px-2">
+        <div class="px-2" @keydown="stopNumberInputArrowKeys">
           <v-divider class="my-2" />
           <div class="d-flex align-center justify-space-between mb-1">
             <span class="text-subtitle-2 font-weight-bold">始点</span>
@@ -206,7 +206,7 @@
 
         <v-divider class="my-2" />
 
-        <div class="px-2">
+        <div class="px-2" @keydown="stopNumberInputArrowKeys">
           <EndForm
             v-for="(en, i) in note.end"
             :key="`append_end_root_${i}`"
@@ -231,6 +231,7 @@
 
 <script setup lang="ts">
 import { ref, computed, inject, watch } from 'vue'
+import { stopNumberInputArrowKeys } from '@/composables/useNumberInputKeys'
 import type { NoteData } from 'chart-types'
 import { type ExtendedNoteData, type Measure } from '@/types'
 import { deleteNotesKey } from '@/composables/injectionKeys'
@@ -422,6 +423,18 @@ const drawType = computed(() => {
 </script>
 
 <style lang="scss" scoped>
+.long-note-svg {
+  .hold-fill {
+    pointer-events: visibleFill;
+    cursor: pointer;
+  }
+
+  .hold-border {
+    pointer-events: visibleStroke;
+    cursor: pointer;
+  }
+}
+
 .v-card {
   max-height: 80vh;
   overflow-y: auto;

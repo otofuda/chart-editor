@@ -51,6 +51,64 @@ const stubs = {
 }
 
 describe('ロングノートの編集・描画', () => {
+  const interactiveMenu = defineComponent({
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    setup: (props, { emit, slots }) => () => h('div', [
+      slots.activator?.({ props: { onClick: () => emit('update:modelValue', !props.modelValue) } }),
+      slots.default?.(),
+    ]),
+  })
+
+  function mountEditableLongNote(type = 2) {
+    const root = note({
+      index: 42, type, option: type === 90 ? ['2'] : [],
+      end: [
+        note({ position: 1, end: [note({ position: 2, lane: 2 })] }),
+        note({ position: 3, lane: 3 }),
+      ],
+    })
+    const wrapper = mount(LongNote, {
+      props: { note: root, measureData: measures },
+      global: {
+        stubs: { ...stubs, 'v-menu': interactiveMenu },
+        provide: { [deleteNotesKey as symbol]: vi.fn() },
+      },
+    })
+    return { wrapper, root }
+  }
+
+  it.each([
+    [2, 0, '.hold-fill'],
+    [2, 1, '.hold-fill'],
+    [2, 2, '.hold-fill'],
+    [2, 0, '.hold-border'],
+    [90, 1, '.hold-fill'],
+  ])('type %s の帯 %s (%s) から対応する編集メニューを開く', async (type, segment, target) => {
+    const { wrapper, root } = mountEditableLongNote(type)
+    const bubbledClick = vi.fn()
+    wrapper.element.addEventListener('click', bubbledClick)
+    try {
+      expect(wrapper.text()).not.toContain('#42 ロング')
+      await wrapper.findAll('.long-note-svg g')[segment].get(target).trigger('click')
+      expect(wrapper.text()).toContain('#42 ロング')
+      expect(bubbledClick).not.toHaveBeenCalled()
+      await wrapper.get('input[aria-label="lane"]').setValue('4')
+      expect(root.lane).toBe(4)
+    } finally { wrapper.unmount() }
+  })
+
+  it('始点と選択チェックボックスの操作を維持する', async () => {
+    const { wrapper, root } = mountEditableLongNote()
+    try {
+      await wrapper.get('.note input[type="checkbox"]').setValue(true)
+      expect(root.isSelected).toBe(true)
+      expect(wrapper.text()).not.toContain('#42 ロング')
+      await wrapper.get('.note').trigger('click')
+      expect(wrapper.text()).toContain('#42 ロング')
+    } finally { wrapper.unmount() }
+  })
+
   it('ダミーLN始点に擬態先の描画クラスとisDummyを付ける', () => {
     const wrapper = mount(LongNote, {
       props: { note: note({ type: 90, option: ['2'] }), measureData: measures },
@@ -78,6 +136,7 @@ describe('Previewとの接続と後始末', () => {
   const soundCount = () => FakeAudioContext.instances.reduce((count, context) =>
     count + context.sources.reduce((n, source) => n + source.start.mock.calls.length, 0), 0)
   beforeEach(() => {
+    localStorage.clear()
     vi.useFakeTimers()
     FakeAudioContext.instances = []
     vi.stubGlobal('AudioContext', FakeAudioContext)

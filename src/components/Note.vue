@@ -49,7 +49,7 @@
           v-if="drawType === 100"
           v-model="note.option[0]"
           class="elevation-4"
-          bg-color="#ffffc0"
+          bg-color="editor-highlight"
           hide-details
           @click.stop
         ></v-textarea>
@@ -95,6 +95,7 @@
     <!-- ポップアップ編集 -->
     <v-card v-if="menu">
       <v-list>
+        <div @keydown="stopNumberInputArrowKeys">
         <v-list-item>
           <v-card-text>#{{ note.index }} {{ noteTypeName }}</v-card-text>
           <template #append>
@@ -191,6 +192,7 @@
             density="compact"
           ></v-text-field>
         </v-list-item>
+        </div>
       </v-list>
 
       <v-card-actions>
@@ -210,6 +212,7 @@
 
 <script setup lang="ts">
 import { ref, computed, inject, watch } from 'vue'
+import { stopNumberInputArrowKeys } from '@/composables/useNumberInputKeys'
 import { type ExtendedNoteData, type Measure } from '@/types'
 import { noteTypes, noteOptions } from '@/composables/useNoteTypes'
 import { isDuplicated, hasError, isLanelessNote } from '@/composables/useNoteCheck'

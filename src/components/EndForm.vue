@@ -82,12 +82,12 @@
           hide-details
           min="0"
           :max="end.split - 1"
-          bg-color="#ffffc0"
+          bg-color="editor-highlight"
           @keydown.enter="placeNotes"
           @keydown.left="endToLeft"
           @keydown.right="endToRight"
-          @keydown.up="endToUp"
-          @keydown.down="endToDown"
+          @keydown.up.stop="endToUp"
+          @keydown.down.stop="endToDown"
         ></v-text-field>
       </v-col>
       <v-col cols="6" sm="4">

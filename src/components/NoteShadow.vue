@@ -38,7 +38,7 @@
       </v-icon>
       <v-textarea
         outlined
-        background-color="amber lighten-4"
+        bg-color="editor-highlight"
         v-if="note.type === 100"
         v-model="note.option[0]"
         class="elevation-4"

@@ -39,7 +39,7 @@
           :y1="gridY.y"
           :x2="plotX + plotWidth"
           :y2="gridY.y"
-          stroke="rgba(0, 0, 0, 0.06)"
+          class="grid-line"
           stroke-width="1"
           stroke-dasharray="3,3"
         />
@@ -50,7 +50,7 @@
           :y1="plotY + plotHeight"
           :x2="plotX + plotWidth"
           :y2="plotY + plotHeight"
-          stroke="rgba(0, 0, 0, 0.16)"
+          class="baseline"
           stroke-width="1.2"
         />
 
@@ -105,7 +105,7 @@
           :width="plotWidth"
           :height="otofudaHeight"
           rx="4"
-          fill="rgba(0, 0, 0, 0.05)"
+          class="track-background"
         />
         <!-- 音札ラベル -->
         <text
@@ -138,7 +138,7 @@
             :y1="plotY + plotHeight"
             :x2="tick.x"
             :y2="plotY + plotHeight + 5"
-            stroke="rgba(0, 0, 0, 0.22)"
+            class="axis-tick"
             stroke-width="1"
           />
           <text
@@ -470,20 +470,25 @@ function handleClick(e: MouseEvent) {
 .peak-text {
   font-size: 10.5px;
   font-weight: bold;
-  fill: #f72047;
+  fill: rgb(var(--v-theme-graph-peak));
 }
 
 .otofuda-label {
   font-size: 9.5px;
   font-weight: bold;
-  fill: #e65100;
+  fill: rgb(var(--v-theme-graph-accent));
 }
 
 .axis-tick-text {
   font-size: 11px;
-  fill: rgba(0, 0, 0, 0.65);
+  fill: rgba(var(--v-theme-on-surface), 0.75);
   font-family: monospace;
 }
+
+.grid-line { stroke: rgba(var(--v-theme-on-surface), 0.12); }
+.baseline { stroke: rgba(var(--v-theme-on-surface), 0.3); }
+.track-background { fill: rgba(var(--v-theme-on-surface), 0.08); }
+.axis-tick { stroke: rgba(var(--v-theme-on-surface), 0.4); }
 
 .density-area {
   transition: opacity 0.2s ease;

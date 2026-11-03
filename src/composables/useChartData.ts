@@ -1,5 +1,6 @@
 import { ref, computed, watch } from 'vue'
 import type { NoteData } from 'chart-types'
+import { readLegacyNumber, usePersistedRef, writeLegacyNumber } from './usePersistedRef'
 import type {
   DifficultyString,
   Measure,
@@ -98,13 +99,13 @@ export function useChartData() {
   })
 
   /** 一拍あたりの高さ (px)、localStorage に永続化 */
-  const beatHeight = ref(Number(localStorage.getItem(BEAT_HEIGHT_KEY)) || 100)
+  const beatHeight = ref(readLegacyNumber(BEAT_HEIGHT_KEY, 100))
 
   /** 譜面停止をシミュレートするかどうか */
-  const isSimulateStop = ref(false)
+  const isSimulateStop = usePersistedRef('chart-editor__simulate-stop', false)
 
   watch(beatHeight, (value) => {
-    localStorage.setItem(BEAT_HEIGHT_KEY, String(value))
+    writeLegacyNumber(BEAT_HEIGHT_KEY, value)
   })
 
   /** 小節情報を生成する computed */

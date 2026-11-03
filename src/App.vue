@@ -132,7 +132,7 @@
               hide-details
               min="0"
               :max="appendNote.split - 1"
-              bg-color="#ffffc0"
+              bg-color="editor-highlight"
               @keydown.enter="placeNotes(appendNote)"
               @keydown.left="appendNoteToLeft"
               @keydown.right="appendNoteToRight"
@@ -566,6 +566,7 @@
         <v-btn color="primary" @click="analyze" variant="outlined" prepend-icon="mdi-chart-timeline-variant">
           譜面分析
         </v-btn>
+        <ThemeToggle />
       </v-row>
       <v-row>
         <v-btn color="success" @click="saveFile" variant="outlined" prepend-icon="mdi-content-save">
@@ -615,7 +616,7 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="dialog.analyzer" width="800">
+    <v-dialog v-model="dialog.analyzer" width="800" scrollable>
       <v-card rounded="xl" prepend-icon="mdi-chart-timeline-variant" :title="`譜面分析 (${currentDifficulty})`">
         <v-divider></v-divider>
         <v-card-text>
@@ -627,46 +628,47 @@
             (analysisData.notesCount / (measureData.at(-1)?.measureReachTime ?? 1)) *
               1000
           }}Notes / 秒
+          <v-divider></v-divider>
+          <DensityGraph
+            v-if="dialog.analyzer"
+            :trend-values="analysisData.trendValues"
+            :otofuda-notes="analysisData.otofudaNotes"
+            @jump="handleJumpToMeasure"
+          />
+          <v-table>
+            <thead>
+              <tr>
+                <th class="text-left">
+                  種類別ノーツ数
+                </th>
+                <th class="text-left">
+                  数
+                </th>
+                <th class="text-left">
+                  割合
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="type in noteTypes" :key="`note_count_${type.value}`">
+                <td>{{ type.title }}</td>
+                <td>{{ analysisData.typeCount[type.value] }}</td>
+                <td>
+                  {{
+                    [1, 2, 3, 4, 5, 6, 7].includes(type.value)
+                      ? analysisData.notesCount === 0 ? '0％' : `${Math.floor(
+                          (analysisData.typeCount[type.value] /
+                            analysisData.notesCount) *
+                            10000
+                        ) / 100}％`
+                      : "－"
+                  }}
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+          <NoteTypePie :type-count="analysisData.typeCount" />
         </v-card-text>
-        <v-divider></v-divider>
-        <DensityGraph
-          v-if="dialog.analyzer"
-          :trend-values="analysisData.trendValues"
-          :otofuda-notes="analysisData.otofudaNotes"
-          @jump="handleJumpToMeasure"
-        />
-        <v-table>
-          <thead>
-            <tr>
-              <th class="text-left">
-                種類別ノーツ数
-              </th>
-              <th class="text-left">
-                数
-              </th>
-              <th class="text-left">
-                割合
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="type in noteTypes" :key="`note_count_${type.value}`">
-              <td>{{ type.title }}</td>
-              <td>{{ analysisData.typeCount[type.value] }}</td>
-              <td>
-                {{
-                  [1, 2, 3, 4, 5, 6, 7].includes(type.value)
-                    ? `${Math.floor(
-                        (analysisData.typeCount[type.value] /
-                          analysisData.notesCount) *
-                          10000
-                      ) / 100}％`
-                    : "－"
-                }}
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
       </v-card>
     </v-dialog>
 
@@ -895,6 +897,8 @@ import { useGoTo } from 'vuetify'
 import Preview from './components/Preview.vue'
 import EndForm from './components/EndForm.vue'
 import DensityGraph from './components/DensityGraph.vue'
+import NoteTypePie from './components/NoteTypePie.vue'
+import ThemeToggle from './components/ThemeToggle.vue'
 
 import usageContent from '../Usage.md?raw'
 
@@ -904,6 +908,7 @@ import { useSelection } from './composables/useSelection'
 import { useFileIO } from './composables/useFileIO'
 import { useTextureDB } from './composables/useTextureDB'
 import { useBackup } from './composables/useBackup'
+import { usePersistedRef } from './composables/usePersistedRef'
 import { noteTypes, noteOptions } from './composables/useNoteTypes'
 import { isLanelessNote } from './composables/useNoteCheck'
 import {
@@ -968,10 +973,12 @@ const dialog = ref({
 })
 
 const scrollTo = ref(0)
-const isShowDetail = ref(false)
-const isCaptureMode = ref(false)
-const isPreviewMode = ref(false)
-const isImageMode = ref(false)
+
+// プレビュー表示モードは、無効化された子項目の選択状態も保持する。
+const isShowDetail = usePersistedRef('chart-editor__show-detail', false)
+const isCaptureMode = usePersistedRef('chart-editor__capture-mode', false)
+const isPreviewMode = usePersistedRef('chart-editor__preview-mode', false)
+const isImageMode = usePersistedRef('chart-editor__image-mode', false)
 
 const colorSwatches = [
   ['#ff5151', '#000000'],
@@ -1016,7 +1023,7 @@ function handleJumpToMeasure(measure: number) {
 const renderedUsage = computed((): string => {
   const inline = (s: string) => s
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`(.+?)`/g, '<code style="background:#f0f0f0;padding:1px 4px;border-radius:3px">$1</code>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
     .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
 
   const out: string[] = []
@@ -1044,10 +1051,7 @@ const renderedUsage = computed((): string => {
       }
       const cells = t.slice(1, -1).split('|').map(c => inline(c.trim()))
       const tag = tableInBody ? 'td' : 'th'
-      const style = tableInBody
-        ? 'padding:4px 8px;border:1px solid #ddd'
-        : 'padding:4px 8px;border:1px solid #ddd;background:#f5f5f5;text-align:left'
-      out.push(`<tr>${cells.map(c => `<${tag} style="${style}">${c}</${tag}>`).join('')}</tr>`)
+      out.push(`<tr>${cells.map(c => `<${tag}>${c}</${tag}>`).join('')}</tr>`)
       continue
     }
 
@@ -1063,7 +1067,7 @@ const renderedUsage = computed((): string => {
     else if (/^# /.test(line))    out.push(inline(line).replace(/^# (.+)$/, '<h2 class="text-h5 mt-4 mb-2">$1</h2>'))
     else if (/^\- /.test(line))   out.push(inline(line).replace(/^\- (.+)$/, '<li style="margin-left:20px">$1</li>'))
     else if (t === '---')         out.push('<hr style="margin:16px 0">')
-    else if (/^> /.test(line))    out.push(inline(line).replace(/^> (.+)$/, '<blockquote style="border-left:4px solid #ccc;padding-left:12px;color:#666;margin:8px 0">$1</blockquote>'))
+    else if (/^> /.test(line))    out.push(inline(line).replace(/^> (.+)$/, '<blockquote>$1</blockquote>'))
     else if (t === '')            out.push('<br>')
     else                          out.push(inline(line))
   }
@@ -1110,11 +1114,11 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   font-family: "Open Sans", "Noto Sans JP", Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #333333;
   background: #202020;
   .panel {
     position: fixed;
-    background: #f0f0f0;
+    background: rgb(var(--v-theme-editor-panel));
+    color: rgb(var(--v-theme-on-surface));
     top: 0;
     left: 0;
     width: calc(100% - 420px);
@@ -1151,6 +1155,30 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     margin-top: 0;
     margin-bottom: 10px;
   }
+}
+
+.usage-content {
+  code {
+    background: rgb(var(--v-theme-surface-light));
+    color: rgb(var(--v-theme-on-surface));
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+  th, td {
+    padding: 4px 8px;
+    border: 1px solid rgba(var(--v-theme-on-surface), 0.25);
+  }
+  th {
+    background: rgb(var(--v-theme-surface-light));
+    text-align: left;
+  }
+  blockquote {
+    border-left: 4px solid rgba(var(--v-theme-on-surface), 0.35);
+    padding-left: 12px;
+    color: rgba(var(--v-theme-on-surface), 0.75);
+    margin: 8px 0;
+  }
+  a { color: rgb(var(--v-theme-primary)); }
 }
 .note {
   position: absolute;

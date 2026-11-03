@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import type { DifficultyString, ExtendedChartData, ExtendedNoteData } from '../types'
 import { getValidatedNote } from './useNoteCheck'
 import { normalizeChartData, type useChartData } from './useChartData'
+import { usePersistedRef } from './usePersistedRef'
 
 type ChartData = ReturnType<typeof useChartData>
 
@@ -28,7 +29,7 @@ export function useFileIO(
   const previewAudio = ref(new Audio())
 
   /** 楽曲音量 (0-100) */
-  const audioVolume = ref(100)
+  const audioVolume = usePersistedRef('chart-editor__audio-volume', 100, { min: 0, max: 100 })
 
   let reader: FileReader | undefined
   function cancelRead() {
