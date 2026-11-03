@@ -25,6 +25,16 @@ describe('useNoteEditor - ノート仮配置', () => {
     expect(editor.preAppendNotes.value.length).toBe(1)
   })
 
+  it('仮配置と挿入で同じoption補完を適用する', () => {
+    const { chartData, editor } = setup()
+    const note = { ...sampleNote, type: 3, option: ['', '', '', '', '2'] }
+    editor.placeNotes(note)
+    expect(editor.preAppendNotes.value[0].option).toEqual(['-1', '0', '1', '1', '2'])
+    editor.appendNotes(editor.preAppendNotes.value[0])
+    expect(chartData.currentChart.value.at(-1)?.option).toEqual(['-1', '0', '1', '1', '2'])
+    expect(note.option).toEqual(['', '', '', '', '2'])
+  })
+
   it('cancelNoteで仮配置ノートが空になる', () => {
     const { editor } = setup()
     editor.placeNotes(sampleNote)

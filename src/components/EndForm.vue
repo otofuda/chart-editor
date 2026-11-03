@@ -255,12 +255,12 @@ function deleteChild(index: number): void {
 // positionにフォーカスして終点移動（その終点のみ 1.0 刻みで変更、0.0〜6.0にクランプ）
 function endToLeft(): void {
   const next = Math.round((Number(props.end.lane ?? 1) - 1) * 10) / 10
-  props.end.lane = Math.max(0, next) as LaneType
+  props.end.lane = Math.min(6, Math.max(0, next)) as LaneType
 }
 
 function endToRight(): void {
   const next = Math.round((Number(props.end.lane ?? 1) + 1) * 10) / 10
-  props.end.lane = Math.min(6, next) as LaneType
+  props.end.lane = Math.min(6, Math.max(0, next)) as LaneType
 }
 
 function endToUp(event: KeyboardEvent): void {
