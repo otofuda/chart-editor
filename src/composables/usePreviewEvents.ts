@@ -102,35 +102,43 @@ export function buildPreviewEvents(
 
 type KeybeamElements = ArrayLike<HTMLElement> | null | undefined
 
-/** 同じDOMに丸められた発光を参照数で管理し、最後の発光が終わるまで維持する。 */
+/** パルスの重なりと、音源時刻から求めたホールド状態を管理する。 */
 export function createKeybeamController(getElements: () => KeybeamElements) {
-  const active = new Map<HTMLElement, { '-on': number; '-hold': number }>()
+  const active = new Map<HTMLElement, number>()
   const timers = new Set<ReturnType<typeof setTimeout>>()
+  let held = new Set<HTMLElement>()
 
-  function activate(lane: number, className: '-on' | '-hold', duration: number) {
+  function pulse(lane: number) {
     const element = getElements()?.[Math.round(lane)]
-    if (!element || !Number.isFinite(duration) || duration <= 0) return
-    const counts = active.get(element) ?? { '-on': 0, '-hold': 0 }
-    active.set(element, counts)
-    counts[className] += 1
-    element.classList.add(className)
+    if (!element) return
+    active.set(element, (active.get(element) ?? 0) + 1)
+    element.classList.add('-on')
     const timer = setTimeout(() => {
       timers.delete(timer)
-      counts[className] -= 1
-      if (counts[className] === 0) element.classList.remove(className)
-      if (counts['-on'] === 0 && counts['-hold'] === 0) active.delete(element)
-    }, duration)
+      const count = (active.get(element) ?? 1) - 1
+      if (count === 0) {
+        element.classList.remove('-on')
+        active.delete(element)
+      } else active.set(element, count)
+    }, 25)
     timers.add(timer)
   }
 
   return {
-    pulse: (lane: number) => activate(lane, '-on', 25),
-    hold: (lane: number, duration: number) => activate(lane, '-hold', duration),
+    pulse,
+    setHolds(lanes: number[]) {
+      const next = new Set(lanes.map(lane => getElements()?.[Math.round(lane)]).filter(Boolean) as HTMLElement[])
+      held.forEach(element => { if (!next.has(element)) element.classList.remove('-hold') })
+      next.forEach(element => { if (!held.has(element)) element.classList.add('-hold') })
+      held = next
+    },
     stop() {
       timers.forEach(timer => clearTimeout(timer))
       timers.clear()
       active.forEach((_, element) => element.classList.remove('-on', '-hold'))
       active.clear()
+      held.forEach(element => element.classList.remove('-hold'))
+      held.clear()
     },
   }
 }
@@ -143,33 +151,78 @@ type PreviewPlaybackOptions = {
   playSound: () => void
   onEvent: (event: PreviewEvent) => void
   onPastEvent: (event: PreviewEvent) => void
+  onSeek?: (color: string | null) => void
 }
 
 /** 再生位置より過去の音を鳴らさず、継続中のホールドだけを復元する。 */
 export function createPreviewEventPlayer(options: PreviewPlaybackOptions) {
   const beams = createKeybeamController(options.getKeybeams)
-  const timers = new Set<ReturnType<typeof setTimeout>>()
+  const holds = new Map<number, number>()
+  let events: PreviewEvent[] = []
+  let cursor = 0
+  let previousTime = -Infinity
+  let running = false
+  const processed = new Set<PreviewEvent>()
+  const hold = (event: PreviewEvent) => event.hold.forEach(([lane, duration]) => {
+    holds.set(lane, Math.max(holds.get(lane) ?? -Infinity, event.timing + duration))
+  })
+  const updateHolds = (time: number) => {
+    holds.forEach((end, lane) => { if (end <= time) holds.delete(lane) })
+    beams.setHolds(options.isShowKeybeam() ? [...holds.keys()] : [])
+  }
   function stop() {
-    timers.forEach(timer => clearTimeout(timer))
-    timers.clear()
+    running = false
+    holds.clear()
     beams.stop()
+  }
+
+  function seek(time: number, includeStart = false) {
+    if (!running) return
+    beams.stop()
+    holds.clear()
+    cursor = 0
+    previousTime = time
+    let color: string | null = null
+    while (cursor < events.length && (includeStart ? events[cursor].timing < time : events[cursor].timing <= time)) {
+      const event = events[cursor++]
+      if (!processed.has(event)) {
+        processed.add(event)
+        options.onPastEvent(event)
+      }
+      if (event.color) color = event.color
+      hold(event)
+    }
+    updateHolds(time)
+    options.onSeek?.(color)
   }
 
   return {
     stop,
-    start(events: PreviewEvents, offset: number) {
+    // オフセット調整では過去の音を鳴らさず、処理済みイベントも再実行しない。
+    seek,
+    start(source: PreviewEvents, offset: number, { includeStart = false } = {}) {
       stop()
-      Object.values(events).sort((a, b) => a.timing - b.timing).forEach(event => {
-        const time = event.timing - offset
-        if (time <= 0) {
-          options.onPastEvent(event)
-          if (options.isShowKeybeam()) {
-            event.hold.forEach(([lane, duration]) => beams.hold(lane, duration + time))
-          }
-          return
+      events = Object.values(source).sort((a, b) => a.timing - b.timing)
+      cursor = 0
+      running = true
+      processed.clear()
+      seek(offset, includeStart)
+    },
+    /** 音源と同じ絶対時刻を渡す。バッファ待ち中はホールドも進めない。 */
+    update(time: number) {
+      if (!running) return
+      if (time < previousTime) { seek(time); return }
+      previousTime = time
+      while (cursor < events.length && events[cursor].timing <= time) {
+        const event = events[cursor++]
+        hold(event)
+        if (processed.has(event)) {
+          if (event.color) options.onSeek?.(event.color)
+          continue
         }
-        const timer = setTimeout(() => {
-          timers.delete(timer)
+        processed.add(event)
+        // 長い描画停止後に過去の打鍵音をまとめて鳴らさず、状態だけを追いつかせる。
+        if (time - event.timing <= 50) {
           // 打鍵音と終点音が同じ時刻にあっても、再生は1回にまとめる
           if (options.isPlayKeySound() && (event.sound || (event.endSound && options.isPlayKeySoundEnd()))) {
             options.playSound()
@@ -178,13 +231,11 @@ export function createPreviewEventPlayer(options: PreviewPlaybackOptions) {
           if (options.isShowKeybeam()) {
             // 単押し
             event.lane.forEach(lane => beams.pulse(lane))
-            // LN(ホールド)
-            event.hold.forEach(([lane, duration]) => beams.hold(lane, duration))
           }
           options.onEvent(event)
-        }, time)
-        timers.add(timer)
-      })
+        } else options.onPastEvent(event)
+      }
+      updateHolds(time)
     },
   }
 }

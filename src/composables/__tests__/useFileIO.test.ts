@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import { useChartData } from '../useChartData'
 import { useFileIO } from '../useFileIO'
+import { ControlledFileReader } from './controlledFileReader'
 
 function setup() {
   const chartData = useChartData()
@@ -71,5 +72,90 @@ describe('useFileIO', () => {
       vi.restoreAllMocks()
       vi.unstubAllGlobals()
     }
+  })
+})
+
+describe('ファイル変更時の再生停止と読み込みの競合', () => {
+  beforeEach(() => {
+    ControlledFileReader.instances = []
+    vi.stubGlobal('FileReader', ControlledFileReader)
+  })
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+
+  function setupChange() {
+    const chartData = useChartData()
+    const beforeChange = vi.fn()
+    const showSnackbar = vi.fn()
+    const io = useFileIO(chartData, showSnackbar, beforeChange)
+    const text = (bpm = 180) => JSON.stringify({ ...chartData.chartObject.value, info: { bpm, beat: 4, offset: 0, version: 2 } })
+    return { chartData, beforeChange, showSnackbar, io, text }
+  }
+
+  it('ファイル選択直後と、読み込み結果を適用する前に再生を止める', () => {
+    const s = setupChange()
+    s.io.readFile(new File([''], 'next.json'))
+    expect(s.beforeChange).toHaveBeenCalledOnce()
+    expect(s.chartData.chartObject.value.info.bpm).toBe(120)
+    s.beforeChange.mockImplementation(() => expect(s.chartData.chartObject.value.info.bpm).toBe(120))
+    ControlledFileReader.instances[0].complete(s.text())
+    expect(s.beforeChange).toHaveBeenCalledTimes(2)
+    expect(s.chartData.chartObject.value.info.bpm).toBe(180)
+    expect(s.io.isLoaded.value).toBe(true)
+  })
+
+  it('連続選択では前の読み込みを中断し、遅いload通知も新しい譜面を上書きしない', () => {
+    const s = setupChange()
+    s.io.readFile(new File([''], 'first.json'))
+    const first = ControlledFileReader.instances[0]
+    const queuedLoad = first.onload
+    expect(() => s.io.readFile(new File([''], 'second.json'))).not.toThrow()
+    expect(first.abort).toHaveBeenCalledOnce()
+    ControlledFileReader.instances[1].complete(s.text(200))
+    first.complete(s.text(150), queuedLoad)
+    expect(s.chartData.chartObject.value.info.bpm).toBe(200)
+    expect(s.io.fileName.value).toBe('second.json')
+    expect(s.beforeChange).toHaveBeenCalledTimes(3)
+  })
+
+  it.each(['clear', 'new'])('%sで読み込みを取り消すと、遅いload通知を適用しない', action => {
+    const s = setupChange()
+    s.io.readFile(new File([''], 'first.json'))
+    const reader = ControlledFileReader.instances[0]
+    const queuedLoad = reader.onload
+    if (action === 'new') s.io.newFile()
+    else s.io.readFile(null)
+    expect(reader.abort).toHaveBeenCalledOnce()
+    reader.complete(s.text(300), queuedLoad)
+    expect(s.chartData.chartObject.value.info.bpm).toBe(120)
+    expect(s.beforeChange).toHaveBeenCalledTimes(2)
+  })
+
+  it('不正なJSONでも前の譜面を維持し、エラーを通知して再生は再開しない', () => {
+    const s = setupChange()
+    s.io.readFile(new File([''], 'broken.json'))
+    expect(() => ControlledFileReader.instances[0].complete('{')).not.toThrow()
+    expect(s.chartData.chartObject.value.info.bpm).toBe(120)
+    expect(s.beforeChange).toHaveBeenCalledOnce()
+    expect(s.showSnackbar).toHaveBeenCalledWith(expect.stringContaining('読み込めませんでした'))
+  })
+
+  it('読み込みエラーを通知した後も次のファイルを読み込める', () => {
+    const s = setupChange()
+    s.io.readFile(new File([''], 'failed.json'))
+    ControlledFileReader.instances[0].onerror!()
+    expect(s.showSnackbar).toHaveBeenCalledOnce()
+    s.io.readFile(new File([''], 'retry.json'))
+    ControlledFileReader.instances[1].complete(s.text(220))
+    expect(s.chartData.chartObject.value.info.bpm).toBe(220)
+  })
+
+  it('音源ファイルもsrcを書き換える前にプレビューを終了する', () => {
+    const s = setupChange()
+    const originalSource = s.io.previewAudio.value.src
+    s.beforeChange.mockImplementation(() => expect(s.io.previewAudio.value.src).toBe(originalSource))
+    vi.stubGlobal('URL', class extends URL { static createObjectURL = vi.fn(() => 'blob:next-track') })
+    s.io.readAudioFile(new File([''], 'next.wav'))
+    expect(s.beforeChange).toHaveBeenCalledOnce()
+    expect(s.io.previewAudio.value.src).toBe('blob:next-track')
   })
 })

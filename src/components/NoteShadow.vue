@@ -136,7 +136,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import { type ExtendedNoteData, type Measure } from '@/types'
-import { type NoteData } from 'chart-types'
+import type { NoteData } from 'chart-types'
 import { cancelNoteKey } from '@/composables/injectionKeys'
 import { getCurveType, generateHoldSvgPaths, type CurveType } from '@/composables/useNoteTypes'
 

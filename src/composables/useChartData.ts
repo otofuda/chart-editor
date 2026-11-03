@@ -38,7 +38,10 @@ export function useChartData() {
 
   const musicBpm = computed(() => chartObject.value.info.bpm)
   const musicBeat = computed(() => chartObject.value.info.beat)
-  const musicOffset = computed(() => chartObject.value.info.offset)
+  const musicOffset = computed(() => {
+    const offset = Number(chartObject.value.info.offset)
+    return Number.isFinite(offset) ? offset : 0
+  })
 
   /** 譜面中の最大小節番号 */
   const maxMeasure = computed(() => {

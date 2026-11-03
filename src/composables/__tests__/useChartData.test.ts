@@ -46,4 +46,11 @@ describe('useChartData', () => {
     const data = useChartData()
     expect(data.beatHeight.value).toBeGreaterThan(0)
   })
+
+  it.each(['', '-', 'abc', NaN, Infinity])('オフセット編集中の%sを0として計算し、NaNの座標を生成しない', value => {
+    const data = useChartData()
+    data.chartObject.value.info.offset = value as any
+    expect(data.musicOffset.value).toBe(0)
+    expect(data.measureData.value.every(measure => Number.isFinite(measure.measureReachTime) && Number.isFinite(measure.measurePositionBottom))).toBe(true)
+  })
 })
