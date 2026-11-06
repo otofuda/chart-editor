@@ -1,271 +1,434 @@
 <!-- eslint-disable vue/no-mutating-props -->
 <template>
-  <!-- note/endはtype 1, 2のみ想定 -->
   <v-menu
     v-model="menu"
     :close-on-click="false"
     :close-on-content-click="false"
-    absolute
-    left
-    :max-width="240"
+    location="left"
+    :max-width="420"
   >
-    <template v-slot:activator="{ on, attrs }">
+    <template v-slot:activator="{ props }">
       <!-- 始点 -->
       <span
         class="note"
         :class="{
           [`type${drawType}`]: true,
-          isDummy: note.type === 90,
+          isDummy: note.type === 90
         }"
         :style="{
           left: `${getLeft(note)}px`,
           bottom: `${getBottom(note)}px`,
           width: `${getWidth(note)}px`
         }"
-        v-bind="attrs"
-        v-on="on"
+        :title="getNoteTooltip(note)"
+        v-bind="props"
       >
         <input
           type="checkbox"
           v-model="note.isSelected"
-          :id="note.index"
+          :id="String(note.index)"
           @click.stop
-        />{{ note.position }}/{{ note.split }}</span
-      >
+        />
+        <strong v-if="Number(note.option?.[0]) && Number(note.option?.[0]) !== 1" class="speed">x{{ note.option[0] }}</strong>
+        <strong v-if="Number(note.option?.[1]) && Number(note.option?.[1]) !== 0" class="orbit">&gt;{{ note.option[1] }}</strong>
+        {{ note.position }}/{{ note.split }}
+      </span>
 
-      <div v-for="(end, i) in note.end" :key="i">
-        <!-- 終点 -->
+      <!-- 終点ノーツ（再帰全ノード） -->
+      <template v-for="ep in treeData.endpoints" :key="ep.id">
+        <!-- 中継点かつ type: 1 の場合は小さな〇（コンボ加算中点） -->
         <span
-          class="note"
-          :class="`type${end.type}`"
+          v-if="ep.isIntermediate && ep.note.type === 1"
+          class="note-midpoint"
           :style="{
-            left: `${getLeft(end)}px`,
-            bottom: `${getBottom(end)}px`,
-            width: `${getWidth(end)}px`
+            left: `${getMidpointLeft(ep.note)}px`,
+            bottom: `${getBottom(ep.note) - 5}px`
           }"
-          >{{ end.position }}/{{ end.split }}</span
+          :title="getNoteTooltip(ep.note)"
         >
-        <!-- 帯 -->
-        <i
-          class="note-hold"
+          <span class="midpoint-badges">
+            <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
+            <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
+          </span>
+        </span>
+        <!-- 末端終点（type !== 89）の場合は通常のノートバー -->
+        <span
+          v-else-if="!ep.isIntermediate && ep.note.type !== 89"
+          class="note"
+          :class="`type${ep.note.type}`"
           :style="{
-            bottom: `${getBottom(note)}px`,
-            left: `${getLeft(end)}px`,
-            height: `${getBottom(end) - getBottom(note)}px`
+            left: `${getLeft(ep.note)}px`,
+            bottom: `${getBottom(ep.note)}px`,
+            width: `${getWidth(ep.note)}px`
           }"
-          v-bind="attrs"
-          v-on="on"
-        ></i>
-      </div>
+          :title="getNoteTooltip(ep.note)"
+        >
+          <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
+          <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
+          {{ ep.note.position }}/{{ ep.note.split }}
+        </span>
+        <!-- 不可視ノード（type: 89）だが speed または orbit が指定されている場合はバッジのみ表示 -->
+        <span
+          v-else-if="hasSpeedOrOrbit(ep.note)"
+          class="note-invisible-badge"
+          :style="{
+            left: `${getLeft(ep.note)}px`,
+            bottom: `${getBottom(ep.note)}px`,
+            width: `${getWidth(ep.note)}px`
+          }"
+          :title="getNoteTooltip(ep.note)"
+        >
+          <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
+          <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
+        </span>
+      </template>
+
+      <!-- 帯（SVGパス） -->
+      <svg
+        class="long-note-svg"
+        :style="{
+          height: `${entireHeight}px`
+        }"
+      >
+        <g v-for="seg in treeData.segments" :key="seg.id" @click.stop="menu = true">
+          <path :d="seg.paths.fillPath" class="hold-fill" />
+          <path :d="seg.paths.leftBorderPath" class="hold-border" />
+          <path :d="seg.paths.rightBorderPath" class="hold-border" />
+        </g>
+      </svg>
     </template>
 
     <!-- ポップアップ編集 -->
-    <v-card v-if="menu" rounded="lg">
-      <v-list>
-        <v-list-item>
-          <v-card-text>
-            #{{ note.index }}
-            ロング
-            {{ note.type === 90 ? "(ダミー)" : "" }}
-          </v-card-text>
-          <v-spacer></v-spacer>
-          <v-btn icon @click="menu = false" right>
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+    <v-card v-if="menu" rounded="lg" class="pa-2">
+      <v-list density="compact">
+        <v-list-item class="px-2">
+          <v-card-title class="pa-0 text-subtitle-1">
+            #{{ note.index }} ロング {{ note.type === 90 ? "(ダミー)" : "" }}
+          </v-card-title>
+          <template #append>
+            <v-btn icon="mdi-close" variant="text" size="small" @click="menu = false" />
+          </template>
         </v-list-item>
-        <v-card-text class="ml-4">始点</v-card-text>
-        <v-list-item>
-          <v-text-field
-            :value="note.measure"
-            @change="value => (note.measure = Number(value))"
-            hide-details
-            suffix="小節"
-            outlined
-            dense
-          ></v-text-field>
-        </v-list-item>
-        <v-list-item>
-          <v-row class="mb-0">
-            <v-col cols="12" sm="6">
+
+        <div class="px-2" @keydown="stopNumberInputArrowKeys">
+          <v-divider class="my-2" />
+          <div class="d-flex align-center justify-space-between mb-1">
+            <span class="text-subtitle-2 font-weight-bold">始点</span>
+            <v-btn
+              color="primary"
+              variant="text"
+              density="compact"
+              prepend-icon="mdi-plus-circle-outline"
+              @click="addEndToRoot"
+            >
+              ここに終点を追加
+            </v-btn>
+          </div>
+
+          <v-row class="mb-2" align="center" dense>
+            <v-col cols="6" sm="4">
               <v-text-field
-                v-model="note.position"
-                label="position"
-                outlined
-                dense
+                v-model.number="note.lane"
+                label="lane"
+                variant="outlined"
+                density="compact"
                 hide-details
                 type="number"
+                step="0.1"
+                min="0"
+                max="6"
               ></v-text-field>
             </v-col>
-            <v-col cols="12" sm="6">
+            <v-col cols="6" sm="4">
               <v-text-field
-                v-model="note.split"
-                label="split"
-                outlined
-                dense
+                :model-value="localMeasure"
+                @update:model-value="val => localMeasure = Number(val)"
+                @change="commitRootMeasure"
+                @keydown.enter.stop="commitRootMeasure"
+                label="measure"
+                variant="outlined"
+                density="compact"
                 hide-details
                 type="number"
+                min="0"
+                :max="maxMeasure"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="6" sm="4">
+              <v-text-field
+                v-model.number="note.position"
+                label="position"
+                variant="outlined"
+                density="compact"
+                hide-details
+                type="number"
+                min="0"
+                :max="note.split - 1"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="6" sm="4">
+              <v-combobox
+                v-model.number="note.split"
+                :items="[4, 8, 16, 32, 12, 24, 48]"
+                label="split"
+                variant="outlined"
+                hide-details
+                density="compact"
+                :menu-props="{}"
+              ></v-combobox>
+            </v-col>
+            <v-col cols="6" sm="4">
+              <v-text-field
+                v-model="rootSpeed"
+                label="speed"
+                placeholder="1"
+                variant="outlined"
+                density="compact"
+                hide-details
+                type="number"
+                step="0.1"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="6" sm="4">
+              <v-text-field
+                v-model="rootOrbit"
+                label="orbit"
+                placeholder="0"
+                variant="outlined"
+                density="compact"
+                hide-details
+                type="number"
+                step="0.1"
               ></v-text-field>
             </v-col>
           </v-row>
-        </v-list-item>
-        <v-list-item>
-          LANE
-          <v-spacer></v-spacer>
-          <v-radio-group v-model="note.lane" row hide-details>
-            <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
-          </v-radio-group>
-        </v-list-item>
-
-        <!-- 終点のレーン(浅い一覧) -->
-        <div
-          v-for="(end, i) in note.end"
-          :key="`longnote_end_${note.index}_${i}`"
-        >
-          <v-divider></v-divider>
-          <v-card-text class="ml-4 mt-2">終点 #{{ i }}</v-card-text>
-          <v-list-item>
-            <v-text-field
-              :value="end.measure"
-              @change="value => (end.measure = Number(value))"
-              hide-details
-              suffix="小節"
-              outlined
-              dense
-            ></v-text-field>
-          </v-list-item>
-          <v-list-item>
-            LANE
-            <v-spacer></v-spacer>
-            <v-radio-group v-model="end.lane" row hide-details>
-              <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
-            </v-radio-group>
-          </v-list-item>
-          <v-list-item>
-            <v-row class="mb-0">
-              <v-col cols="12" sm="6">
-                <v-text-field
-                  v-model="end.position"
-                  label="position"
-                  outlined
-                  dense
-                  hide-details
-                  type="number"
-                ></v-text-field>
-              </v-col>
-              <v-col cols="12" sm="6">
-                <v-text-field
-                  v-model="end.split"
-                  label="split"
-                  outlined
-                  dense
-                  hide-details
-                  type="number"
-                ></v-text-field>
-              </v-col>
-            </v-row>
-          </v-list-item>
-          <v-list-item>
-            終端
-            <v-spacer></v-spacer>
-            <v-radio-group v-model="end.type" row hide-details>
-              <v-radio label="あり" :value="1" class="ml-2"></v-radio>
-              <v-radio label="なし" :value="89" class="ml-2"></v-radio>
-            </v-radio-group>
-          </v-list-item>
         </div>
 
-        <v-alert
-          v-if="note.end.size === 0"
-          class="mx-4 mb-0"
-          dense
-          type="warning"
-          rounded="lg"
-        >
-          終点が1つもありません
-        </v-alert>
+        <v-divider class="my-2" />
+
+        <div class="px-2" @keydown="stopNumberInputArrowKeys">
+          <EndForm
+            v-for="(en, i) in note.end"
+            :key="`append_end_root_${i}`"
+            :end="en"
+            :parent="note"
+            :index="i"
+            :max-measure="maxMeasure"
+            @delete-end="deleteEnd(i)"
+            @place-notes="menu = false"
+          />
+        </div>
       </v-list>
-      <v-card-actions class="pt-0">
-        <v-btn color="error" text @click="deleteThisNote">
-          <v-icon left>mdi-delete</v-icon> ノートを削除
+
+      <v-card-actions class="pt-0 px-2 justify-space-between">
+        <v-btn color="error" variant="text" prepend-icon="mdi-delete" @click="deleteThisNote">
+          ノートを削除
         </v-btn>
       </v-card-actions>
     </v-card>
   </v-menu>
 </template>
 
-<script lang="ts">
-import Vue, { PropType } from "vue";
+<script setup lang="ts">
+import { computed, inject } from 'vue'
+import { stopNumberInputArrowKeys } from '@/composables/useNumberInputKeys'
+import type { NoteData } from 'chart-types'
+import { type ExtendedNoteData, type Measure } from '@/types'
+import { deleteNotesKey } from '@/composables/injectionKeys'
+import { generateHoldSvgPaths, getCurveType, type CurveType } from '@/composables/useNoteTypes'
+import EndForm from './EndForm.vue'
+import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
 
-import { ExtendedNoteData, Measure } from "@/types";
+const props = defineProps<{
+  note: ExtendedNoteData
+  measureData: Measure[]
+  currentDifficulty?: string
+}>()
 
-export default Vue.extend({
-  inject: ["deleteNotes"],
-  data() {
-    return {
-      menu: false
-    };
+const deleteNotes = inject(deleteNotesKey)!
+
+const { menu, localMeasure } = useNoteMeasureEdit(() => props.note)
+
+function commitRootMeasure() {
+  props.note.measure = localMeasure.value
+}
+
+const rootSpeed = computed<string>({
+  get: () => props.note.option?.[0] ?? '',
+  set: (val) => {
+    if (!props.note.option) props.note.option = []
+    while (props.note.option.length < 1) props.note.option.push('')
+    props.note.option[0] = val ?? ''
   },
-  props: {
-    note: {
-      type: Object as PropType<ExtendedNoteData>,
-      required: true
-    },
-    measureData: {
-      type: Array as PropType<Measure[]>,
-      required: true
-    }
+})
+
+const rootOrbit = computed<string>({
+  get: () => props.note.option?.[1] ?? '',
+  set: (val) => {
+    if (!props.note.option) props.note.option = []
+    while (props.note.option.length < 2) props.note.option.push('')
+    props.note.option[1] = val ?? ''
   },
-  methods: {
-    getLeft(note: ExtendedNoteData) {
-      return (note.lane - 1) * 60 + 60;
-    },
-    getBottom(note: ExtendedNoteData) {
-      return (
-        this.measureData[note.measure].measurePositionBottom +
-        (note.position / note.split) *
-          this.measureData[note.measure].measureHeight
-      );
-    },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getWidth(note: ExtendedNoteData) {
-      return 60;
-    },
-    deleteThisNote() {
-      // @ts-ignore "deleteNotes" inject
-      this.deleteNotes(this.note.index);
-      this.menu = false;
-    }
-  },
-  computed: {
-    /** 描画用のノートタイプ(ダミー時は擬態対象) */
-    drawType (): number {
-      if (this.note.type === 90) {
-        return Number(this.note.option[0]);
-      }
-      return this.note.type;
-    },
-    /** 描画用のOption配列(ダミー時は[0]を削除したもの) */
-    drawOptions (): string[] {
-      if (this.note.type === 90) {
-        return this.note.option.slice(1)
-      }
-      return this.note.option;
-    }
+})
+
+function getHoldNodeWidth(n: NoteData | ExtendedNoteData): number {
+  if (n.type === 2) return 1
+  const w = Number(n.option?.[3])
+  if (!w || isNaN(w) || w <= 0 || w === -1) return 1
+  return w
+}
+
+function hasSpeedOrOrbit(note: NoteData): boolean {
+  const s = Number(note.option?.[0])
+  const o = Number(note.option?.[1])
+  return Boolean((s && s !== 1) || (o && o !== 0))
+}
+
+function getNoteTooltip(note: NoteData): string {
+  let text = `${note.position}/${note.split}`
+  if (note.option?.[0] && Number(note.option[0]) !== 1) text += ` (speed: x${note.option[0]})`
+  if (note.option?.[1] && Number(note.option[1]) !== 0) text += ` (orbit: >${note.option[1]})`
+  if (note.option?.[3] && Number(note.option[3]) !== 1 && Number(note.option[3]) > 0) text += ` (width: ${note.option[3]})`
+  return text
+}
+
+const entireHeight = computed(() => {
+  const last = props.measureData.at(-1)
+  return (last?.measurePositionBottom ?? 0) + (last?.measureHeight ?? 0)
+})
+
+const maxMeasure = computed(() => (props.measureData.length > 0 ? props.measureData.length - 1 : 999))
+
+function getLeft(n: NoteData | ExtendedNoteData) {
+  const w = getHoldNodeWidth(n)
+  const center = (n.lane - 1) * 60 + 60 + 30
+  return center - (w / 2) * 60
+}
+
+function getMidpointLeft(n: NoteData | ExtendedNoteData) {
+  return (n.lane - 1) * 60 + 60 + 30 - 5
+}
+
+function getBottom(n: NoteData | ExtendedNoteData) {
+  const m = props.measureData[n.measure]
+  if (!m) return 0
+  return (
+    m.measurePositionBottom +
+    (n.position / n.split) * m.measureHeight
+  )
+}
+
+function getWidth(n: NoteData | ExtendedNoteData) {
+  return 60 * getHoldNodeWidth(n)
+}
+
+interface HoldSegment {
+  id: string
+  parent: NoteData
+  child: NoteData
+  curveType: CurveType
+  paths: { fillPath: string; leftBorderPath: string; rightBorderPath: string }
+}
+
+interface EndPointNode {
+  id: string
+  note: NoteData
+  parent: NoteData
+  depth: number
+  index: number
+  isIntermediate: boolean
+}
+
+const treeData = computed(() => {
+  const segments: HoldSegment[] = []
+  const endpoints: EndPointNode[] = []
+
+  function traverse(parent: NoteData, depth: number) {
+    if (!parent.end || !Array.isArray(parent.end)) return
+
+    parent.end.forEach((child, idx) => {
+      const childId = `end_${depth}_${idx}_${child.measure}_${child.position}`
+      const isIntermediate = Boolean(child.end && Array.isArray(child.end) && child.end.length > 0)
+      endpoints.push({
+        id: childId,
+        note: child,
+        parent,
+        depth,
+        index: idx,
+        isIntermediate,
+      })
+
+      const x1 = (parent.lane - 1) * 60 + 60 + 30
+      const b1 = getBottom(parent)
+      const x2 = (child.lane - 1) * 60 + 60 + 30
+      const b2 = getBottom(child)
+
+      const y1 = entireHeight.value - b1
+      const y2 = entireHeight.value - b2
+      const curveType = getCurveType(child)
+
+      const w1 = getHoldNodeWidth(parent) * 38
+      const w2 = getHoldNodeWidth(child) * 38
+
+      const paths = generateHoldSvgPaths(x1, y1, x2, y2, curveType, w1, w2)
+      segments.push({
+        id: `seg_${childId}`,
+        parent,
+        child,
+        curveType,
+        paths,
+      })
+
+      traverse(child, depth + 1)
+    })
   }
-});
+
+  traverse(props.note, 1)
+  return { segments, endpoints }
+})
+
+function addEndToRoot(): void {
+  props.note.end.push({
+    type: 1,
+    lane: props.note.lane,
+    measure: props.note.measure,
+    position: Math.min(props.note.position + 1, props.note.split),
+    split: props.note.split,
+    option: ['', '', 'linear'],
+    end: [],
+  })
+}
+
+function deleteEnd(index: number): void {
+  props.note.end.splice(index, 1)
+}
+
+function deleteThisNote(): void {
+  deleteNotes(props.note.index)
+  menu.value = false
+}
+
+const drawType = computed(() => {
+  if (props.note.type === 90) return Number(props.note.option[0])
+  return props.note.type
+})
 </script>
 
 <style lang="scss" scoped>
+.long-note-svg {
+  .hold-fill {
+    pointer-events: visibleFill;
+    cursor: pointer;
+  }
+
+  .hold-border {
+    pointer-events: visibleStroke;
+    cursor: pointer;
+  }
+}
+
 .v-card {
-  &__text {
-    padding: 0;
-    text-align: left;
-  }
-  .v-input {
-    margin-top: 0;
-    &--radio-group__input .v-radio {
-      margin: 0;
-    }
-  }
+  max-height: 80vh;
+  overflow-y: auto;
 }
 </style>

@@ -1,42 +1,45 @@
 <template>
-  <div class="object-based-measure">
+  <div class="object-based-measure" :class="{ 'is-child': isChild }">
     <h3>
       {{ measure.measure }}小節
       <span>
         {{ measure.measureBeat }}/4拍子・{{ measure.measureBpm }}BPM
       </span>
     </h3>
-    <v-expansion-panels dark>
+    <v-expansion-panels theme="dark">
       <v-expansion-panel
         v-for="(note, i) in notes"
-        :key="`note_${measure.measure}_${i}`"
+        :key="`note_${measure.measure}_${getNoteKey(note, i)}`"
       >
-        <v-expansion-panel-header>
-          #{{ note.index }} {{ noteTypeName(note) }}
+        <v-expansion-panel-title>
+          <template v-if="note.index !== undefined">#{{ note.index }} </template>
+          {{ noteTypeName(note) }}
           <span>（{{ note.position }}/{{ note.split }}）</span>
           <template v-if="hasError(note)" v-slot:actions>
             <v-icon color="error">
               mdi-alert-circle
             </v-icon>
           </template>
-        </v-expansion-panel-header>
+        </v-expansion-panel-title>
 
-        <v-expansion-panel-content>
-          <v-alert type="error" v-if="hasError(note)">
+        <v-expansion-panel-text>
+          <v-alert type="error" v-if="hasError(note)" class="mb-3">
             {{ hasError(note) }}
           </v-alert>
 
           <v-text-field
-            :value="note.measure"
-            @change="value => (note.measure = Number(value))"
-            @keydown.enter.stop="menu = false"
+            :model-value="getLocalMeasure(note, i)"
+            @update:model-value="val => setLocalMeasure(note, i, Number(val))"
+            @change="commitMeasure(note, i)"
+            @keydown.enter.stop="commitMeasure(note, i)"
             label="小節"
-            outlined
-            dense
+            variant="outlined"
+            density="compact"
             hide-details
             type="number"
           ></v-text-field>
-          <v-row>
+
+          <v-row class="mt-4">
             <v-col cols="12" sm="6">
               <v-select
                 :items="noteTypes"
@@ -44,29 +47,30 @@
                 label="ノート種別"
                 v-model="note.type"
                 align="left"
-                outlined
-                dense
+                variant="outlined"
+                density="compact"
               ></v-select>
             </v-col>
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model.number="note.lane"
                 label="lane"
-                outlined
-                dense
+                variant="outlined"
+                density="compact"
                 hide-details
                 type="number"
+                step="0.1"
               ></v-text-field>
             </v-col>
           </v-row>
 
-          <v-row>
+          <v-row class="my-4">
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model.number="note.position"
                 label="position"
-                outlined
-                dense
+                variant="outlined"
+                density="compact"
                 hide-details
                 type="number"
               ></v-text-field>
@@ -75,143 +79,141 @@
               <v-text-field
                 v-model.number="note.split"
                 label="split"
-                outlined
-                dense
+                variant="outlined"
+                density="compact"
                 hide-details
                 type="number"
               ></v-text-field>
             </v-col>
           </v-row>
 
-          <row v-for="(opt, i) in noteOptions(note)" :key="`option_${i}`">
+          <v-row v-for="(opt, optIdx) in noteOptions(note)" :key="`option_${optIdx}`" class="my-0">
             <v-text-field
-              v-model="note.option[i]"
+              v-model="note.option[optIdx]"
               hide-details
               :label="opt.label"
               :type="opt.type"
               class="mb-4"
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
             ></v-text-field>
-          </row>
+          </v-row>
 
-          <!-- ロングノーツの時、終点を表示 -->
-          <div class="object-based-measure__children" v-if="note.type === 2">
+          <!-- ロングノーツまたは終点ネストを持つ時、終点を表示 -->
+          <div class="object-based-measure__children" v-if="note.type === 2 || (note.end && note.end.length > 0)">
             <ObjectBasedMeasure
-              :measure="{
-                ...measure,
-                measure: '[終点]',
-                measureBeat: '-',
-                measureBpm: '-'
-              }"
+              :measure="({ ...measure, measure: '[終点・中点]', measureBeat: '-', measureBpm: '-' } as any)"
               :notes="note.end"
-            >
-            </ObjectBasedMeasure>
+              :is-child="true"
+            ></ObjectBasedMeasure>
           </div>
 
           <v-checkbox
             v-model="note.isSelected"
             label="選択"
             v-show="note.isSelected !== undefined"
+            density="compact"
+            hide-details
           ></v-checkbox>
-          <v-btn color="error" text @click="deleteNote(note)">
-            <v-icon left>mdi-delete</v-icon>
+          <v-btn color="error" variant="text" @click="deleteNote(note)" prepend-icon="mdi-delete">
             削除
           </v-btn>
-          <v-btn text @click="showSnackbar(JSON.stringify(note, null, 2))">
-            <v-icon>mdi-information</v-icon>
+          <v-btn variant="text" @click="showSnackbar(JSON.stringify(note, null, 2))" prepend-icon="mdi-information">
             ノート情報表示
           </v-btn>
-        </v-expansion-panel-content>
+        </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>
   </div>
 </template>
 
-<script lang="ts">
-import Vue, { PropType } from "vue";
-import { DifficultyString, ExtendedNoteData, Measure } from "@/types";
+<script setup lang="ts">
+import { ref, inject } from 'vue'
+import { type DifficultyString, type ExtendedNoteData, type Measure } from '@/types'
+import { noteTypes, noteOptions } from '@/composables/useNoteTypes'
+import { hasError } from '@/composables/useNoteCheck'
+import { deleteNotesKey, showSnackbarKey } from '@/composables/injectionKeys'
 
-import noteCheck from "../mixins/noteCheck";
-import noteTypes, { NoteTypesDataType, NoteTypesMethodsType } from "../mixins/noteTypes";
+const props = defineProps<{
+  notes?: ExtendedNoteData[]
+  measure: Measure
+  measureData?: any[]
+  currentDifficulty?: DifficultyString
+  isChild?: boolean
+}>()
 
-type MethodsType = {
-  deleteNote(note: ExtendedNoteData): void;
-  noteTypeName(note: ExtendedNoteData): string;
+const deleteNotes = inject(deleteNotesKey)!
+const showSnackbar = inject(showSnackbarKey)!
+
+const localMeasures = ref<Record<string, number>>({})
+
+function getNoteKey(note: ExtendedNoteData, index: number): string {
+  return note.index !== undefined ? String(note.index) : `${props.measure.measure}_${note.position}_${index}`
 }
 
-type PropsType = {
-  notes: ExtendedNoteData[];
-  measure: Measure;
-  measureData: any[];
-  currentDifficulty: DifficultyString;
-}
-
-export default Vue.extend<
-  NoteTypesDataType,
-  MethodsType & NoteTypesMethodsType,
-  {},
-  PropsType
->({
-  name: "ObjectBasedMeasure",
-  mixins: [noteTypes, noteCheck],
-  inject: ["deleteNotes", "showSnackbar"],
-  props: {
-    notes: {
-      type: Array as PropType<ExtendedNoteData[]>,
-      required: false,
-      default: () => []
-    },
-    measure: {
-      type: Object as PropType<Measure>,
-      required: true
-    },
-    measureData: {
-      type: Array,
-      default: () => []
-    },
-    currentDifficulty: {
-      type: String as PropType<DifficultyString>,
-      default: "easy"
-    }
-  },
-  // @ts-ignore "noteOptions" はmixin内に定義
-  methods: {
-    deleteNote(note) {
-      // @ts-ignore "deleteNotes" inject
-      this.deleteNotes(note.index);
-      // this.menu = false;
-    },
-    noteTypeName(note) {
-      const types = this.noteTypes;
-      if (note.type !== 90) {
-        return types.find(t => t.value === note.type)?.text || "---";
-      }
-      else {
-        return 'ダミー ' + types.find(t => String(t.value) === note.option[0])?.text
-      }
-    }
+function getLocalMeasure(note: ExtendedNoteData, index: number) {
+  const key = getNoteKey(note, index)
+  if (localMeasures.value[key] === undefined) {
+    localMeasures.value[key] = note.measure
   }
-});
+  return localMeasures.value[key]
+}
+
+function setLocalMeasure(note: ExtendedNoteData, index: number, val: number) {
+  const key = getNoteKey(note, index)
+  localMeasures.value[key] = val
+}
+
+function commitMeasure(note: ExtendedNoteData, index: number) {
+  const key = getNoteKey(note, index)
+  note.measure = localMeasures.value[key]
+}
+
+function deleteNote(note: ExtendedNoteData) {
+  if (note.index !== undefined) {
+    deleteNotes(note.index)
+  }
+}
+
+function noteTypeName(note: ExtendedNoteData) {
+  if (note.type !== 90) {
+    return noteTypes.find(t => t.value === note.type)?.title || '---'
+  } else {
+    return 'ダミー ' + noteTypes.find(t => String(t.value) === note.option[0])?.title
+  }
+}
 </script>
 
 <style lang="scss" scoped>
 .object-based-measure {
   color: #f0f0f0;
-  margin-left: calc(100% - 420px);
-  max-width: 100%;
-  min-width: 200px;
+  width: 100%;
+  box-sizing: border-box;
+
   h3 {
-    padding: 8px;
+    padding: 8px 4px;
+    font-size: 1.1rem;
     span {
       color: #909090;
-      font-size: 16px;
+      font-size: 0.9rem;
       font-weight: normal;
     }
   }
+
   &__children {
-    position: relative;
-    left: 80px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    padding-left: 8px;
+    border-left: 2px solid rgba(255, 255, 255, 0.2);
+  }
+
+  :deep(.v-expansion-panel-text__wrapper) {
+    padding: 8px 8px;
+  }
+
+  :deep(.v-expansion-panel-title) {
+    padding: 8px 12px;
+    min-height: 40px;
   }
 }
 </style>

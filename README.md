@@ -6,7 +6,7 @@
 ![commits](https://flat.badgen.net/github/commits/otofuda/chart-editor)
 ![last-commit](https://flat.badgen.net/github/last-commit/otofuda/chart-editor)
 
-Chart editor (v2) for Otofuda format
+Chart editor (v2) for Otofuda format — built with **Vue 3 + Vite 8 + Vuetify 4 + TypeScript**.
 
 ### Open the App
 
@@ -16,7 +16,7 @@ Chart editor (v2) for Otofuda format
 
 ```sh
 npm install
-npm run serve
+npm run dev
 ```
 
 ### Compiles and minifies for production
@@ -24,3 +24,28 @@ npm run serve
 ```sh
 npm run build
 ```
+
+### Run unit tests
+
+```sh
+npx vitest run
+```
+
+### Type checking
+
+```sh
+npx tsc --noEmit
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BASE_URL` | `/chart-editor/` | Base path for the application (e.g. `/` for local, `/chart-editor/` for GitHub Pages) |
+
+```sh
+BASE_URL=/ npm run dev     # Run locally at http://localhost:5173/
+npm run build              # Build with default base /chart-editor/
+BASE_URL=/ npm run build   # Build with base /
+```
+
