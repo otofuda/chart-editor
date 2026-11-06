@@ -54,8 +54,8 @@
         <!-- ロングノーツ -->
         <!-- FIXME: 多分負荷でかい -->
         <LongNote
-          v-for="(note, i) in longNotes"
-          :key="`longnote_${i}`"
+          v-for="note in longNotes"
+          :key="note.index"
           :note="note"
           :measureData="measureData"
         />

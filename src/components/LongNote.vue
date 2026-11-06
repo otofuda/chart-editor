@@ -230,13 +230,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, watch } from 'vue'
+import { computed, inject } from 'vue'
 import { stopNumberInputArrowKeys } from '@/composables/useNumberInputKeys'
 import type { NoteData } from 'chart-types'
 import { type ExtendedNoteData, type Measure } from '@/types'
 import { deleteNotesKey } from '@/composables/injectionKeys'
 import { generateHoldSvgPaths, getCurveType, type CurveType } from '@/composables/useNoteTypes'
 import EndForm from './EndForm.vue'
+import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -246,8 +247,7 @@ const props = defineProps<{
 
 const deleteNotes = inject(deleteNotesKey)!
 
-const menu = ref(false)
-const localMeasure = ref(props.note.measure)
+const { menu, localMeasure } = useNoteMeasureEdit(() => props.note)
 
 function commitRootMeasure() {
   props.note.measure = localMeasure.value
@@ -291,14 +291,6 @@ function getNoteTooltip(note: NoteData): string {
   if (note.option?.[3] && Number(note.option[3]) !== 1 && Number(note.option[3]) > 0) text += ` (width: ${note.option[3]})`
   return text
 }
-
-watch(menu, (isOpen) => {
-  if (isOpen) {
-    localMeasure.value = props.note.measure
-  } else {
-    props.note.measure = localMeasure.value
-  }
-})
 
 const entireHeight = computed(() => {
   const last = props.measureData.at(-1)

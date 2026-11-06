@@ -104,8 +104,8 @@
     <span class="measure__number" v-text="measure.measure"></span>
 
     <Note
-      v-for="(note, i) in dispNotes"
-      :key="`note_${measure.measure}_${i}`"
+      v-for="note in dispNotes"
+      :key="note.index"
       :note="note"
       :measure="measure"
       :currentChart="notes"

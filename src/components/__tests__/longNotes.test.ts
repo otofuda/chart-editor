@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import type { ExtendedNoteData, Measure } from '../../types'
-import { deleteNotesKey, showSnackbarKey } from '../../composables/injectionKeys'
+import { appendNotesKey, copyNotesToDifficultyKey, deleteNotesKey, getMovedNoteKey, setAppendNoteInfoKey, showSnackbarKey } from '../../composables/injectionKeys'
 import EndForm from '../EndForm.vue'
 import LongNote from '../LongNote.vue'
 import Preview from '../Preview.vue'
+import MeasureComponent from '../Measure.vue'
+import Note from '../Note.vue'
 import { useChartData } from '../../composables/useChartData'
 import { useFileIO } from '../../composables/useFileIO'
 import { ControlledFileReader } from '../../composables/__tests__/controlledFileReader'
@@ -49,6 +51,143 @@ const stubs = {
     setup: (_, { slots }) => () => h('div', [slots.activator?.({ props: {} }), slots.default?.()]),
   }),
 }
+
+describe('ノーツの編集状態と削除', () => {
+  const interactiveMenu = defineComponent({
+    props: ['modelValue'], emits: ['update:modelValue'],
+    setup: (props, { emit, slots }) => () => h('div', [
+      slots.activator?.({ props: { onClick: () => emit('update:modelValue', !props.modelValue) } }),
+      slots.default?.(),
+    ]),
+  })
+  const globals = {
+    stubs: { ...stubs, 'v-menu': interactiveMenu, 'v-radio': layout, 'v-radio-group': layout,
+      'v-textarea': layout, 'v-tooltip': layout, 'v-card-text': layout, 'v-list-item-title': layout },
+    provide: { [showSnackbarKey as symbol]: vi.fn(), [setAppendNoteInfoKey as symbol]: vi.fn(),
+      [appendNotesKey as symbol]: vi.fn(), [getMovedNoteKey as symbol]: vi.fn(),
+      [copyNotesToDifficultyKey as symbol]: vi.fn() },
+  }
+
+  function mountPreview(data: ReturnType<typeof useChartData>) {
+    const host = defineComponent({
+      setup: () => () => h(Preview, {
+        currentChart: data.currentChart.value,
+        currentDifficulty: data.currentDifficulty.value,
+        measureData: data.measureData.value,
+        infoObject: { ...data.chartObject.value.info, version: 2 },
+      }),
+    })
+    return mount(host, { global: {
+      ...globals,
+      stubs: { ...globals.stubs, MeasureComponent: true, ObjectBasedMeasure: true, NoteShadow: true },
+      provide: { ...globals.provide, [deleteNotesKey as symbol]: data.deleteNotes },
+    } })
+  }
+
+  it.each([0, 1])('ロングノーツの %i 番目を削除しても他の始点、終点、帯が変わらない', async deleted => {
+    const data = useChartData()
+    data.chartObject.value.easy = [0, 1, 2].map((i) => note({
+      index: i + 1, type: i === 1 ? 90 : 2, option: i === 1 ? ['2'] : [],
+      measure: i + 1, lane: (i + 1) as 1 | 2 | 3,
+      end: [note({ measure: i + 3, position: 1, lane: (i + 1) as 1 | 2 | 3 })],
+    }))
+    data.chartObject.value.easy.push(note({ index: 4, type: 99, measure: 6 }))
+    const wrapper = mountPreview(data)
+    try {
+      const notes = () => wrapper.findAllComponents(LongNote)
+      const remainingElements = notes().filter((_, index) => index !== deleted).map(component => component.get('.note').element)
+      const before = notes().map(component => ({
+        data: JSON.stringify(component.props('note')),
+        bottom: component.get('.note').attributes('style'),
+        paths: component.findAll('.long-note-svg path').map(path => path.attributes('d')),
+      }))
+      await notes()[deleted].get('.note').trigger('click')
+      await notes()[deleted].findAll('button').find(button => button.text().includes('ノートを削除'))!.trigger('click')
+      expect(notes()).toHaveLength(2)
+      notes().forEach((component, index) => expect(component.get('.note').element).toBe(remainingElements[index]))
+      expect(notes().map(component => ({
+        data: JSON.stringify(component.props('note')),
+        bottom: component.get('.note').attributes('style'),
+        paths: component.findAll('.long-note-svg path').map(path => path.attributes('d')),
+      }))).toEqual(before.filter((_, index) => index !== deleted))
+    } finally { wrapper.unmount() }
+  })
+
+  it('同じ小節の通常ノーツを削除しても残りのノーツが変わらない', async () => {
+    const data = useChartData()
+    data.chartObject.value.easy = [note({ index: 1, position: 0 }), note({ index: 2, position: 2 })]
+    const host = defineComponent({
+      setup: () => () => h(MeasureComponent, { measure: measures[0], notes: data.currentChart.value }),
+    })
+    const wrapper = mount(host, { global: {
+      ...globals, provide: { ...globals.provide, [deleteNotesKey as symbol]: data.deleteNotes },
+    } })
+    try {
+      const before = JSON.stringify(data.currentChart.value[1])
+      const remainingElement = wrapper.findAllComponents(Note)[1].get('.note').element
+      const first = wrapper.findAllComponents(Note)[0]
+      await first.get('.note').trigger('click')
+      await first.findAll('button').find(button => button.text() === '削除')!.trigger('click')
+      expect(data.currentChart.value).toHaveLength(1)
+      expect(JSON.stringify(data.currentChart.value[0])).toBe(before)
+      expect(wrapper.findAllComponents(Note)).toHaveLength(1)
+      expect(wrapper.getComponent(Note).get('.note').element).toBe(remainingElement)
+    } finally { wrapper.unmount() }
+  })
+
+  it.each([Note, LongNote])('編集対象の置換時は入力を破棄し、通常のメニュー終了時は確定する', async component => {
+    const oldNote = note({ index: 1, measure: 1, type: component === LongNote ? 2 : 1 })
+    const newNote = note({ index: 1, measure: 3, type: oldNote.type })
+    const props = { note: oldNote, measureData: measures, measure: measures[0], currentChart: [oldNote] }
+    const wrapper = mount(component, { props, global: {
+      ...globals, provide: { ...globals.provide, [deleteNotesKey as symbol]: vi.fn() },
+    } })
+    try {
+      await wrapper.get('.note').trigger('click')
+      const input = wrapper.findAll('input[type="number"]')[component === LongNote ? 1 : 0]
+      ;(input.element as HTMLInputElement).value = '2'
+      await input.trigger('input')
+      await wrapper.setProps({ note: newNote })
+      expect(oldNote.measure).toBe(1)
+      expect(newNote.measure).toBe(3)
+      expect(wrapper.find('input[type="number"]').exists()).toBe(false)
+      await wrapper.get('.note').trigger('click')
+      const newInput = wrapper.findAll('input[type="number"]')[component === LongNote ? 1 : 0]
+      ;(newInput.element as HTMLInputElement).value = '4'
+      await newInput.trigger('input')
+      wrapper.findComponent(interactiveMenu).vm.$emit('update:modelValue', false)
+      await nextTick()
+      expect(newNote.measure).toBe(4)
+    } finally { wrapper.unmount() }
+  })
+
+  it('同じ識別番号を持つ難易度と譜面に切り替えても入力が引き継がれない', async () => {
+    const data = useChartData()
+    data.chartObject.value.easy = [note({ index: 1, type: 2, measure: 1 })]
+    data.chartObject.value.hard = [note({ index: 1, type: 2, measure: 3 })]
+    const wrapper = mountPreview(data)
+    try {
+      const edit = async (value: string) => {
+        const longNote = wrapper.getComponent(LongNote)
+        await longNote.get('.note').trigger('click')
+        const input = longNote.get('input[aria-label="measure"]')
+        ;(input.element as HTMLInputElement).value = value
+        await input.trigger('input')
+      }
+      await edit('2')
+      data.currentDifficulty.value = 'hard'
+      await nextTick()
+      expect(data.chartObject.value.easy[0].measure).toBe(1)
+      expect(data.chartObject.value.hard[0].measure).toBe(3)
+      expect(wrapper.getComponent(LongNote).find('input[aria-label="measure"]').exists()).toBe(false)
+      await edit('4')
+      data.chartObject.value.hard = [note({ index: 1, type: 2, measure: 5 })]
+      await nextTick()
+      expect(data.chartObject.value.hard[0].measure).toBe(5)
+      expect(wrapper.getComponent(LongNote).find('input[aria-label="measure"]').exists()).toBe(false)
+    } finally { wrapper.unmount() }
+  })
+})
 
 describe('ロングノートの編集・描画', () => {
   const interactiveMenu = defineComponent({

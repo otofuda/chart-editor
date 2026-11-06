@@ -211,12 +211,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, watch } from 'vue'
+import { computed, inject } from 'vue'
 import { stopNumberInputArrowKeys } from '@/composables/useNumberInputKeys'
 import { type ExtendedNoteData, type Measure } from '@/types'
 import { noteTypes, noteOptions } from '@/composables/useNoteTypes'
 import { isDuplicated, hasError, isLanelessNote } from '@/composables/useNoteCheck'
 import { deleteNotesKey, setAppendNoteInfoKey, showSnackbarKey } from '@/composables/injectionKeys'
+import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -228,16 +229,7 @@ const deleteNotes = inject(deleteNotesKey)!
 const setAppendNoteInfo = inject(setAppendNoteInfoKey)!
 const showSnackbar = inject(showSnackbarKey)!
 
-const menu = ref(false)
-const localMeasure = ref(props.note.measure)
-
-watch(menu, (isOpen) => {
-  if (isOpen) {
-    localMeasure.value = props.note.measure
-  } else {
-    props.note.measure = localMeasure.value
-  }
-})
+const { menu, localMeasure } = useNoteMeasureEdit(() => props.note)
 
 function deleteThisNote() {
   deleteNotes(props.note.index)
