@@ -29,6 +29,7 @@
       <v-col cols="6" sm="4">
         <v-text-field
           v-model.number="end.lane"
+          v-history-field="field('終点のレーンを変更')"
           label="lane"
           variant="outlined"
           density="compact"
@@ -45,7 +46,8 @@
           ]"
           hide-details
           label="type"
-          v-model="end.type"
+          :model-value="end.type"
+          @update:model-value="value => change('終点の種別を変更', () => end.type = value)"
           variant="outlined"
           density="compact"
           :menu-props="{}"
@@ -56,7 +58,8 @@
           :items="curveTypeOptions"
           hide-details
           label="曲線"
-          v-model="curveType"
+          :model-value="curveType"
+          @update:model-value="value => change('終点の曲線を変更', () => curveType = value)"
           variant="outlined"
           density="compact"
           :menu-props="{}"
@@ -65,6 +68,7 @@
       <v-col cols="6" sm="4">
         <v-text-field
           v-model.number="end.measure"
+          v-history-field="field('終点の小節番号を変更')"
           label="measure"
           variant="outlined"
           density="compact"
@@ -76,6 +80,7 @@
       <v-col cols="6" sm="4">
         <v-text-field
           v-model.number="end.position"
+          v-history-field="field('終点の位置を変更')"
           label="position"
           variant="outlined"
           density="compact"
@@ -92,7 +97,9 @@
       </v-col>
       <v-col cols="6" sm="4">
         <v-combobox
-          v-model.number="end.split"
+          :model-value="end.split"
+          v-history-field="field('終点の分割数を変更')"
+          @update:model-value="changeSplit"
           :items="[4, 8, 16, 32, 12, 24, 48]"
           label="split"
           variant="outlined"
@@ -104,6 +111,7 @@
       <v-col cols="6" sm="4">
         <v-text-field
           v-model="endSpeed"
+          v-history-field="field('終点の速度を変更')"
           label="speed"
           placeholder="1"
           variant="outlined"
@@ -116,6 +124,7 @@
       <v-col cols="6" sm="4">
         <v-text-field
           v-model="endOrbit"
+          v-history-field="field('終点の軌道を変更')"
           label="orbit"
           placeholder="0"
           variant="outlined"
@@ -128,6 +137,7 @@
       <v-col cols="12" sm="4">
         <v-text-field
           v-model="endWidth"
+          v-history-field="field('終点の幅を変更')"
           label="width"
           placeholder="1 (通常幅)"
           variant="outlined"
@@ -160,6 +170,7 @@
         :parent="end"
         :index="i"
         :max-measure="props.maxMeasure"
+        :history-enabled="historyEnabled"
         @delete-end="deleteChild"
         @place-notes="placeNotes"
       />
@@ -171,6 +182,7 @@
 import { computed } from 'vue'
 import type { LaneType, NoteData } from 'chart-types'
 import { curveTypeOptions, getCurveType, type CurveType } from '@/composables/useNoteTypes'
+import { numberInputValue, useHistoryFields, vHistoryField } from '@/composables/useHistoryField'
 
 const props = withDefaults(
   defineProps<{
@@ -178,6 +190,7 @@ const props = withDefaults(
     parent: NoteData
     index: number
     maxMeasure?: number
+    historyEnabled?: boolean
   }>(),
   {
     maxMeasure: 999,
@@ -185,6 +198,14 @@ const props = withDefaults(
 )
 
 const emit = defineEmits(['delete-end', 'append-to-up', 'append-to-down', 'place-notes'])
+const { field, change, input } = useHistoryFields(() => Boolean(props.historyEnabled))
+
+/** 分割数の入力や候補選択を、終点の同じ入力欄の編集として履歴へまとめる。 */
+function changeSplit(value: unknown) {
+  input('終点の分割数を変更', () => {
+    props.end.split = numberInputValue(value)
+  })
+}
 
 const endSpeed = computed<string>({
   get: () => props.end.option?.[0] ?? '',
@@ -222,8 +243,9 @@ const endWidth = computed<string>({
   },
 })
 
+/** この終点へ子の終点を追加する。確定済みノーツの場合だけ履歴に記録する。 */
 function addEndToThis(): void {
-  props.end.end.push({
+  change('終点に子の終点を追加', () => props.end.end.push({
     type: 1,
     lane: props.end.lane,
     measure: props.end.measure,
@@ -231,16 +253,17 @@ function addEndToThis(): void {
     split: props.end.split,
     option: ['', '', 'linear'],
     end: [],
-  })
+  }))
 }
 
+/** 親へ削除を依頼し、子孫を含む終点の削除を1操作として記録する。 */
 function deleteThisEnd(): void {
-  emit('delete-end', props.index)
+  change('終点を削除', () => emit('delete-end', props.index))
 }
 
-// 再帰の場合、自分の終点リストから子を消去
+/** 再帰したフォームから削除を依頼された子の終点を取り除く。 */
 function deleteChild(index: number): void {
-  props.end.end.splice(index, 1)
+  change('子の終点を削除', () => props.end.end.splice(index, 1))
 }
 
 // positionにフォーカスして終点移動（その終点のみ 1.0 刻みで変更、0.0〜6.0にクランプ）

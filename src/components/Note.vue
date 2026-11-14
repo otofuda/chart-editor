@@ -51,6 +51,7 @@
           variant="outlined"
           v-if="drawType === 100"
           v-model="note.option[0]"
+          v-history-field="field('コメントを変更')"
           class="elevation-4"
           bg-color="editor-highlight"
           hide-details
@@ -109,7 +110,8 @@
         <v-list-item>
           <v-text-field
             v-model.number="localMeasure"
-            @change="note.measure = localMeasure"
+            v-history-field="field('小節番号を変更', applyMeasure, isMeasureDirty)"
+            @change="commitMeasure"
             @keydown.enter.stop="menu = false"
             hide-details
             suffix="小節"
@@ -125,6 +127,7 @@
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model.number="note.position"
+                v-history-field="field('ノーツの位置を変更')"
                 label="position"
                 variant="outlined"
                 density="compact"
@@ -135,6 +138,7 @@
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model.number="note.split"
+                v-history-field="field('ノーツの分割数を変更')"
                 label="split"
                 variant="outlined"
                 density="compact"
@@ -149,7 +153,8 @@
           LANE
           <v-spacer></v-spacer>
           <v-radio-group
-            v-model.number="note.lane"
+            :model-value="note.lane"
+            @update:model-value="value => change('ノーツのレーンを変更', () => note.lane = value)"
             inline
             hide-details
             :disabled="getIsLanelessNote"
@@ -165,7 +170,8 @@
             :items="getNoteTypes"
             hide-details
             label="ノート種別"
-            v-model="note.type"
+            :model-value="note.type"
+            @update:model-value="value => change('ノーツ種別を変更', () => note.type = value)"
             align="left"
             variant="outlined"
             density="compact"
@@ -188,6 +194,7 @@
         <v-list-item v-for="(opt, i) in getOptions" :key="`option_${i}`">
           <v-text-field
             v-model="note.option[i]"
+            v-history-field="field(`${opt.label}を変更`)"
             hide-details
             :label="opt.label"
             :type="opt.type"
@@ -223,6 +230,7 @@ import { deleteNotesKey, setAppendNoteInfoKey, showSnackbarKey } from '@/composa
 import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
 import { noteDragKey } from '@/composables/useNoteDrag'
 import { canDragNote } from '@/composables/noteMovement'
+import { useHistoryFields, vHistoryField } from '@/composables/useHistoryField'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -235,7 +243,14 @@ const setAppendNoteInfo = inject(setAppendNoteInfoKey)!
 const showSnackbar = inject(showSnackbarKey)!
 const noteDrag = inject(noteDragKey, null)
 
-const { menu, localMeasure } = useNoteMeasureEdit(() => props.note)
+const { history, field, change } = useHistoryFields()
+const {
+  menu,
+  localMeasure,
+  applyMeasure,
+  commitMeasure,
+  isMeasureDirty,
+} = useNoteMeasureEdit(() => props.note, history)
 
 function deleteThisNote() {
   deleteNotes(props.note.index)

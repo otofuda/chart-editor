@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick, ref } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import type { ExtendedNoteData, Measure } from '@/types'
 import {
@@ -10,11 +10,13 @@ import {
   getMovedNoteKey,
   setAppendNoteInfoKey,
   showSnackbarKey,
+  chartHistoryKey,
 } from '@/composables/injectionKeys'
 import Preview from '../Preview.vue'
 import Note from '../Note.vue'
 import LongNote from '../LongNote.vue'
 import NoteShadow from '../NoteShadow.vue'
+import { useChartData } from '@/composables/useChartData'
 
 /** テストごとの差分だけを指定して、画面に配置するノーツを作る。 */
 function note(overrides: Partial<ExtendedNoteData> = {}): ExtendedNoteData {
@@ -155,7 +157,9 @@ let frameId: number
 
 /** 譜面プレビューを描画し、ポインター捕捉とスクロールを制御できる検証環境を作る。 */
 function setup(sources: ExtendedNoteData[] = [note()], extraProps = {}) {
-  const chart = ref(sources)
+  const data = useChartData()
+  data.chartObject.value.easy = sources
+  const chart = data.currentChart
   const showSnackbar = vi.fn()
   const host = defineComponent({
     setup: () => () => h(Preview, {
@@ -179,6 +183,7 @@ function setup(sources: ExtendedNoteData[] = [note()], extraProps = {}) {
         [deleteNotesKey as symbol]: vi.fn(),
         [getMovedNoteKey as symbol]: vi.fn(),
         [setAppendNoteInfoKey as symbol]: vi.fn(),
+        [chartHistoryKey as symbol]: data.history,
       },
     },
   })
@@ -218,6 +223,7 @@ function setup(sources: ExtendedNoteData[] = [note()], extraProps = {}) {
   return {
     wrapper,
     chart,
+    history: data.history,
     content,
     bar,
     showSnackbar,
@@ -247,6 +253,39 @@ afterEach(() => {
 })
 
 describe('譜面のドラッグ操作', () => {
+  it('選択ノーツのドラッグを一回で往復し、Undo時の未確定候補を破棄する', async () => {
+    const { wrapper, chart, bar, history } = setup([
+      note({ isSelected: true }), note({ index: 2, lane: 3, isSelected: true }),
+    ])
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    expect(history.entries.value).toHaveLength(0)
+    pointer(window, 'pointerup', 310, 550)
+    expect(history.entries.value).toHaveLength(1)
+    expect(chart.value.map(n => n.lane)).toEqual([3, 4])
+    pointer(bar().element, 'pointerdown', 310, 550)
+    pointer(window, 'pointermove', 250, 500)
+    history.undo()
+    pointer(window, 'pointerup', 250, 500)
+    await nextTick()
+    expect(chart.value.map(n => n.lane)).toEqual([2, 3])
+    expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+    expect(history.entries.value).toHaveLength(1)
+    history.redo()
+    expect(chart.value.map(n => n.lane)).toEqual([3, 4])
+  })
+
+  it('ドラッグのキャンセルと移動しないドロップは履歴を増やさない', () => {
+    const { bar, history } = setup()
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointerup', 250, 600)
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    pointer(window, 'pointerup', 310, 550)
+    expect(history.entries.value).toEqual([])
+  })
+
   it('タッチで縦に動かすと、ドラッグのしきい値未満でも標準スクロールを抑止する', async () => {
     const { wrapper, chart, bar } = setup()
     const source = bar().element

@@ -68,7 +68,7 @@ export function useFileIO(
       cancelRead()
       // 読み込み待ちの間に再生し直した場合も、適用前に終了する。
       beforeFileChange()
-      chartObject.value = parsed
+      chartData.history.reset(parsed)
       isLoaded.value = true
     }
     next.onerror = fail
@@ -89,6 +89,7 @@ export function useFileIO(
    * JSON ファイルを名前をつけて保存する
    */
   function saveFile(): void {
+    chartData.history.commitEdit()
     const saveObject: Record<string, unknown> = {
       raku: [],
       easy: [],

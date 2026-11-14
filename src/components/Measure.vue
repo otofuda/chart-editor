@@ -119,6 +119,7 @@ import { type DifficultyString, type ExtendedNoteData, type Measure } from '@/ty
 import Note from './Note.vue'
 import {
   deleteNotesKey, appendNotesKey, showSnackbarKey, getMovedNoteKey, copyNotesToDifficultyKey,
+  chartHistoryKey,
 } from '@/composables/injectionKeys'
 
 const props = defineProps<{
@@ -132,6 +133,7 @@ const appendNotes = inject(appendNotesKey)!
 const showSnackbar = inject(showSnackbarKey)!
 const getMovedNote = inject(getMovedNoteKey)!
 const copyNotesToDifficulty = inject(copyNotesToDifficultyKey)!
+const history = inject(chartHistoryKey, null)
 
 const difficulties = ['raku', 'easy', 'normal', 'hard', 'extra'] as DifficultyString[]
 const copyToDifficulty = ref<DifficultyString>(props.currentDifficulty ?? 'easy')
@@ -151,7 +153,7 @@ function clearAll() {
 }
 
 // 小節内のノーツをすべて複製
-function copyAll() {
+function doCopyAll() {
   let targets = notesList.value.filter(note => note.type !== 2)
   // チェック済みのみ複製する場合のフィルター
   if (copyOrMoveOnlySelected.value) targets = targets.filter(note => note.isSelected)
@@ -165,7 +167,7 @@ function copyAll() {
 }
 
 // 小節内のノーツをすべて移動
-function moveAll() {
+function doMoveAll() {
   let targets = notesList.value.filter(note => note.type !== 2)
   // チェック済みのみ移動する場合のフィルター
   if (copyOrMoveOnlySelected.value) targets = targets.filter(note => note.isSelected)
@@ -178,6 +180,29 @@ function moveAll() {
     // 各movedNoteを取得して対象難易度に複製
     copyNotesToDifficulty(copyToDifficulty.value, ...targets.map(note => getMovedNote({ ...note }, copyToMeasure.value)))
     deleteNotes(...idx)
+  }
+}
+
+/** 小節内のノーツの複製を、コピー先難易度を対象とする1操作として記録する。 */
+function copyAll() {
+  if (history) {
+    history.run(
+      { label: '小節のノーツを複製', difficulties: [copyToDifficulty.value] },
+      doCopyAll
+    )
+  } else {
+    doCopyAll()
+  }
+}
+
+/** 移動先への挿入と移動元の削除を、難易度をまたいでも1操作にまとめる。 */
+function moveAll() {
+  const difficulties = [...new Set([props.currentDifficulty ?? 'easy', copyToDifficulty.value])]
+
+  if (history) {
+    history.run({ label: '小節のノーツを移動', difficulties }, doMoveAll)
+  } else {
+    doMoveAll()
   }
 }
 

@@ -7,6 +7,7 @@ import {
 } from 'vue'
 import type { NoteData } from 'chart-types'
 import type { ExtendedNoteData, Measure } from '@/types'
+import type { ChartHistory } from './useChartHistory'
 import {
   calculateNoteMove,
   canDragNote,
@@ -47,6 +48,7 @@ export function useNoteDrag(options: {
   /** 難易度など、変更時にドラッグを中断すべき編集対象の識別子。 */
   context: Ref<string | undefined>
   showSnackbar: (message: string) => void
+  history?: ChartHistory | null
 }) {
   const candidate = shallowRef<NoteMoveCandidate | null>(null)
   let pointer = { x: 0, y: 0 }
@@ -264,7 +266,14 @@ export function useNoteDrag(options: {
     if (final.error) {
       options.showSnackbar(final.error)
     } else {
-      commitNoteMove(final)
+      if (options.history) {
+        options.history.run(
+          { label: 'ノーツをドラッグ移動' },
+          () => commitNoteMove(final)
+        )
+      } else {
+        commitNoteMove(final)
+      }
     }
   }
 
@@ -389,5 +398,6 @@ export function useNoteDrag(options: {
     start,
     startWhole,
     candidate,
+    cancel,
   }
 }

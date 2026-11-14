@@ -103,6 +103,37 @@ describe('ファイル変更時の再生停止と読み込みの競合', () => {
     expect(s.io.isLoaded.value).toBe(true)
   })
 
+  it('読み込み成功でだけ履歴をリセットし、失敗・選択解除・古い通知では維持する', () => {
+    const s = setupChange()
+    s.chartData.history.run({ label: 'BPM変更' }, () => { s.chartData.chartObject.value.info.bpm = 160 })
+    s.chartData.history.undo()
+    s.io.readFile(new File([''], 'broken.json'))
+    ControlledFileReader.instances[0].complete('{')
+    expect(s.chartData.history.canRedo.value).toBe(true)
+    s.io.readFile(new File([''], 'old.json'))
+    const old = ControlledFileReader.instances[1]
+    const queued = old.onload
+    s.io.readFile(null)
+    old.complete(s.text(300), queued)
+    expect(s.chartData.history.canRedo.value).toBe(true)
+    s.io.readFile(new File([''], 'next.json'))
+    expect(s.chartData.history.entries.value).toHaveLength(1)
+    ControlledFileReader.instances[2].complete(s.text(220))
+    expect(s.chartData.history.entries.value).toEqual([])
+    expect(s.chartData.history.canRedo.value).toBe(false)
+    expect(s.chartData.chartObject.value.info.bpm).toBe(220)
+  })
+
+  it('名前をつけて保存しても履歴をリセットしない', () => {
+    const s = setupChange()
+    s.chartData.history.run({ label: 'BPM変更' }, () => { s.chartData.chartObject.value.info.bpm = 160 })
+    vi.stubGlobal('URL', class extends URL { static createObjectURL = vi.fn(() => 'blob:test') })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    s.io.saveFile()
+    expect(s.chartData.history.entries.value).toHaveLength(1)
+    expect(s.chartData.history.canUndo.value).toBe(true)
+  })
+
   it('読み込み時にinfoと編集情報を正規化し、LNのcurveとwidthを保持する', () => {
     const s = setupChange()
     const end = { type: 89, lane: 2, measure: 1, position: 0, split: 4, option: ['1', '0', 'ease', '2'], end: [] }

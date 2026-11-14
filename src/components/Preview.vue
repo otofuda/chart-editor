@@ -390,7 +390,7 @@ import MeasureComponent from './Measure.vue'
 import ObjectBasedMeasure from './ObjectBasedMeasure.vue'
 import LongNote from './LongNote.vue'
 import NoteShadow from './NoteShadow.vue'
-import { showSnackbarKey } from '@/composables/injectionKeys'
+import { showSnackbarKey, chartHistoryKey } from '@/composables/injectionKeys'
 import { buildPreviewEvents, createPreviewEventPlayer } from '@/composables/usePreviewEvents'
 import { createPreviewPlayback, getPreviewMeasureIndex, getPreviewPosition } from '@/composables/usePreviewPlayback'
 import { createPreviewSounds } from '@/composables/usePreviewSounds'
@@ -498,6 +498,7 @@ const noteDrag = useNoteDrag({
   ownSplit: useOwnDragSplit,
   context: computed(() => props.currentDifficulty),
   showSnackbar,
+  history: inject(chartHistoryKey, null),
 })
 
 provide(noteDragKey, noteDrag)
@@ -743,7 +744,7 @@ watch(isPlayGuide, (enabled, _, onCleanup) => {
 })
 
 // ファイル選択時はデータの変更通知を待たず、スクロール予約も残さずに終了する。
-defineExpose({ stop: () => previewStop(false) })
+defineExpose({ stop: () => previewStop(false), cancelDrag: noteDrag.cancel })
 
 // 全体からロングノーツ（＋ロングのダミー）だけを取得
 const longNotes = computed(() =>

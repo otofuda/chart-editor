@@ -154,6 +154,7 @@
             <v-col cols="6" sm="4">
               <v-text-field
                 v-model.number="note.lane"
+                v-history-field="field('ロング始点のレーンを変更')"
                 label="lane"
                 variant="outlined"
                 density="compact"
@@ -167,6 +168,7 @@
             <v-col cols="6" sm="4">
               <v-text-field
                 :model-value="localMeasure"
+                v-history-field="field('小節番号を変更', applyMeasure, isMeasureDirty)"
                 @update:model-value="val => localMeasure = Number(val)"
                 @change="commitRootMeasure"
                 @keydown.enter.stop="commitRootMeasure"
@@ -182,6 +184,7 @@
             <v-col cols="6" sm="4">
               <v-text-field
                 v-model.number="note.position"
+                v-history-field="field('ロング始点の位置を変更')"
                 label="position"
                 variant="outlined"
                 density="compact"
@@ -193,7 +196,9 @@
             </v-col>
             <v-col cols="6" sm="4">
               <v-combobox
-                v-model.number="note.split"
+                :model-value="note.split"
+                v-history-field="field('ロング始点の分割数を変更')"
+                @update:model-value="changeRootSplit"
                 :items="[4, 8, 16, 32, 12, 24, 48]"
                 label="split"
                 variant="outlined"
@@ -205,6 +210,7 @@
             <v-col cols="6" sm="4">
               <v-text-field
                 v-model="rootSpeed"
+                v-history-field="field('ロング始点の速度を変更')"
                 label="speed"
                 placeholder="1"
                 variant="outlined"
@@ -217,6 +223,7 @@
             <v-col cols="6" sm="4">
               <v-text-field
                 v-model="rootOrbit"
+                v-history-field="field('ロング始点の軌道を変更')"
                 label="orbit"
                 placeholder="0"
                 variant="outlined"
@@ -239,6 +246,7 @@
             :parent="note"
             :index="i"
             :max-measure="maxMeasure"
+            history-enabled
             @delete-end="deleteEnd(i)"
             @place-notes="menu = false"
           />
@@ -264,6 +272,7 @@ import { generateHoldSvgPaths, getCurveType, type CurveType } from '@/composable
 import EndForm from './EndForm.vue'
 import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
 import { noteDragKey } from '@/composables/useNoteDrag'
+import { numberInputValue, useHistoryFields, vHistoryField } from '@/composables/useHistoryField'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -274,10 +283,20 @@ const props = defineProps<{
 const deleteNotes = inject(deleteNotesKey)!
 const noteDrag = inject(noteDragKey, null)
 
-const { menu, localMeasure } = useNoteMeasureEdit(() => props.note)
+const { history, field, change, input } = useHistoryFields()
+const {
+  menu,
+  localMeasure,
+  applyMeasure,
+  commitMeasure: commitRootMeasure,
+  isMeasureDirty,
+} = useNoteMeasureEdit(() => props.note, history)
 
-function commitRootMeasure() {
-  props.note.measure = localMeasure.value
+/** 分割数の入力や候補選択を、始点の同じ入力欄の編集として履歴へまとめる。 */
+function changeRootSplit(value: unknown) {
+  input('ロング始点の分割数を変更', () => {
+    props.note.split = numberInputValue(value)
+  })
 }
 
 const rootSpeed = computed<string>({
@@ -413,8 +432,9 @@ const treeData = computed(() => {
   return { segments, endpoints }
 })
 
+/** ロング始点に終点を追加し、1操作として記録する。 */
 function addEndToRoot(): void {
-  props.note.end.push({
+  change('ロングに終点を追加', () => props.note.end.push({
     type: 1,
     lane: props.note.lane,
     measure: props.note.measure,
@@ -422,11 +442,12 @@ function addEndToRoot(): void {
     split: props.note.split,
     option: ['', '', 'linear'],
     end: [],
-  })
+  }))
 }
 
+/** 指定した終点とその子孫を削除し、1操作として記録する。 */
 function deleteEnd(index: number): void {
-  props.note.end.splice(index, 1)
+  change('ロングの終点を削除', () => props.note.end.splice(index, 1))
 }
 
 function deleteThisNote(): void {

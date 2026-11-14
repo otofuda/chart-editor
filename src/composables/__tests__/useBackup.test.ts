@@ -62,6 +62,41 @@ describe('useBackup', () => {
     expect(chartData.chartObject.value.easy.length).toBe(0)
   })
 
+  it('バックアップ復元を一回で往復し、操作時の難易度へ戻す', () => {
+    const data = useChartData()
+    const backup = useBackup(data)
+    data.history.run({ label: 'BPM変更' }, () => { data.chartObject.value.info.bpm = 160 })
+    backup.saveBackup()
+    expect(data.history.entries.value).toHaveLength(1)
+    expect(JSON.parse(localStorage.getItem('chart-editor__backup')!)).not.toHaveProperty('history')
+    localStorage.setItem('chart-editor__backup', JSON.stringify({ info: { bpm: 220 } }))
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    backup.restoreBackup()
+    expect(data.history.entries.value).toHaveLength(2)
+    expect(data.chartObject.value.info.bpm).toBe(220)
+    data.currentDifficulty.value = 'hard'
+    data.history.undo()
+    expect(data.currentDifficulty.value).toBe('easy')
+    expect(data.chartObject.value.info.bpm).toBe(160)
+    data.history.redo()
+    expect(data.chartObject.value.info.bpm).toBe(220)
+  })
+
+  it('復元のキャンセル・読み込み失敗でRedoを失わない', () => {
+    const data = useChartData()
+    const backup = useBackup(data)
+    data.history.run({ label: 'BPM変更' }, () => { data.chartObject.value.info.bpm = 160 })
+    data.history.undo()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    localStorage.setItem('chart-editor__backup', '{')
+    backup.restoreBackup()
+    expect(data.history.canRedo.value).toBe(true)
+    confirm.mockReturnValue(true)
+    backup.restoreBackup()
+    expect(data.history.canRedo.value).toBe(true)
+    expect(data.history.entries.value).toHaveLength(1)
+  })
+
   it('番号が重複した古いバックアップを復元してLEDを削除しても、通常・ロングノーツは残る', () => {
     const chartData = useChartData()
     const backup = useBackup(chartData)

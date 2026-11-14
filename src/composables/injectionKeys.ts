@@ -1,6 +1,10 @@
 import type { InjectionKey } from 'vue'
 import type { NoteData } from 'chart-types'
 import type { DifficultyString } from '../types'
+import type { ChartHistory } from './useChartHistory'
+
+/** 確定済みの譜面編集に対して、画面全体で共有する操作履歴。 */
+export const chartHistoryKey: InjectionKey<ChartHistory> = Symbol('chartHistory')
 
 /** スナックバーメッセージを表示する */
 export const showSnackbarKey: InjectionKey<(message: string) => void> =

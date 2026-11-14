@@ -57,6 +57,7 @@ export function useBackup(chartData: ChartData) {
    * LocalStorage に譜面バックアップを保存する (Ctrl+S)
    */
   function saveBackup(): void {
+    chartData.history.commitEdit()
     localStorage.setItem('chart-editor__backup', JSON.stringify(chartObject.value))
     showSnackbar('譜面バックアップを保存しました')
   }
@@ -72,7 +73,11 @@ export function useBackup(chartData: ChartData) {
     if (confirmed && backupData) {
       try {
         const parsed = JSON.parse(backupData)
-        chartObject.value = normalizeChartData(parsed, difficulties)
+        const restored = normalizeChartData(parsed, difficulties)
+        chartData.history.run({ label: 'バックアップから復元', difficulties }, () => {
+          chartData.history.prepareRestore()
+          chartObject.value = restored
+        })
         showSnackbar('バックアップから復元しました')
       } catch {
         showSnackbar('バックアップデータの読み込みに失敗しました')

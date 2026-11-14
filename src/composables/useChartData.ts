@@ -1,6 +1,7 @@
 import { ref, computed, watch } from 'vue'
 import type { NoteData } from 'chart-types'
 import { readLegacyNumber, usePersistedRef, writeLegacyNumber } from './usePersistedRef'
+import { useChartHistory } from './useChartHistory'
 import type {
   DifficultyString,
   Measure,
@@ -78,6 +79,7 @@ export function useChartData() {
   })
 
   const currentDifficulty = ref<DifficultyString>('easy')
+  const history = useChartHistory(chartObject, currentDifficulty)
 
   /** 選択中の難易度の譜面データ配列 */
   const currentChart = computed<ExtendedNoteData[]>(
@@ -168,15 +170,16 @@ export function useChartData() {
    * @param indices - 削除するノートのインデックス
    */
   function deleteNotes(...indices: number[]): void {
-    indices.forEach((i) => {
+    history.run({ label: 'ノーツを削除' }, () => {
       chartObject.value[currentDifficulty.value] = currentChart.value.filter(
-        (note: ExtendedNoteData) => note.index !== i
+        note => !indices.includes(note.index!)
       )
     })
   }
 
   return {
     difficulties,
+    history,
     chartObject,
     currentDifficulty,
     currentChart,

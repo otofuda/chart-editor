@@ -28,6 +28,7 @@ export function useNoteEditor(
     currentChart,
     difficulties,
     measureData,
+    history,
   } = chartData
 
   /** 配置するノート */
@@ -334,6 +335,8 @@ export function useNoteEditor(
     const diff = newMeasure - oldNote.measure
     return {
       ...oldNote,
+      // リアクティブな配列の参照を残すと、挿入時のstructuredCloneが失敗するため複製する。
+      option: [...oldNote.option],
       measure: newMeasure,
       end: oldNote.end.map((end) => getMovedNote({ ...end }, end.measure + diff)),
     }
@@ -346,9 +349,15 @@ export function useNoteEditor(
     isAutoFollow,
     getAppendNote,
     appendNoteColorOption,
-    appendNotes,
+    appendNotes: (...notes: NoteData[]) => history.run(
+      { label: 'ノーツを挿入' },
+      () => appendNotes(...notes)
+    ),
     placeNotes,
-    appendSimultaneously,
+    appendSimultaneously: (...notes: NoteData[]) => history.run(
+      { label: '全難易度に同時挿入', difficulties },
+      () => appendSimultaneously(...notes)
+    ),
     addEndToAppendNote,
     deleteEndOfAppendNote,
     changeAppendNoteType,
@@ -358,7 +367,10 @@ export function useNoteEditor(
     appendNoteToDown,
     setAppendNoteInfo,
     cancelNote,
-    copyNotesToDifficulty,
+    copyNotesToDifficulty: (target: DifficultyString | null, ...notes: NoteData[]) => history.run(
+      { label: 'ノーツを複製', difficulties: [target || currentDifficulty.value] },
+      () => copyNotesToDifficulty(target, ...notes)
+    ),
     getMovedNote,
   }
 }

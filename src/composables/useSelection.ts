@@ -175,11 +175,26 @@ export function useSelection(
     selectionTypeTo,
     selectionMeasureAddition,
     selectionClear,
-    selectionDelete,
-    selectionChangeType,
-    selectionChangeLane,
-    selectionAddLane,
-    selectionAddMeasure,
+    selectionDelete: (close: () => void) => chartData.history.run(
+      { label: '選択ノーツを削除' },
+      () => selectionDelete(close)
+    ),
+    selectionChangeType: (type: number) => chartData.history.run(
+      { label: 'ノーツ種別を一括変更' },
+      () => selectionChangeType(type)
+    ),
+    selectionChangeLane: (lane: LaneType) => chartData.history.run(
+      { label: 'レーンを一括変更' },
+      () => selectionChangeLane(lane)
+    ),
+    selectionAddLane: (diff: number) => chartData.history.run(
+      { label: 'レーンを一括加算' },
+      () => selectionAddLane(diff)
+    ),
+    selectionAddMeasure: (diff: number) => chartData.history.run(
+      { label: '小節を一括移動' },
+      () => selectionAddMeasure(diff)
+    ),
     batchSelect,
   }
 }

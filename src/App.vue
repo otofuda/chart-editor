@@ -68,6 +68,14 @@
         </v-btn>
       </v-btn-group>
 
+      <HistoryControls
+        v-model:open="dialog.history"
+        :history="history"
+        @undo="undo"
+        @redo="redo"
+        @update:open="handleHistoryVisibility"
+      />
+
       <h3>ノートの挿入（仮配置：{{ preAppendNotes.length }}個）</h3>
 
       <v-checkbox
@@ -513,6 +521,7 @@
         <v-col>
           <v-text-field
             v-model.number="chartObject.info.offset"
+            v-history-field="infoField('オフセットを変更')"
             label="オフセット"
             required
             variant="outlined"
@@ -523,6 +532,7 @@
         <v-col>
           <v-text-field
             v-model.number="chartObject.info.bpm"
+            v-history-field="infoField('BPMを変更')"
             label="BPM"
             required
             variant="outlined"
@@ -533,6 +543,7 @@
         <v-col>
           <v-text-field
             v-model.number="chartObject.info.beat"
+            v-history-field="infoField('拍子を変更')"
             label="拍子"
             required
             variant="outlined"
@@ -558,7 +569,7 @@
         </v-btn>
         <v-btn
           color="primary"
-          @click="dialog.logs = !dialog.logs"
+          @click="toggleMessageLog"
           variant="outlined"
           prepend-icon="mdi-message-outline"
         >
@@ -892,7 +903,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, provide, onMounted } from 'vue'
+import { ref, computed, provide, onMounted, onBeforeUnmount } from 'vue'
 import { useGoTo } from 'vuetify'
 
 import Preview from './components/Preview.vue'
@@ -900,6 +911,9 @@ import EndForm from './components/EndForm.vue'
 import DensityGraph from './components/DensityGraph.vue'
 import NoteTypePie from './components/NoteTypePie.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
+import HistoryControls from './components/HistoryControls.vue'
+import { vHistoryField } from './composables/useHistoryField'
+import { useHistoryShortcuts } from './composables/useHistoryShortcuts'
 
 import usageContent from '../Usage.md?raw'
 
@@ -920,14 +934,60 @@ import {
   getMovedNoteKey,
   copyNotesToDifficultyKey,
   setAppendNoteInfoKey,
+  chartHistoryKey,
 } from './composables/injectionKeys'
 
 // --- composable の初期化 ---
 const chartData = useChartData()
-const { chartObject, currentChart, currentDifficulty, measureData, beatHeight, maxMeasure, isSimulateStop, musicBpm, difficulties } = chartData
+const { history } = chartData
+const {
+  chartObject,
+  currentChart,
+  currentDifficulty,
+  measureData,
+  beatHeight,
+  maxMeasure,
+  isSimulateStop,
+  musicBpm,
+  difficulties,
+} = chartData
 
 const backup = useBackup(chartData)
-const { snackbar, snackbarText, logs, analysisData, showSnackbar, saveBackup, restoreBackup, analyze: runAnalyze } = backup
+const {
+  snackbar,
+  snackbarText,
+  logs,
+  analysisData,
+  showSnackbar,
+  saveBackup,
+  restoreBackup,
+  analyze: runAnalyze,
+} = backup
+
+/** 譜面情報の入力欄を、難易度共通の履歴へ接続する設定を生成する。 */
+function infoField(label: string) {
+  return { history, meta: { label, difficulties: [] } }
+}
+
+/** 直前の操作を取り消し、取り消した操作名を通知する。 */
+function undo() {
+  const entry = history.undo()
+
+  if (entry) {
+    showSnackbar(`${entry.label}：元に戻しました`)
+  }
+}
+
+/** 取り消した操作をやり直し、再実行した操作名を通知する。 */
+function redo() {
+  const entry = history.redo()
+
+  if (entry) {
+    showSnackbar(`${entry.label}：やり直しました`)
+  }
+}
+
+useHistoryShortcuts({ undo, redo, saveBackup })
 
 // scrollToMeasure 関数 (goTo は Vuetify 4 composable)
 const goTo = useGoTo()
@@ -956,6 +1016,12 @@ const {
 } = selection
 
 const previewRef = ref<InstanceType<typeof Preview> | null>(null)
+const removeHistoryRestore = history.onBeforeRestore(() => {
+  previewRef.value?.stop()
+  previewRef.value?.cancelDrag()
+})
+onBeforeUnmount(removeHistoryRestore)
+
 const fileIO = useFileIO(chartData, showSnackbar, () => previewRef.value?.stop())
 const { fileName, isLoaded, previewAudio, audioVolume, readFile, newFile, saveFile, readAudioFile } = fileIO
 
@@ -968,10 +1034,27 @@ const dialog = ref({
   analyzer: false,
   help: false,
   logs: false,
+  history: false,
   checked: false,
   batchcheck: false,
   texture: false,
 })
+
+/** 操作履歴を開く際に、同じ位置に表示するメッセージログを閉じる。 */
+function handleHistoryVisibility(isOpen: boolean): void {
+  if (isOpen) {
+    dialog.value.logs = false
+  }
+}
+
+/** メッセージログの表示を切り替え、開く際は操作履歴を閉じる。 */
+function toggleMessageLog(): void {
+  dialog.value.logs = !dialog.value.logs
+
+  if (dialog.value.logs) {
+    dialog.value.history = false
+  }
+}
 
 const scrollTo = ref(0)
 
@@ -1084,6 +1167,7 @@ function zoomOut() { beatHeight.value = Math.max((beatHeight.value - 10) || 0, 0
 
 // --- Provide (typed) ---
 provide(showSnackbarKey, showSnackbar)
+provide(chartHistoryKey, history)
 provide(deleteNotesKey, chartData.deleteNotes)
 provide(cancelNoteKey, cancelNote)
 provide(appendNotesKey, appendNotes)
@@ -1099,14 +1183,6 @@ onMounted(() => {
     e.returnValue = '移動してもよろしいですか？'
   })
 })
-
-document.addEventListener('keydown', (e: KeyboardEvent) => {
-  if (e.ctrlKey && e.key === 's') {
-    e.preventDefault()
-    saveBackup()
-  }
-})
-
 
 </script>
 
@@ -1690,8 +1766,11 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   }
 }
 
-.message-log {
+.message-log,
+.history-log {
   position: fixed;
+  // Vuetifyのカードの既定値（0）を上書きし、後続の編集カードより前面に表示する。
+  z-index: 120;
   top: 20px;
   left: 20px;
   width: 400px;
