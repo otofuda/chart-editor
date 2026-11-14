@@ -65,7 +65,6 @@
           left: `${(ep.note.lane - 1) * 60 + 85}px`,
           bottom: `${getAbsoluteBottom(ep.note) - 5}px`
         }"
-        :title="getNoteTooltip(ep.note)"
       >
         <span class="midpoint-badges">
           <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
@@ -86,7 +85,6 @@
           bottom: `${getAbsoluteBottom(ep.note)}px`,
           width: `${getWidth(ep.note)}px`
         }"
-        :title="getNoteTooltip(ep.note)"
       >
         <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
         <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
@@ -105,7 +103,6 @@
           bottom: `${getAbsoluteBottom(ep.note)}px`,
           width: `${getWidth(ep.note)}px`
         }"
-        :title="getNoteTooltip(ep.note)"
       >
         <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
         <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
@@ -152,14 +149,6 @@ function hasSpeedOrOrbit(note: NoteData): boolean {
   const s = Number(note.option?.[0])
   const o = Number(note.option?.[1])
   return Boolean((s && s !== 1) || (o && o !== 0))
-}
-
-function getNoteTooltip(note: NoteData): string {
-  let text = `${note.position}/${note.split}`
-  if (note.option?.[0] && Number(note.option[0]) !== 1) text += ` (speed: x${note.option[0]})`
-  if (note.option?.[1] && Number(note.option[1]) !== 0) text += ` (orbit: >${note.option[1]})`
-  if (note.option?.[3] && Number(note.option[3]) !== 1 && Number(note.option[3]) > 0) text += ` (width: ${note.option[3]})`
-  return text
 }
 
 const entireHeight = computed(() => {
@@ -346,9 +335,8 @@ const drawType = computed(() => {
 .shadow {
   color: #909090;
   animation: blink 0.5s infinite;
-  &:active {
-    transform: scale(1.5);
-  }
+  // 配置用の表示が既存ノーツに重なっても、タッチやドラッグを遮らない。
+  pointer-events: none;
 }
 .preappend {
   opacity: 1;

@@ -14,6 +14,7 @@
       :isCaptureMode="isCaptureMode"
       :isPreviewMode="isPreviewMode"
       :isImageMode="isImageMode"
+      :placementSplit="appendNote.split"
     />
 
     <v-container fluid class="panel">

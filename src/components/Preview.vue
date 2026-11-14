@@ -75,6 +75,30 @@
           :measureData="measureData"
           :isPreAppend="true"
         />
+
+        <div
+          v-if="dragCandidate"
+          class="note-drag-preview"
+          :class="{ invalid: dragCandidate.error }"
+        >
+          <NoteShadow
+            v-for="(note, i) in dragCandidate.roots"
+            :key="i"
+            :note="note"
+            :measureData="measures"
+          />
+          <span
+            class="note-drag-anchor"
+            :style="{
+              left: `${
+                hasMovableLane(dragCandidate.anchor)
+                  ? 60 + (dragCandidate.anchor.lane - 1) * 60 + 30
+                  : 210
+              }px`,
+              bottom: `${noteBottom(dragCandidate.anchor, measures)}px`
+            }"
+          />
+        </div>
       </div>
     </div>
 
@@ -195,6 +219,13 @@
               density="compact"
             ></v-checkbox>
 
+            <v-switch
+              v-model="useOwnDragSplit"
+              label="ドラッグ移動で各ノーツの split を使う"
+              persistent-hint
+              hint="オフの場合は配置欄の split に吸着します"
+              density="compact"
+            />
             <v-switch
               v-model="isObjectBasedPreview"
               label="Object表示モード"
@@ -347,7 +378,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, inject, provide, onBeforeUnmount, watch } from 'vue'
 import {
   type DifficultyString,
   type ExtendedNoteData,
@@ -364,6 +395,8 @@ import { buildPreviewEvents, createPreviewEventPlayer } from '@/composables/useP
 import { createPreviewPlayback, getPreviewMeasureIndex, getPreviewPosition } from '@/composables/usePreviewPlayback'
 import { createPreviewSounds } from '@/composables/usePreviewSounds'
 import { readLegacyNumber, usePersistedRef, writeLegacyNumber } from '@/composables/usePersistedRef'
+import { noteDragKey, useNoteDrag } from '@/composables/useNoteDrag'
+import { hasMovableLane, noteBottom } from '@/composables/noteMovement'
 
 const props = defineProps<{
   currentChart?: ExtendedNoteData[]
@@ -378,6 +411,7 @@ const props = defineProps<{
   isCaptureMode?: boolean
   isPreviewMode?: boolean
   isImageMode?: boolean
+  placementSplit?: number
 }>()
 
 const showSnackbar = inject(showSnackbarKey)!
@@ -444,6 +478,31 @@ watch(hidden, (v) => writeLegacyNumber('chart-editor__hidden', v))
 
 const chart = computed(() => props.currentChart ?? [])
 const measures = computed(() => props.measureData ?? [])
+
+/** ドラッグの吸着にノーツ自身の split を使う設定を保存する。 */
+const useOwnDragSplit = usePersistedRef('chart-editor__drag-own-split', false)
+
+/** 再生中や、編集を行わない表示モードではドラッグを無効にする。 */
+const dragEnabled = computed(() =>
+  !isPreviewing.value &&
+  !isObjectBasedPreview.value &&
+  !(props.isShowDetail && props.isCaptureMode),
+)
+
+const noteDrag = useNoteDrag({
+  content: previewContent,
+  chart,
+  measures,
+  enabled: dragEnabled,
+  split: computed(() => Number(props.placementSplit ?? 8)),
+  ownSplit: useOwnDragSplit,
+  context: computed(() => props.currentDifficulty),
+  showSnackbar,
+})
+
+provide(noteDragKey, noteDrag)
+const { candidate: dragCandidate } = noteDrag
+
 // 選択状態などの編集用情報を除き、再生内容の変更だけを監視する。
 const playbackChartSignature = computed(() => JSON.stringify(chart.value, (key, value) =>
   key === 'index' || key === 'isSelected' ? undefined : value))
@@ -711,6 +770,46 @@ const entireHeight = computed(() => {
 </script>
 
 <style lang="scss" scoped>
+:deep(.note-draggable) {
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.note-drag-preview {
+  pointer-events: none;
+  color: #64ddff;
+
+  &.invalid {
+    color: #ff7070;
+  }
+
+  :deep(*) {
+    pointer-events: none !important;
+  }
+
+  :deep(.note),
+  :deep(.note-midpoint),
+  :deep(.note-invisible-badge) {
+    z-index: 106;
+    transition: none;
+    outline: 2px solid currentColor;
+    color: inherit;
+  }
+  :deep(.long-note-svg) {
+    z-index: 104;
+  }
+}
+
+.note-drag-anchor {
+  position: absolute;
+  z-index: 107;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  transform: translate(-50%, 50%);
+}
+
 .preview-content {
   position: relative;
 }

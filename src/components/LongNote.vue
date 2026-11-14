@@ -13,6 +13,7 @@
         class="note"
         :class="{
           [`type${drawType}`]: true,
+          'note-draggable': noteDrag?.enabled.value,
           isDummy: note.type === 90
         }"
         :style="{
@@ -20,8 +21,8 @@
           bottom: `${getBottom(note)}px`,
           width: `${getWidth(note)}px`
         }"
-        :title="getNoteTooltip(note)"
         v-bind="props"
+        @pointerdown="noteDrag?.start($event, note)"
       >
         <input
           type="checkbox"
@@ -40,11 +41,13 @@
         <span
           v-if="ep.isIntermediate && ep.note.type === 1"
           class="note-midpoint"
+          :class="{ 'note-draggable': noteDrag?.enabled.value }"
           :style="{
             left: `${getMidpointLeft(ep.note)}px`,
             bottom: `${getBottom(ep.note) - 5}px`
           }"
-          :title="getNoteTooltip(ep.note)"
+          @pointerdown="noteDrag?.start($event, note, ep.note)"
+          @click.stop="menu = true"
         >
           <span class="midpoint-badges">
             <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
@@ -55,13 +58,17 @@
         <span
           v-else-if="!ep.isIntermediate && ep.note.type !== 89"
           class="note"
-          :class="`type${ep.note.type}`"
+          :class="[
+            `type${ep.note.type}`,
+            { 'note-draggable': noteDrag?.enabled.value }
+          ]"
           :style="{
             left: `${getLeft(ep.note)}px`,
             bottom: `${getBottom(ep.note)}px`,
             width: `${getWidth(ep.note)}px`
           }"
-          :title="getNoteTooltip(ep.note)"
+          @pointerdown="noteDrag?.start($event, note, ep.note)"
+          @click.stop="menu = true"
         >
           <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
           <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
@@ -71,24 +78,42 @@
         <span
           v-else-if="hasSpeedOrOrbit(ep.note)"
           class="note-invisible-badge"
+          :class="{ 'note-draggable': noteDrag?.enabled.value }"
           :style="{
             left: `${getLeft(ep.note)}px`,
             bottom: `${getBottom(ep.note)}px`,
             width: `${getWidth(ep.note)}px`
           }"
-          :title="getNoteTooltip(ep.note)"
+          @pointerdown="noteDrag?.start($event, note, ep.note)"
+          @click.stop="menu = true"
         >
           <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
           <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
+        </span>
+        <span
+          v-if="ep.note.type === 89 && noteDrag?.enabled.value"
+          class="note-invisible-handle note-draggable"
+          :class="{ 'touch-visible': menu }"
+          :style="{
+            left: `${getMidpointLeft(ep.note) - 7}px`,
+            bottom: `${getBottom(ep.note) - 12}px`
+          }"
+          aria-label="不可視の中点・終点"
+          @pointerdown="noteDrag?.start($event, note, ep.note)"
+          @click.stop="menu = true"
+        >
+          <span />
         </span>
       </template>
 
       <!-- 帯（SVGパス） -->
       <svg
         class="long-note-svg"
+        :class="{ 'note-draggable': noteDrag?.enabled.value }"
         :style="{
           height: `${entireHeight}px`
         }"
+        @pointerdown="noteDrag?.startWhole($event, note)"
       >
         <g v-for="seg in treeData.segments" :key="seg.id" @click.stop="menu = true">
           <path :d="seg.paths.fillPath" class="hold-fill" />
@@ -238,6 +263,7 @@ import { deleteNotesKey } from '@/composables/injectionKeys'
 import { generateHoldSvgPaths, getCurveType, type CurveType } from '@/composables/useNoteTypes'
 import EndForm from './EndForm.vue'
 import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
+import { noteDragKey } from '@/composables/useNoteDrag'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -246,6 +272,7 @@ const props = defineProps<{
 }>()
 
 const deleteNotes = inject(deleteNotesKey)!
+const noteDrag = inject(noteDragKey, null)
 
 const { menu, localMeasure } = useNoteMeasureEdit(() => props.note)
 
@@ -282,14 +309,6 @@ function hasSpeedOrOrbit(note: NoteData): boolean {
   const s = Number(note.option?.[0])
   const o = Number(note.option?.[1])
   return Boolean((s && s !== 1) || (o && o !== 0))
-}
-
-function getNoteTooltip(note: NoteData): string {
-  let text = `${note.position}/${note.split}`
-  if (note.option?.[0] && Number(note.option[0]) !== 1) text += ` (speed: x${note.option[0]})`
-  if (note.option?.[1] && Number(note.option[1]) !== 0) text += ` (orbit: >${note.option[1]})`
-  if (note.option?.[3] && Number(note.option[3]) !== 1 && Number(note.option[3]) > 0) text += ` (width: ${note.option[3]})`
-  return text
 }
 
 const entireHeight = computed(() => {
@@ -343,11 +362,18 @@ const treeData = computed(() => {
   const segments: HoldSegment[] = []
   const endpoints: EndPointNode[] = []
 
-  function traverse(parent: NoteData, depth: number) {
+  /**
+   * 子ノーツを再帰的にたどり、端点と帯の描画情報を集める。
+   *
+   * @param parent 接続元のノーツ
+   * @param depth 始点からの階層の深さ
+   * @param parentId 位置変更によって変化しない、親までの経路を表す識別子
+   */
+  function traverse(parent: NoteData, depth: number, parentId = 'root') {
     if (!parent.end || !Array.isArray(parent.end)) return
 
     parent.end.forEach((child, idx) => {
-      const childId = `end_${depth}_${idx}_${child.measure}_${child.position}`
+      const childId = `${parentId}_${idx}`
       const isIntermediate = Boolean(child.end && Array.isArray(child.end) && child.end.length > 0)
       endpoints.push({
         id: childId,
@@ -379,7 +405,7 @@ const treeData = computed(() => {
         paths,
       })
 
-      traverse(child, depth + 1)
+      traverse(child, depth + 1, childId)
     })
   }
 
@@ -415,7 +441,48 @@ const drawType = computed(() => {
 </script>
 
 <style lang="scss" scoped>
+.note-invisible-handle {
+  position: absolute;
+  z-index: 105;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+
+  > span {
+    width: 10px;
+    height: 10px;
+    border: 2px solid #6ecc6e;
+    background: #303030;
+    transform: rotate(45deg);
+    opacity: 0;
+  }
+
+  @media (hover: hover) {
+    &:hover > span {
+      opacity: 1;
+    }
+  }
+
+  @media (hover: none) {
+    &.touch-visible > span {
+      opacity: 1;
+    }
+
+    &:not(.touch-visible) {
+      pointer-events: none;
+    }
+  }
+}
+
 .long-note-svg {
+  &.note-draggable {
+    .hold-fill,
+    .hold-border {
+      cursor: grab;
+    }
+  }
+
   .hold-fill {
     pointer-events: visibleFill;
     cursor: pointer;

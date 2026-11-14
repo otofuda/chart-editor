@@ -16,6 +16,7 @@
           [`type${drawType}`]: true,
           isDummy: note.type === 90,
           hidden: isHiddenControl,
+          'note-draggable': noteDrag?.enabled.value && canDragNote(note),
           menu
         }"
         :style="{
@@ -25,6 +26,7 @@
           background: dispColor
         }"
         v-bind="props"
+        @pointerdown="noteDrag?.start($event, note)"
       >
         <!-- テクスチャの時 -->
         <img
@@ -38,6 +40,7 @@
             height: `${measure.measureHeight * Number(drawOptions[2])}px`
           }"
           alt="texture"
+          :draggable="false"
         />
 
         <!-- コメントの時 -->
@@ -218,6 +221,8 @@ import { noteTypes, noteOptions } from '@/composables/useNoteTypes'
 import { isDuplicated, hasError, isLanelessNote } from '@/composables/useNoteCheck'
 import { deleteNotesKey, setAppendNoteInfoKey, showSnackbarKey } from '@/composables/injectionKeys'
 import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
+import { noteDragKey } from '@/composables/useNoteDrag'
+import { canDragNote } from '@/composables/noteMovement'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -228,6 +233,7 @@ const props = defineProps<{
 const deleteNotes = inject(deleteNotesKey)!
 const setAppendNoteInfo = inject(setAppendNoteInfoKey)!
 const showSnackbar = inject(showSnackbarKey)!
+const noteDrag = inject(noteDragKey, null)
 
 const { menu, localMeasure } = useNoteMeasureEdit(() => props.note)
 

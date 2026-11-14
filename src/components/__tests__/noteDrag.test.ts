@@ -1,0 +1,621 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, nextTick, ref } from 'vue'
+import { mount, type VueWrapper } from '@vue/test-utils'
+import type { ExtendedNoteData, Measure } from '@/types'
+import {
+  appendNotesKey,
+  cancelNoteKey,
+  copyNotesToDifficultyKey,
+  deleteNotesKey,
+  getMovedNoteKey,
+  setAppendNoteInfoKey,
+  showSnackbarKey,
+} from '@/composables/injectionKeys'
+import Preview from '../Preview.vue'
+import Note from '../Note.vue'
+import LongNote from '../LongNote.vue'
+import NoteShadow from '../NoteShadow.vue'
+
+/** テストごとの差分だけを指定して、画面に配置するノーツを作る。 */
+function note(overrides: Partial<ExtendedNoteData> = {}): ExtendedNoteData {
+  return {
+    index: 1,
+    type: 1,
+    lane: 2,
+    measure: 0,
+    position: 1,
+    split: 4,
+    option: [],
+    end: [],
+    ...overrides,
+  }
+}
+
+const measures: Measure[] = [0, 1, 2].map(measure => ({
+  measure,
+  measureHeight: 400,
+  measurePositionBottom: measure * 400,
+  measureBpm: 120,
+  measureBeat: 4,
+  measureLength: 2000,
+  measureReachTime: measure * 2000,
+}))
+
+const layout = defineComponent({
+  setup: (_, { slots }) => () => h('div', slots.default?.()),
+})
+
+const input = defineComponent({
+  props: ['modelValue', 'label'],
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () => h('input', {
+    'aria-label': props.label,
+    value: props.modelValue,
+    onInput: (event: Event) => emit(
+      'update:modelValue',
+      (event.target as HTMLInputElement).value,
+    ),
+  }),
+})
+
+const toggle = defineComponent({
+  props: ['modelValue', 'label'],
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () => h('input', {
+    type: 'checkbox',
+    'aria-label': props.label,
+    checked: props.modelValue,
+    onChange: (event: Event) => emit(
+      'update:modelValue',
+      (event.target as HTMLInputElement).checked,
+    ),
+  }),
+})
+
+const menu = defineComponent({
+  props: ['modelValue'],
+  emits: ['update:modelValue'],
+  setup: (props, { emit, slots }) => () => h('div', [
+    slots.activator?.({
+      props: {
+        role: 'button',
+        onClick: () => emit('update:modelValue', !props.modelValue),
+      },
+    }),
+    slots.default?.(),
+  ]),
+})
+
+const stubs = {
+  ...Object.fromEntries([
+    'v-row', 'v-col', 'v-spacer', 'v-select', 'v-combobox', 'v-alert', 'v-tooltip',
+    'v-card', 'v-card-text', 'v-list', 'v-list-item',
+    'v-list-item-title', 'v-card-title', 'v-divider', 'v-card-actions',
+    'v-expansion-panels', 'v-expansion-panel', 'v-expansion-panel-title', 'v-expansion-panel-text',
+    'v-icon', 'v-slider', 'v-radio-group', 'v-radio',
+  ].map(name => [name, layout])),
+  'v-text-field': input,
+  'v-textarea': input,
+  'v-checkbox': toggle,
+  'v-switch': toggle,
+  'v-btn': defineComponent({
+    setup: (_, { slots }) => () => h('button', slots.default?.()),
+  }),
+  'v-menu': menu,
+}
+
+/**
+ * マウス・タッチ共通のポインターイベントを、指定した対象へ送出する。
+ *
+ * @param target イベントを受け取るノーツ要素、譜面、またはウィンドウ
+ * @param type pointerdown などのイベント名
+ * @param x ビューポート内の横座標
+ * @param y ビューポート内の縦座標
+ * @param extras ポインター種別や識別子など、テストごとに上書きする属性
+ */
+function pointer(
+  target: EventTarget,
+  type: string,
+  x: number,
+  y: number,
+  extras: Record<string, unknown> = {},
+) {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientX: x,
+    clientY: y,
+    button: 0,
+  })
+
+  Object.defineProperties(
+    event,
+    Object.fromEntries(Object.entries({
+      pointerId: 1,
+      pointerType: 'mouse',
+      isPrimary: true,
+      ...extras,
+    }).map(([key, value]) => [key, { value }])),
+  )
+
+  target.dispatchEvent(event)
+  return event
+}
+
+/** 標準スクロールをキャンセルできたか確認するため、指の移動イベントを送出する。 */
+function touchMove(target: EventTarget): Event {
+  const event = new Event('touchmove', { bubbles: true, cancelable: true })
+  target.dispatchEvent(event)
+  return event
+}
+
+let wrappers: VueWrapper[] = []
+let frames: Map<number, FrameRequestCallback>
+let frameId: number
+
+/** 譜面プレビューを描画し、ポインター捕捉とスクロールを制御できる検証環境を作る。 */
+function setup(sources: ExtendedNoteData[] = [note()], extraProps = {}) {
+  const chart = ref(sources)
+  const showSnackbar = vi.fn()
+  const host = defineComponent({
+    setup: () => () => h(Preview, {
+      currentChart: chart.value,
+      currentDifficulty: 'easy',
+      measureData: measures,
+      infoObject: { bpm: 120, beat: 4, offset: 0, version: 2 },
+      placementSplit: 8,
+      ...extraProps,
+    }),
+  })
+  const wrapper = mount(host, {
+    attachTo: document.body,
+    global: {
+      stubs,
+      provide: {
+        [appendNotesKey as symbol]: vi.fn(),
+        [cancelNoteKey as symbol]: vi.fn(),
+        [copyNotesToDifficultyKey as symbol]: vi.fn(),
+        [showSnackbarKey as symbol]: showSnackbar,
+        [deleteNotesKey as symbol]: vi.fn(),
+        [getMovedNoteKey as symbol]: vi.fn(),
+        [setAppendNoteInfoKey as symbol]: vi.fn(),
+      },
+    },
+  })
+
+  wrappers.push(wrapper)
+  const content = wrapper.get('.preview-content').element as HTMLElement
+  let scroll = 0
+
+  vi.spyOn(content, 'getBoundingClientRect').mockImplementation(() => ({
+    x: 100,
+    y: -scroll,
+    left: 100,
+    right: 520,
+    top: -scroll,
+    bottom: 1200 - scroll,
+    width: 420,
+    height: 1200,
+    toJSON: () => ({}),
+  }))
+
+  const capture = vi.fn()
+  const release = vi.fn()
+
+  Object.assign(content, {
+    setPointerCapture: capture,
+    hasPointerCapture: () => capture.mock.calls.length > 0,
+    releasePointerCapture: release,
+  })
+
+  const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation((x: number | ScrollToOptions) => {
+    if (typeof x === 'object') {
+      scroll += x.top ?? 0
+    }
+  })
+  const bar = () => wrapper.findComponent(Note).get('.note')
+
+  return {
+    wrapper,
+    chart,
+    content,
+    bar,
+    showSnackbar,
+    capture,
+    release,
+    scrollBy,
+  }
+}
+
+beforeEach(() => {
+  localStorage.clear()
+  frameId = 0
+  frames = new Map()
+  vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+    frames.set(++frameId, callback)
+    return frameId
+  }))
+  vi.stubGlobal('cancelAnimationFrame', vi.fn((id: number) => frames.delete(id)))
+})
+
+afterEach(() => {
+  wrappers.forEach(w => w.unmount())
+  wrappers = []
+  document.body.innerHTML = ''
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+describe('譜面のドラッグ操作', () => {
+  it('タッチで縦に動かすと、ドラッグのしきい値未満でも標準スクロールを抑止する', async () => {
+    const { wrapper, chart, bar } = setup()
+    const source = bar().element
+
+    pointer(source, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    pointer(window, 'pointermove', 250, 599, { pointerType: 'touch' })
+    expect(touchMove(source).defaultPrevented).toBe(true)
+    await nextTick()
+    expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+
+    pointer(window, 'pointermove', 250, 550, { pointerType: 'touch' })
+    expect(touchMove(source).defaultPrevented).toBe(true)
+    await nextTick()
+    expect(chart.value[0]).toMatchObject({ lane: 2, position: 1, split: 4 })
+    expect(wrapper.get('.note-drag-preview').getComponent(NoteShadow).props('note'))
+      .toMatchObject({ lane: 2, position: 3, split: 8 })
+
+    pointer(window, 'pointerup', 250, 550, { pointerType: 'touch' })
+    expect(chart.value[0]).toMatchObject({ lane: 2, position: 3, split: 8 })
+    expect(touchMove(source).defaultPrevented).toBe(false)
+  })
+
+  it('移動しないタップは抑止せず、編集メニューを開く', async () => {
+    const { wrapper, bar } = setup()
+    const source = bar().element
+    const down = pointer(source, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    const start = new Event('touchstart', { bubbles: true, cancelable: true })
+    source.dispatchEvent(start)
+
+    expect(down.defaultPrevented).toBe(false)
+    expect(start.defaultPrevented).toBe(false)
+    pointer(window, 'pointerup', 250, 600, { pointerType: 'touch' })
+    await bar().trigger('click')
+    expect(wrapper.find('input[aria-label="position"]').exists()).toBe(true)
+  })
+
+  it('譜面の空白やチェックボックス、音札から始めたタッチではスクロールを抑止しない', () => {
+    const { content, bar } = setup()
+    const checkbox = bar().get('input[type="checkbox"]').element
+
+    for (const target of [content, checkbox]) {
+      pointer(target, 'pointerdown', 250, 600, { pointerType: 'touch' })
+      expect(touchMove(target).defaultPrevented).toBe(false)
+      pointer(window, 'pointerup', 250, 550, { pointerType: 'touch' })
+    }
+
+    const otofuda = setup([note({ type: 5, lane: 3 })])
+    const target = otofuda.bar().element
+    pointer(target, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    expect(touchMove(target).defaultPrevented).toBe(false)
+  })
+
+  it('タッチで掴んだノーツ以外の指の移動や、マウス操作中のタッチを抑止しない', () => {
+    const { bar, content } = setup()
+
+    pointer(bar().element, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    expect(touchMove(content).defaultPrevented).toBe(false)
+    expect(touchMove(document.body).defaultPrevented).toBe(false)
+    pointer(window, 'pointerup', 250, 600, { pointerType: 'touch' })
+
+    pointer(bar().element, 'pointerdown', 250, 600)
+    expect(touchMove(bar().element).defaultPrevented).toBe(false)
+    pointer(window, 'pointerup', 250, 600)
+  })
+
+  it('タッチ操作を中断したら標準スクロールの抑止も解除する', () => {
+    const { chart, bar } = setup()
+    const source = bar().element
+
+    pointer(source, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    expect(touchMove(source).defaultPrevented).toBe(true)
+    pointer(window, 'pointercancel', 250, 600, { pointerType: 'touch' })
+
+    expect(touchMove(source).defaultPrevented).toBe(false)
+    expect(chart.value[0]).toMatchObject({ lane: 2, position: 1, split: 4 })
+  })
+
+  it.each(['mouse', 'touch'])('%s で候補を表示し、ドロップ時だけ確定する', async pointerType => {
+    const { wrapper, chart, bar, capture, release } = setup()
+    pointer(bar().element, 'pointerdown', 250, 600, { pointerType })
+    pointer(window, 'pointermove', 310, 550, { pointerType })
+    await nextTick()
+    expect(chart.value[0]).toMatchObject({ lane: 2, position: 1, split: 4 })
+    const shadow = wrapper.get('.note-drag-preview').getComponent(NoteShadow)
+    expect(shadow.props('note')).toMatchObject({ position: 3, split: 8 })
+    expect(shadow.get('.note').classes()).toContain('shadow')
+    expect(wrapper.find('.note-drag-preview').exists()).toBe(true)
+    expect(capture).toHaveBeenCalledWith(1)
+    if (pointerType === 'touch') {
+      // 暗黙の捕捉が元のノーツから外れたイベントで、操作全体を取り消さない。
+      pointer(bar().element, 'lostpointercapture', 310, 550, { pointerType })
+    }
+    pointer(window, 'pointerup', 310, 550, { pointerType })
+    await nextTick()
+    expect(chart.value[0]).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+    expect(release).toHaveBeenCalledWith(1)
+    await bar().trigger('click')
+    expect(wrapper.find('input[aria-label="position"]').exists()).toBe(false)
+  })
+
+  it('しきい値未満の動きはクリックとして編集メニューを開く', async () => {
+    const { wrapper, chart, bar, capture } = setup()
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 252, 599)
+    pointer(window, 'pointerup', 252, 599)
+    await bar().trigger('click')
+    expect(wrapper.find('input[aria-label="position"]').exists()).toBe(true)
+    expect(chart.value[0].split).toBe(4)
+    expect(capture).not.toHaveBeenCalled()
+  })
+
+  it('チェックボックスやコメント入力からドラッグを開始しない', async () => {
+    const { wrapper, chart, bar } = setup()
+    pointer(bar().get('input[type="checkbox"]').element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    pointer(window, 'pointerup', 310, 550)
+    await nextTick()
+    expect(chart.value[0].lane).toBe(2)
+    expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+    await bar().get('input[type="checkbox"]').setValue(true)
+    expect(chart.value[0].isSelected).toBe(true)
+
+    const comments = setup([note({ type: 100, lane: -1, option: ['コメント'] })])
+    pointer(comments.bar().get('input:not([type="checkbox"])').element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 250, 550)
+    pointer(window, 'pointerup', 250, 550)
+    expect(comments.chart.value[0].split).toBe(4)
+  })
+
+  it.each(['Escape', 'pointercancel', 'blur', 'lostpointercapture'])('%s で候補を破棄する', async reason => {
+    const { wrapper, chart, bar, content } = setup()
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    if (reason === 'Escape') {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: reason }))
+    } else if (reason === 'blur') {
+      window.dispatchEvent(new Event('blur'))
+    } else {
+      pointer(reason === 'lostpointercapture' ? content : window, reason, 310, 550)
+    }
+    pointer(window, 'pointerup', 310, 550)
+    await nextTick()
+    expect(chart.value[0]).toMatchObject({ lane: 2, position: 1, split: 4 })
+    expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+    expect(frames.size).toBe(0)
+  })
+
+  it('選択対象の1つが範囲外なら理由を表示して全体を取り消す', async () => {
+    const { wrapper, chart, bar, showSnackbar } = setup([
+      note({ isSelected: true }), note({ index: 2, lane: 5, isSelected: true }),
+    ])
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    await nextTick()
+    expect(wrapper.get('.note-drag-preview').classes()).toContain('invalid')
+    pointer(window, 'pointerup', 310, 550)
+    expect(showSnackbar).toHaveBeenCalledWith(expect.stringContaining('レーン'))
+    expect(chart.value.map(n => n.lane)).toEqual([2, 5])
+  })
+
+  it('split の設定を保持し、掴んだノーツ自身の split に切り替える', async () => {
+    const { wrapper, chart, bar } = setup()
+    const toggle = wrapper.get('input[aria-label="ドラッグ移動で各ノーツの split を使う"]')
+    expect((toggle.element as HTMLInputElement).checked).toBe(false)
+    await toggle.setValue(true)
+    expect(localStorage.getItem('chart-editor__drag-own-split')).toBe('true')
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 250, 540)
+    pointer(window, 'pointerup', 250, 540)
+    expect(chart.value[0]).toMatchObject({ position: 2, split: 4 })
+    const next = setup()
+    const restoredToggle = next.wrapper.get(
+      'input[aria-label="ドラッグ移動で各ノーツの split を使う"]',
+    )
+    expect((restoredToggle.element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('音札と音札ダミーではドラッグを開始しない', async () => {
+    const { wrapper, chart } = setup([
+      note({ type: 5, lane: 3 }),
+      note({ index: 2, type: 90, option: ['5'] }),
+    ])
+    for (const component of wrapper.findAllComponents(Note)) {
+      expect(component.get('.note').classes()).not.toContain('note-draggable')
+      pointer(component.get('.note').element, 'pointerdown', 250, 600)
+      pointer(window, 'pointermove', 310, 550)
+      pointer(window, 'pointerup', 310, 550)
+    }
+    await nextTick()
+    expect(chart.value.map(n => n.split)).toEqual([4, 4])
+  })
+
+  it('ロングの不可視点にはハンドルを設け、直接ドラッグでその点だけ動かす', async () => {
+    const root = note({ type: 2, isSelected: true, end: [note({ type: 89, measure: 1 })] })
+    const { wrapper, chart } = setup([root])
+    const handle = wrapper.findComponent(LongNote).get('.note-invisible-handle')
+    expect(handle.classes()).not.toContain('touch-visible')
+    await wrapper.findComponent(LongNote).get('.note').trigger('click')
+    expect(handle.classes()).toContain('touch-visible')
+    pointer(handle.element, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    pointer(window, 'pointermove', 310, 550, { pointerType: 'touch' })
+    pointer(window, 'pointerup', 310, 550, { pointerType: 'touch' })
+    expect(chart.value[0]).toMatchObject({ lane: 2, position: 1, split: 4 })
+    expect(chart.value[0].end[0]).toMatchObject({ lane: 3, position: 3, split: 8 })
+  })
+
+  it.each([
+    { type: 2, pointerType: 'mouse', selector: '.hold-fill' },
+    { type: 90, pointerType: 'touch', selector: '.hold-border' },
+  ])('$pointerType で未選択のロングの帯を掴み、分岐全体を移動する', async ({
+    type,
+    pointerType,
+    selector,
+  }) => {
+    const root = note({
+      type,
+      lane: 2.5 as ExtendedNoteData['lane'],
+      option: type === 90 ? ['2'] : [],
+      end: [
+        note({
+          measure: 1,
+          lane: 3.5 as ExtendedNoteData['lane'],
+          option: ['1', '0', 'ease', '2'],
+          end: [note({ measure: 2, lane: 4.5 as ExtendedNoteData['lane'] })],
+        }),
+        note({ type: 89, measure: 1, position: 2 }),
+      ],
+    })
+    const selected = note({ index: 2, lane: 1, measure: 1, isSelected: true })
+    const { wrapper, chart } = setup([root, selected])
+    const long = wrapper.getComponent(LongNote)
+    const band = long.get(selector)
+
+    pointer(band.element, 'pointerdown', 250, 600, { pointerType })
+    expect(touchMove(band.element).defaultPrevented).toBe(pointerType === 'touch')
+    pointer(window, 'pointermove', 310, 550, { pointerType })
+    await nextTick()
+
+    expect(chart.value[0]).toMatchObject({ lane: 2.5, position: 1, split: 4 })
+    const shadow = wrapper.get('.note-drag-preview').getComponent(NoteShadow)
+    expect(shadow.props('note')).toMatchObject({ lane: 3.5, position: 3, split: 8 })
+
+    pointer(window, 'pointerup', 310, 550, { pointerType })
+    await nextTick()
+
+    expect(chart.value[0]).toMatchObject({ lane: 3.5, position: 3, split: 8 })
+    expect(chart.value[0].end[0]).toMatchObject({
+      lane: 4.5,
+      measure: 1,
+      position: 3,
+      split: 8,
+      option: ['1', '0', 'ease', '2'],
+    })
+    expect(chart.value[0].end[0].end[0]).toMatchObject({
+      lane: 5.5,
+      measure: 2,
+      position: 3,
+      split: 8,
+    })
+    expect(chart.value[0].end[1]).toMatchObject({
+      lane: 3,
+      measure: 1,
+      position: 5,
+      split: 8,
+    })
+    expect(chart.value[1]).toMatchObject({ lane: 1, measure: 1, position: 1, split: 4 })
+
+    await band.trigger('click')
+    expect(long.find('input[aria-label="lane"]').exists()).toBe(false)
+
+    pointer(band.element, 'pointerdown', 310, 550, { pointerType })
+    pointer(window, 'pointerup', 310, 550, { pointerType })
+    await band.trigger('click')
+    expect(long.find('input[aria-label="lane"]').exists()).toBe(true)
+  })
+
+  it('ドラッグ中の外部編集で候補を破棄し、編集内容を上書きしない', async () => {
+    const { wrapper, chart, bar } = setup()
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    chart.value[0].position = 2
+    pointer(window, 'pointerup', 310, 550)
+    await nextTick()
+    expect(chart.value[0]).toMatchObject({ lane: 2, position: 2, split: 4 })
+    expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+  })
+
+  it('別の指のキャンセルでは操作を中断しない', async () => {
+    const { chart, bar } = setup()
+    pointer(bar().element, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    pointer(window, 'pointermove', 310, 550, { pointerType: 'touch' })
+    pointer(window, 'pointercancel', 250, 600, { pointerId: 2, pointerType: 'touch' })
+    pointer(window, 'pointerup', 310, 550, { pointerType: 'touch' })
+    expect(chart.value[0]).toMatchObject({ lane: 3, position: 3, split: 8 })
+  })
+
+  it('再生開始で進行中のドラッグを取り消し、再生中は新たに移動しない', async () => {
+    const { wrapper, chart, bar } = setup()
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    await wrapper.findAll('button').find(button => button.text().includes('再生'))!.trigger('click')
+    pointer(window, 'pointerup', 310, 550)
+    expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    pointer(window, 'pointerup', 310, 550)
+    expect(chart.value[0]).toMatchObject({ lane: 2, position: 1, split: 4 })
+  })
+
+  it('再生中以外でもキャプチャ・画像・プレビューモードでは移動を開始しない', async () => {
+    for (const mode of ['isCaptureMode', 'isImageMode', 'isPreviewMode']) {
+      const { wrapper, chart, bar } = setup([note()], {
+        isShowDetail: true,
+        isCaptureMode: true,
+        [mode]: true,
+      })
+      pointer(bar().element, 'pointerdown', 250, 600)
+      pointer(window, 'pointermove', 310, 550)
+      pointer(window, 'pointerup', 310, 550)
+      await nextTick()
+      expect(chart.value[0].lane).toBe(2)
+      expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+    }
+  })
+
+  it('無効化された表示設定が残っていても通常表示では移動できる', async () => {
+    const { chart, bar } = setup([note()], { isShowDetail: false, isCaptureMode: true, isImageMode: true })
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    pointer(window, 'pointerup', 310, 550)
+    expect(chart.value[0]).toMatchObject({ lane: 3, position: 3, split: 8 })
+  })
+
+  it('テクスチャ画像の標準ドラッグを抑止し、画像から位置を移動できる', async () => {
+    const { chart, bar } = setup([note({ type: 94, option: ['texture/202020.png', '1', '0.25'] })])
+    const img = bar().get('img')
+    expect(img.attributes('draggable')).toBe('false')
+    pointer(img.element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    pointer(window, 'pointerup', 310, 550)
+    expect(chart.value[0]).toMatchObject({ lane: 3, position: 3, split: 8 })
+  })
+
+  it('画面端で自動スクロールし、スクロール分も移動先に反映する', async () => {
+    const { wrapper, chart, bar, scrollBy } = setup()
+    pointer(bar().element, 'pointerdown', 250, 35)
+    pointer(window, 'pointermove', 250, 10)
+    const id = frameId
+    const callback = frames.get(id)!
+    frames.delete(id)
+    callback(16)
+    await nextTick()
+    expect(scrollBy).toHaveBeenCalledWith({ top: expect.any(Number), behavior: 'instant' })
+    const shadow = wrapper.get('.note-drag-preview').getComponent(NoteShadow)
+    expect(shadow.props('note')).toMatchObject({ position: 3, split: 8 })
+    pointer(window, 'pointerup', 250, 10)
+    expect(chart.value[0]).toMatchObject({ position: 3, split: 8 })
+    expect(frames.size).toBe(0)
+  })
+
+  it('アンマウント時にイベントと自動スクロールを解除する', async () => {
+    const { wrapper, chart, bar } = setup()
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    wrapper.unmount()
+    wrappers = wrappers.filter(w => w !== wrapper)
+    expect(frames.size).toBe(0)
+    pointer(window, 'pointerup', 310, 550)
+    expect(chart.value[0].lane).toBe(2)
+  })
+})
