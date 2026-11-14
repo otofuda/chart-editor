@@ -1,11 +1,50 @@
 import type { NoteData } from 'chart-types'
-import type { ExtendedNoteData } from '../types'
+import type { DifficultyString, ExtendedChartData, ExtendedNoteData } from '../types'
 
 type ComparatorsOption = {
   /** preAppendNotes 内を走査するかどうか */
   checkPreAppend?: boolean
   /** 比較対象となるノーツ配列 (未指定時は currentChart を使用) */
   comparators?: ExtendedNoteData[] | null
+}
+
+/** 全難易度の音札位置を集計し、不一致の音札ごとに不足する難易度を示す警告を返す。 */
+export function getOtofudaMismatchWarnings(
+  chart: ExtendedChartData,
+  difficulties: readonly DifficultyString[]
+): ReadonlyMap<NoteData, string> {
+  const positions = new Map<string, { notes: NoteData[]; difficulties: Set<DifficultyString> }>()
+
+  for (const difficulty of difficulties) {
+    for (const note of chart[difficulty]) {
+      if (
+        note.type !== 5 ||
+        !Number.isFinite(note.measure) || note.measure < 0 ||
+        !Number.isFinite(note.position) || note.position < 0 ||
+        !Number.isFinite(note.split) || note.split <= 0 ||
+        note.position >= note.split
+      ) continue
+
+      const key = `${note.measure}:${note.position / note.split}`
+      let entry = positions.get(key)
+      if (!entry) {
+        entry = { notes: [], difficulties: new Set() }
+        positions.set(key, entry)
+      }
+      entry.notes.push(note)
+      entry.difficulties.add(difficulty)
+    }
+  }
+
+  const warnings = new Map<NoteData, string>()
+  for (const entry of positions.values()) {
+    const missing = difficulties.filter(difficulty => !entry.difficulties.has(difficulty))
+    if (missing.length === 0) continue
+
+    const message = `音札ノーツ位置が一致していません：${missing.map(difficulty => difficulty.toUpperCase()).join('、')}`
+    for (const note of entry.notes) warnings.set(note, message)
+  }
+  return warnings
 }
 
 /**

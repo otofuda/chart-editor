@@ -1,14 +1,17 @@
 import type { NoteData } from 'chart-types'
 import type { ExtendedNoteData, Measure } from '@/types'
 
+/** ドラッグの確定先。配置欄の移動は譜面や選択状態から独立させる。 */
+export type NoteMoveSource = 'chart' | 'draft'
+
 /** ダミーノーツの場合は擬態先、それ以外は自身のノーツ種別を返す。 */
 export function effectiveNoteType(note: NoteData): number {
   return note.type === 90 ? Number(note.option[0]) : note.type
 }
 
-/** 音札および音札に擬態するダミーを除き、ドラッグ対象かを判定する。 */
-export function canDragNote(note: NoteData): boolean {
-  return effectiveNoteType(note) !== 5
+/** 配置前は音札の縦移動も許可し、挿入済みの音札はドラッグ対象から除く。 */
+export function canDragNote(note: NoteData, source: NoteMoveSource = 'chart'): boolean {
+  return source === 'draft' || effectiveNoteType(note) !== 5
 }
 
 /** ノーツの実際の種別を基に、横方向へ移動できるかを判定する。 */
@@ -124,6 +127,7 @@ type Target = {
 
 /** ドラッグ開始時の対象、座標、小節情報を保持するスナップショット。 */
 export type NoteMoveSession = {
+  source: NoteMoveSource
   roots: { source: ExtendedNoteData; before: ExtendedNoteData }[]
   targets: Target[]
   anchor: Target
@@ -136,6 +140,7 @@ export type NoteMoveSession = {
 
 /** 描画用の移動候補と確定時の更新内容。移動できない場合は error に理由を保持する。 */
 export type NoteMoveCandidate = {
+  source: NoteMoveSource
   roots: ExtendedNoteData[]
   changes: { source: NoteData; value: NoteData }[]
   anchor: NoteData
@@ -156,6 +161,7 @@ function atPath(root: NoteData, path: number[]): NoteData {
  * @param measures ドラッグ開始時に表示されている小節情報
  * @param split 縦位置の吸着に使う分割数
  * @param whole ロングの帯から、始点・中点・終点をまとめて移動するか
+ * @param source 譜面のノーツか、配置欄のシャドーか
  * @returns 移動セッション。対象外のノーツの場合は null
  */
 export function createNoteMoveSession(
@@ -165,12 +171,13 @@ export function createNoteMoveSession(
   measures: Measure[],
   split: number,
   whole = false,
+  source: NoteMoveSource = 'chart',
 ): NoteMoveSession | null {
-  if (!canDragNote(root) || !chart.includes(root)) {
+  if (!canDragNote(root, source) || (source === 'chart' && !chart.includes(root))) {
     return null
   }
 
-  const selectedGroup = node === root && Boolean(root.isSelected)
+  const selectedGroup = source === 'chart' && node === root && Boolean(root.isSelected)
   const group = selectedGroup || (whole && node === root && isLong(root))
   const roots = (selectedGroup ? chart.filter(n => n.isSelected && canDragNote(n)) : [root])
     .map(source => ({ source, before: cloneNote(source) }))
@@ -208,6 +215,7 @@ export function createNoteMoveSession(
   }
 
   return {
+    source,
     roots,
     targets,
     anchor,
@@ -295,7 +303,13 @@ export function calculateNoteMove(
     value: atPath(roots[target.root], target.path),
   }))
   const anchor = atPath(roots[session.anchor.root], session.anchor.path)
-  const result: NoteMoveCandidate = { roots, changes, anchor, error: null }
+  const result: NoteMoveCandidate = {
+    source: session.source,
+    roots,
+    changes,
+    anchor,
+    error: null,
+  }
 
   try {
     let shift = fraction(0n)
@@ -318,6 +332,10 @@ export function calculateNoteMove(
       : Math.round(session.anchorBefore.lane + deltaX / 60) - session.anchorBefore.lane
 
     changes.forEach(({ value }) => {
+      if (session.source === 'draft' && effectiveNoteType(value) === 5) {
+        value.lane = 3
+      }
+
       if (moveY) {
         applyTime(value, add(time(value), shift))
       }

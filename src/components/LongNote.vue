@@ -2,10 +2,11 @@
 <template>
   <v-menu
     v-model="menu"
-    :close-on-click="false"
     :close-on-content-click="false"
     location="left"
     :max-width="420"
+    :target="menuTarget"
+    :location-strategy="locationStrategy"
   >
     <template v-slot:activator="{ props }">
       <!-- 始点 -->
@@ -23,6 +24,8 @@
         }"
         v-bind="props"
         @pointerdown="noteDrag?.start($event, note)"
+        @click="rememberMenuTarget"
+        @keydown="rememberMenuTarget"
       >
         <input
           type="checkbox"
@@ -47,7 +50,7 @@
             bottom: `${getBottom(ep.note) - 5}px`
           }"
           @pointerdown="noteDrag?.start($event, note, ep.note)"
-          @click.stop="menu = true"
+          @click.stop="openMenu"
         >
           <span class="midpoint-badges">
             <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
@@ -68,7 +71,7 @@
             width: `${getWidth(ep.note)}px`
           }"
           @pointerdown="noteDrag?.start($event, note, ep.note)"
-          @click.stop="menu = true"
+          @click.stop="openMenu"
         >
           <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
           <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
@@ -85,7 +88,7 @@
             width: `${getWidth(ep.note)}px`
           }"
           @pointerdown="noteDrag?.start($event, note, ep.note)"
-          @click.stop="menu = true"
+          @click.stop="openMenu"
         >
           <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
           <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
@@ -100,7 +103,7 @@
           }"
           aria-label="不可視の中点・終点"
           @pointerdown="noteDrag?.start($event, note, ep.note)"
-          @click.stop="menu = true"
+          @click.stop="openMenu"
         >
           <span />
         </span>
@@ -115,7 +118,7 @@
         }"
         @pointerdown="noteDrag?.startWhole($event, note)"
       >
-        <g v-for="seg in treeData.segments" :key="seg.id" @click.stop="menu = true">
+        <g v-for="seg in treeData.segments" :key="seg.id" @click.stop="openMenu">
           <path :d="seg.paths.fillPath" class="hold-fill" />
           <path :d="seg.paths.leftBorderPath" class="hold-border" />
           <path :d="seg.paths.rightBorderPath" class="hold-border" />
@@ -271,6 +274,7 @@ import { deleteNotesKey } from '@/composables/injectionKeys'
 import { generateHoldSvgPaths, getCurveType, type CurveType } from '@/composables/useNoteTypes'
 import EndForm from './EndForm.vue'
 import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
+import { useNoteMenuLocation } from '@/composables/useNoteMenuLocation'
 import { noteDragKey } from '@/composables/useNoteDrag'
 import { numberInputValue, useHistoryFields, vHistoryField } from '@/composables/useHistoryField'
 
@@ -291,6 +295,13 @@ const {
   commitMeasure: commitRootMeasure,
   isMeasureDirty,
 } = useNoteMeasureEdit(() => props.note, history)
+
+const {
+  menuTarget,
+  locationStrategy,
+  rememberMenuTarget,
+  openMenu,
+} = useNoteMenuLocation(menu, 420)
 
 /** 分割数の入力や候補選択を、始点の同じ入力欄の編集として履歴へまとめる。 */
 function changeRootSplit(value: unknown) {

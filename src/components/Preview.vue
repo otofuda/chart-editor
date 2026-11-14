@@ -65,6 +65,7 @@
           v-if="appendNote"
           :note="appendNote"
           :measureData="measureData"
+          :isDraggable="dragEnabled"
         />
 
         <!-- 仮配置ノーツ -->
@@ -492,6 +493,7 @@ const dragEnabled = computed(() =>
 const noteDrag = useNoteDrag({
   content: previewContent,
   chart,
+  draft: computed(() => props.appendNote ?? null),
   measures,
   enabled: dragEnabled,
   split: computed(() => Number(props.placementSplit ?? 8)),
@@ -791,19 +793,19 @@ const entireHeight = computed(() => {
   :deep(.note),
   :deep(.note-midpoint),
   :deep(.note-invisible-badge) {
-    z-index: 106;
+    z-index: 110;
     transition: none;
     outline: 2px solid currentColor;
     color: inherit;
   }
   :deep(.long-note-svg) {
-    z-index: 104;
+    z-index: 109;
   }
 }
 
 .note-drag-anchor {
   position: absolute;
-  z-index: 107;
+  z-index: 110;
   width: 14px;
   height: 14px;
   border: 2px solid currentColor;

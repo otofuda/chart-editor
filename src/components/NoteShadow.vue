@@ -1,6 +1,6 @@
 <!-- eslint-disable vue/no-mutating-props -->
 <template>
-  <div>
+  <div :class="{ 'draft-shadow': isEditable, 'note-draggable': isEditable }">
     <!-- 始点 -->
     <span
       class="note"
@@ -16,7 +16,8 @@
         width: `${getWidth(note)}px`,
         background: dispColor
       }"
-      @click="calcelThisNote"
+      @pointerdown="startNodeDrag($event)"
+      @click="handleRootClick"
     >
       <!-- テクスチャの時 -->
       <img
@@ -30,6 +31,7 @@
           height: `${measureData.at(-1)?.measureHeight * Number(note.option[2])}px`
         }"
         alt="texture"
+        :draggable="false"
       />
 
       <!-- コメントの時 -->
@@ -65,6 +67,7 @@
           left: `${(ep.note.lane - 1) * 60 + 85}px`,
           bottom: `${getAbsoluteBottom(ep.note) - 5}px`
         }"
+        @pointerdown="startNodeDrag($event, ep.note)"
       >
         <span class="midpoint-badges">
           <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
@@ -85,6 +88,7 @@
           bottom: `${getAbsoluteBottom(ep.note)}px`,
           width: `${getWidth(ep.note)}px`
         }"
+        @pointerdown="startNodeDrag($event, ep.note)"
       >
         <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
         <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
@@ -103,9 +107,25 @@
           bottom: `${getAbsoluteBottom(ep.note)}px`,
           width: `${getWidth(ep.note)}px`
         }"
+        @pointerdown="startNodeDrag($event, ep.note)"
       >
         <strong v-if="Number(ep.note.option?.[0]) && Number(ep.note.option?.[0]) !== 1" class="speed">x{{ ep.note.option[0] }}</strong>
         <strong v-if="Number(ep.note.option?.[1]) && Number(ep.note.option?.[1]) !== 0" class="orbit">&gt;{{ ep.note.option[1] }}</strong>
+      </span>
+
+      <span
+        v-if="isEditable && isLongDraft && ep.note.type === 89"
+        class="draft-invisible-handle"
+        :class="{ 'touch-visible': showHandles }"
+        :style="{
+          left: `${(ep.note.lane - 1) * 60 + 78}px`,
+          bottom: `${getAbsoluteBottom(ep.note) - 12}px`
+        }"
+        aria-label="配置前の不可視の中点・終点"
+        @pointerdown="startInvisibleDrag($event, ep.note)"
+        @click="!showHandles && handleRootClick()"
+      >
+        <span />
       </span>
     </template>
 
@@ -120,6 +140,8 @@
       :style="{
         height: `${entireHeight}px`
       }"
+      @pointerdown="startWholeDrag"
+      @click="isEditable && handleRootClick()"
     >
       <g v-for="seg in treeData.segments" :key="seg.id">
         <path :d="seg.paths.fillPath" class="hold-fill" />
@@ -131,19 +153,86 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { type ExtendedNoteData, type Measure } from '@/types'
 import type { NoteData } from 'chart-types'
 import { cancelNoteKey } from '@/composables/injectionKeys'
 import { getCurveType, generateHoldSvgPaths, type CurveType } from '@/composables/useNoteTypes'
+import { noteDragKey } from '@/composables/useNoteDrag'
+import { effectiveNoteType } from '@/composables/noteMovement'
 
 const props = defineProps<{
   note: ExtendedNoteData
   measureData: Measure[]
   isPreAppend?: boolean // 仮配置ノートかどうか
+  /** 配置欄と連動するシャドーだけ、ドラッグと不可視点の操作を有効にする。 */
+  isDraggable?: boolean
 }>()
 
 const cancelNote = inject(cancelNoteKey)!
+const noteDrag = inject(noteDragKey, null)
+const isEditable = computed(() =>
+  Boolean(props.isDraggable && !props.isPreAppend && noteDrag?.enabled.value),
+)
+const showHandles = ref(false)
+const isLongDraft = computed(() => effectiveNoteType(props.note) === 2)
+let pointerType = 'mouse'
+
+/** 配置前の始点・中点・終点を、共通のドラッグ処理へ渡す。 */
+function startNodeDrag(event: PointerEvent, node: NoteData = props.note): void {
+  if (!isEditable.value) {
+    return
+  }
+
+  pointerType = event.pointerType
+  noteDrag?.start(event, props.note, node)
+}
+
+/** 配置前の帯から、分岐を含めたロング全体の移動を開始する。 */
+function startWholeDrag(event: PointerEvent): void {
+  if (!isEditable.value) {
+    return
+  }
+
+  pointerType = event.pointerType
+  noteDrag?.startWhole(event, props.note)
+}
+
+/** マウス併用端末でも、表示前の不可視点へのタッチは帯の操作として扱う。 */
+function startInvisibleDrag(event: PointerEvent, node: NoteData): void {
+  if (event.pointerType === 'touch' && !showHandles.value) {
+    startWholeDrag(event)
+  } else {
+    startNodeDrag(event, node)
+  }
+}
+
+/** 仮配置済みノーツの取消、または配置前ロングのタッチ用ハンドル切替を処理する。 */
+function handleRootClick(): void {
+  if (props.isPreAppend) {
+    cancelNote(props.note.index)
+  } else if (
+    isEditable.value &&
+    isLongDraft.value &&
+    pointerType === 'touch'
+  ) {
+    showHandles.value = !showHandles.value
+  }
+}
+
+// 別の配置対象や種類へ切り替えたときは、不可視点のタップ選択を解除する。
+watch(
+  [
+    () => props.note,
+    () => props.note.type,
+    isLongDraft,
+    isEditable,
+  ],
+  () => {
+    showHandles.value = false
+  },
+  { flush: 'sync' },
+)
 
 function hasSpeedOrOrbit(note: NoteData): boolean {
   const s = Number(note.option?.[0])
@@ -268,11 +357,12 @@ const treeData = computed(() => {
   const segments: HoldSegment[] = []
   const endpoints: EndPointNode[] = []
 
-  function traverse(parent: NoteData, depth: number) {
+  /** 分岐の経路を識別子に使い、位置が変わっても描画要素の対応を保つ。 */
+  function traverse(parent: NoteData, depth: number, parentId = 'shadow_root') {
     if (!parent.end || !Array.isArray(parent.end)) return
 
     parent.end.forEach((child, idx) => {
-      const childId = `shadow_end_${depth}_${idx}_${child.measure}_${child.position}`
+      const childId = `${parentId}_${idx}`
       const isIntermediate = Boolean(child.end && Array.isArray(child.end) && child.end.length > 0)
       endpoints.push({
         id: childId,
@@ -304,17 +394,13 @@ const treeData = computed(() => {
         paths,
       })
 
-      traverse(child, depth + 1)
+      traverse(child, depth + 1, childId)
     })
   }
 
   traverse(props.note, 1)
   return { segments, endpoints }
 })
-
-function calcelThisNote() {
-  if (props.isPreAppend) cancelNote(props.note.index)
-}
 
 const dispColor = computed(() => {
   if (props.note.type === 96) {
@@ -335,9 +421,72 @@ const drawType = computed(() => {
 .shadow {
   color: #909090;
   animation: blink 0.5s infinite;
-  // 配置用の表示が既存ノーツに重なっても、タッチやドラッグを遮らない。
+  // 表示専用のシャドーは、重なった既存ノーツへの入力を遮らない。
   pointer-events: none;
 }
+
+// 配置欄のシャドーだけ既存ノーツより前面で入力を受け取り、表示専用の候補は透過する。
+.draft-shadow {
+  .note,
+  .note-midpoint,
+  .note-invisible-badge {
+    z-index: 107;
+    pointer-events: auto;
+    cursor: grab;
+  }
+
+  .long-note-svg {
+    z-index: 106;
+    pointer-events: none;
+
+    .hold-fill {
+      pointer-events: visibleFill;
+      cursor: grab;
+    }
+
+    .hold-border {
+      pointer-events: visibleStroke;
+      cursor: grab;
+    }
+  }
+}
+
+.draft-invisible-handle {
+  position: absolute;
+  z-index: 108;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  pointer-events: none;
+
+  > span {
+    width: 10px;
+    height: 10px;
+    border: 2px solid #6ecc6e;
+    background: #303030;
+    transform: rotate(45deg);
+    opacity: 0;
+  }
+
+  @media (hover: hover) {
+    pointer-events: auto;
+
+    &:hover > span {
+      opacity: 1;
+    }
+  }
+
+  &.touch-visible {
+    pointer-events: auto;
+
+    > span {
+      opacity: 1;
+    }
+  }
+}
+
 .preappend {
   opacity: 1;
   color: rgba(255, 255, 255, 0.5) !important;

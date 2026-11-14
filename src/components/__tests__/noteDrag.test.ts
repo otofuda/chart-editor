@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, nextTick } from 'vue'
+import { defineComponent, h, nextTick, reactive, ref } from 'vue'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import type { ExtendedNoteData, Measure } from '@/types'
 import {
@@ -17,6 +17,7 @@ import Note from '../Note.vue'
 import LongNote from '../LongNote.vue'
 import NoteShadow from '../NoteShadow.vue'
 import { useChartData } from '@/composables/useChartData'
+import { useNoteEditor } from '@/composables/useNoteEditor'
 
 /** テストごとの差分だけを指定して、画面に配置するノーツを作る。 */
 function note(overrides: Partial<ExtendedNoteData> = {}): ExtendedNoteData {
@@ -156,11 +157,16 @@ let frames: Map<number, FrameRequestCallback>
 let frameId: number
 
 /** 譜面プレビューを描画し、ポインター捕捉とスクロールを制御できる検証環境を作る。 */
-function setup(sources: ExtendedNoteData[] = [note()], extraProps = {}) {
+function setup(
+  sources: ExtendedNoteData[] = [note()],
+  extraProps: Record<string, unknown> = {},
+) {
   const data = useChartData()
   data.chartObject.value.easy = sources
   const chart = data.currentChart
   const showSnackbar = vi.fn()
+  const cancelNote = vi.fn()
+  const previewProps = reactive(extraProps)
   const host = defineComponent({
     setup: () => () => h(Preview, {
       currentChart: chart.value,
@@ -168,7 +174,7 @@ function setup(sources: ExtendedNoteData[] = [note()], extraProps = {}) {
       measureData: measures,
       infoObject: { bpm: 120, beat: 4, offset: 0, version: 2 },
       placementSplit: 8,
-      ...extraProps,
+      ...previewProps,
     }),
   })
   const wrapper = mount(host, {
@@ -177,7 +183,7 @@ function setup(sources: ExtendedNoteData[] = [note()], extraProps = {}) {
       stubs,
       provide: {
         [appendNotesKey as symbol]: vi.fn(),
-        [cancelNoteKey as symbol]: vi.fn(),
+        [cancelNoteKey as symbol]: cancelNote,
         [copyNotesToDifficultyKey as symbol]: vi.fn(),
         [showSnackbarKey as symbol]: showSnackbar,
         [deleteNotesKey as symbol]: vi.fn(),
@@ -223,6 +229,9 @@ function setup(sources: ExtendedNoteData[] = [note()], extraProps = {}) {
   return {
     wrapper,
     chart,
+    data,
+    previewProps,
+    cancelNote,
     history: data.history,
     content,
     bar,
@@ -242,6 +251,282 @@ beforeEach(() => {
     return frameId
   }))
   vi.stubGlobal('cancelAnimationFrame', vi.fn((id: number) => frames.delete(id)))
+})
+
+/** 配置欄用のシャドーだけを取得し、表示専用の移動候補や仮配置済みノーツと区別する。 */
+function placementShadow(wrapper: VueWrapper) {
+  return wrapper.findAllComponents(NoteShadow)
+    .find(component => component.props('isDraggable') === true)!
+}
+
+describe('配置欄のシャドーのドラッグ操作', () => {
+  it.each(['mouse', 'touch'])('%s で配置欄の位置だけを確定し、その位置で仮配置できる', async pointerType => {
+    const draft = ref(note({ isSelected: true }))
+    const { wrapper, chart, data, history, cancelNote } = setup(
+      [note({ index: 9, isSelected: true })],
+      { appendNote: draft.value },
+    )
+    const before = JSON.stringify(chart.value)
+    const source = placementShadow(wrapper).get('.note').element
+
+    pointer(source, 'pointerdown', 250, 600, { pointerType })
+    if (pointerType === 'touch') {
+      expect(touchMove(source).defaultPrevented).toBe(true)
+    }
+    pointer(window, 'pointermove', 310, 550, { pointerType })
+    await nextTick()
+
+    expect(draft.value).toMatchObject({ lane: 2, position: 1, split: 4 })
+    const candidate = wrapper.get('.note-drag-preview').getComponent(NoteShadow)
+    expect(candidate.props('note')).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(candidate.props('isDraggable')).toBe(false)
+
+    pointer(window, 'pointerup', 310, 550, { pointerType })
+    await nextTick()
+    expect(draft.value).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(JSON.stringify(chart.value)).toBe(before)
+    expect(history.entries.value).toHaveLength(0)
+    expect(cancelNote).not.toHaveBeenCalled()
+
+    const editor = useNoteEditor(data, vi.fn(), vi.fn())
+    editor.appendNote.value = draft.value
+    editor.placeNotes(editor.appendNote.value)
+    expect(editor.preAppendNotes.value).toHaveLength(1)
+    expect(editor.preAppendNotes.value[0]).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(JSON.stringify(chart.value)).toBe(before)
+  })
+
+  it.each([5, 90])('音札と音札ダミーの配置前シャドー type %s はレーン3固定で縦に移動する', async type => {
+    const draft = ref(note({ type, lane: 1, option: type === 90 ? ['5'] : [] }))
+    const { wrapper, history } = setup([], { appendNote: draft.value })
+
+    pointer(placementShadow(wrapper).get('.note').element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    await nextTick()
+    expect(wrapper.get('.note-drag-preview').getComponent(NoteShadow).props('note'))
+      .toMatchObject({ lane: 3, position: 3, split: 8 })
+    pointer(window, 'pointerup', 310, 550)
+    expect(draft.value).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(history.entries.value).toHaveLength(0)
+  })
+
+  it('split トグルを使い、横だけの移動では配置欄の時刻を変えない', async () => {
+    const draft = ref(note({ split: 12, position: 1 }))
+    const { wrapper } = setup([], { appendNote: draft.value })
+    const source = placementShadow(wrapper).get('.note').element
+
+    pointer(source, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 600)
+    pointer(window, 'pointerup', 310, 600)
+    expect(draft.value).toMatchObject({ lane: 3, position: 1, split: 12 })
+
+    await wrapper.get('input[aria-label="ドラッグ移動で各ノーツの split を使う"]').setValue(true)
+    pointer(source, 'pointerdown', 310, 600)
+    pointer(window, 'pointermove', 310, 535)
+    pointer(window, 'pointerup', 310, 535)
+    expect(draft.value).toMatchObject({ lane: 3, position: 3, split: 12 })
+  })
+
+  it.each([2, 90])('配置前ロング type %s は各点を個別に、帯から分岐全体を移動できる', async type => {
+    const draft = ref(note({
+      type,
+      option: type === 90 ? ['2'] : [],
+      end: [
+        note({
+          type: 89,
+          measure: 1,
+          lane: 2.5 as ExtendedNoteData['lane'],
+          option: ['1', '0', 'ease', '2'],
+          end: [note({ measure: 2, lane: 3 })],
+        }),
+        note({ measure: 1, lane: 4 }),
+      ],
+    }))
+    const { wrapper, history } = setup([], { appendNote: draft.value })
+    const shadow = placementShadow(wrapper)
+
+    // 始点だけの移動では、中点・終点を動かさない。
+    pointer(shadow.get('.note').element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    pointer(window, 'pointerup', 310, 550)
+    await nextTick()
+    expect(draft.value).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(draft.value.end[0]).toMatchObject({ lane: 2.5, position: 1, split: 4 })
+
+    // 不可視の中点を単独移動し、子や別の分岐には反映しない。
+    pointer(shadow.get('.draft-invisible-handle').element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 280, 550)
+    pointer(window, 'pointerup', 280, 550)
+    await nextTick()
+    expect(draft.value.end[0]).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(draft.value.end[0].end[0]).toMatchObject({ lane: 3, position: 1, split: 4 })
+    expect(draft.value.end[1]).toMatchObject({ lane: 4, position: 1, split: 4 })
+
+    // 帯を掴むと、各点の差を保って全体を移動する。
+    pointer(shadow.get('.hold-fill').element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    pointer(window, 'pointerup', 310, 550)
+    await nextTick()
+    expect(draft.value).toMatchObject({ lane: 4, position: 4, split: 8 })
+    expect(draft.value.end[0]).toMatchObject({
+      lane: 4,
+      position: 4,
+      split: 8,
+      option: ['1', '0', 'ease', '2'],
+    })
+    expect(draft.value.end[0].end[0]).toMatchObject({ lane: 4, position: 3, split: 8 })
+    expect(draft.value.end[1]).toMatchObject({ lane: 5, position: 3, split: 8 })
+    expect(history.entries.value).toHaveLength(0)
+  })
+
+  it('タップで不可視点を表示し、ドラッグ後のクリックでは表示を切り替えない', async () => {
+    const draft = ref(note({ type: 2, end: [note({ type: 89, measure: 1 })] }))
+    const { wrapper, previewProps } = setup([], { appendNote: draft.value })
+    const shadow = placementShadow(wrapper)
+    const source = shadow.get('.note').element
+
+    expect(shadow.get('.draft-invisible-handle').classes()).not.toContain('touch-visible')
+    pointer(source, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    pointer(window, 'pointerup', 250, 600, { pointerType: 'touch' })
+    await shadow.get('.note').trigger('click')
+    expect(shadow.get('.draft-invisible-handle').classes()).toContain('touch-visible')
+
+    const band = shadow.get('.hold-border')
+    pointer(band.element, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    expect(touchMove(band.element).defaultPrevented).toBe(true)
+    pointer(window, 'pointermove', 310, 550, { pointerType: 'touch' })
+    pointer(window, 'pointerup', 310, 550, { pointerType: 'touch' })
+    await band.trigger('click')
+    expect(shadow.get('.draft-invisible-handle').classes()).toContain('touch-visible')
+
+    pointer(band.element, 'pointerdown', 310, 550, { pointerType: 'touch' })
+    pointer(window, 'pointerup', 310, 550, { pointerType: 'touch' })
+    await band.trigger('click')
+    expect(shadow.get('.draft-invisible-handle').classes()).not.toContain('touch-visible')
+
+    pointer(source, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    pointer(window, 'pointerup', 250, 600, { pointerType: 'touch' })
+    await shadow.get('.note').trigger('click')
+    draft.value.type = 1
+    await nextTick()
+    expect(shadow.find('.draft-invisible-handle').exists()).toBe(false)
+    draft.value.type = 2
+    await nextTick()
+    expect(shadow.get('.draft-invisible-handle').classes()).not.toContain('touch-visible')
+
+    previewProps.appendNote = null
+    await nextTick()
+    expect(wrapper.find('.draft-shadow').exists()).toBe(false)
+  })
+
+  it('ハンドル表示前の不可視点へのタッチは帯として扱い、表示後は個別に動かす', async () => {
+    const draft = ref(note({ type: 2, end: [note({ type: 89, measure: 1 })] }))
+    const { wrapper } = setup([], { appendNote: draft.value })
+    const shadow = placementShadow(wrapper)
+    const handle = shadow.get('.draft-invisible-handle')
+
+    pointer(handle.element, 'pointerdown', 250, 600, { pointerType: 'touch' })
+    pointer(window, 'pointermove', 310, 550, { pointerType: 'touch' })
+    pointer(window, 'pointerup', 310, 550, { pointerType: 'touch' })
+    await handle.trigger('click')
+    expect(draft.value).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(draft.value.end[0]).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(handle.classes()).not.toContain('touch-visible')
+
+    pointer(handle.element, 'pointerdown', 310, 550, { pointerType: 'touch' })
+    pointer(window, 'pointerup', 310, 550, { pointerType: 'touch' })
+    await handle.trigger('click')
+    expect(handle.classes()).toContain('touch-visible')
+
+    pointer(handle.element, 'pointerdown', 310, 550, { pointerType: 'touch' })
+    pointer(window, 'pointermove', 370, 500, { pointerType: 'touch' })
+    pointer(window, 'pointerup', 370, 500, { pointerType: 'touch' })
+    expect(draft.value).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(draft.value.end[0]).toMatchObject({ lane: 4, position: 4, split: 8 })
+  })
+
+  it.each(['Escape', 'pointercancel', 'field', 'replace', 'mode', 'difficulty', 'playback', 'hide'])(
+    '%s で候補を破棄し、配置欄へ未確定の位置を反映しない',
+    async reason => {
+      const draft = ref(note())
+      const { wrapper, previewProps } = setup([], { appendNote: draft.value })
+      const source = placementShadow(wrapper).get('.note').element
+
+      pointer(source, 'pointerdown', 250, 600, { pointerType: 'touch' })
+      pointer(window, 'pointermove', 310, 550, { pointerType: 'touch' })
+      if (reason === 'Escape') {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      } else if (reason === 'pointercancel') {
+        pointer(window, 'pointercancel', 310, 550, { pointerType: 'touch' })
+      } else if (reason === 'field') {
+        draft.value.position = 2
+      } else if (reason === 'replace') {
+        previewProps.appendNote = { ...draft.value }
+      } else if (reason === 'mode') {
+        previewProps.isShowDetail = true
+        previewProps.isCaptureMode = true
+      } else if (reason === 'difficulty') {
+        previewProps.currentDifficulty = 'hard'
+      } else if (reason === 'playback') {
+        await wrapper.findAll('button').find(button => button.text().includes('再生'))!.trigger('click')
+      } else {
+        previewProps.appendNote = null
+      }
+      await nextTick()
+      pointer(window, 'pointerup', 310, 550, { pointerType: 'touch' })
+      await nextTick()
+
+      expect(draft.value).toMatchObject({ lane: 2, position: reason === 'field' ? 2 : 1, split: 4 })
+      expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+      expect(touchMove(source).defaultPrevented).toBe(false)
+    },
+  )
+
+  it.each(['lane', 'measure', 'order'])('移動先が %s の制約に反する場合は配置欄を更新しない', async kind => {
+    const draft = ref(note(kind === 'measure'
+      ? { measure: 2, position: 3 }
+      : kind === 'order'
+        ? { type: 2, end: [note({ position: 2 })] }
+        : { lane: 5 }))
+    const { wrapper, showSnackbar } = setup([], { appendNote: draft.value })
+    const before = JSON.stringify(draft.value)
+    const x = kind === 'lane' ? 310 : 250
+    const y = kind === 'lane' ? 550 : 500
+
+    pointer(placementShadow(wrapper).get('.note').element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', x, y)
+    await nextTick()
+    expect(wrapper.get('.note-drag-preview').classes()).toContain('invalid')
+    pointer(window, 'pointerup', x, y)
+    expect(JSON.stringify(draft.value)).toBe(before)
+    expect(showSnackbar).toHaveBeenCalled()
+  })
+
+  it('挿入モードをオフにすると既存ノーツを移動でき、仮配置済みノーツはドラッグしない', async () => {
+    const draft = ref(note())
+    const staged = ref(note({ index: 2, lane: 4 }))
+    const { wrapper, previewProps, chart, bar, cancelNote } = setup([note()], {
+      appendNote: draft.value,
+      preAppendNotes: [staged.value],
+    })
+    const placed = wrapper.findAllComponents(NoteShadow)
+      .find(component => component.props('isPreAppend'))!
+
+    pointer(placed.get('.note').element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    pointer(window, 'pointerup', 310, 550)
+    expect(staged.value).toMatchObject({ lane: 4, position: 1, split: 4 })
+    await placed.get('.note').trigger('click')
+    expect(cancelNote).toHaveBeenCalledWith(2)
+
+    previewProps.appendNote = null
+    await nextTick()
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 310, 550)
+    pointer(window, 'pointerup', 310, 550)
+    expect(chart.value[0]).toMatchObject({ lane: 3, position: 3, split: 8 })
+    expect(draft.value).toMatchObject({ lane: 2, position: 1, split: 4 })
+  })
 })
 
 afterEach(() => {

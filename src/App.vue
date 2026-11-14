@@ -722,6 +722,83 @@
           </v-row>
         </v-card-text>
         <v-divider></v-divider>
+        <!-- 共通typeのoption定義を使い、チェックした項目だけを一括変更する。 -->
+        <v-card-text data-testid="selection-options">
+          <strong>
+            オプションの変更
+          </strong>
+
+          <p>
+            同じtypeのノーツを1つ以上選択すると、チェックした項目だけを一括変更できます。
+            チェックした項目が空欄の場合は値を消去します。保存時は既存の規則で省略・既定値補完されます。
+            ロングノーツは始点のオプションのみ変更します。
+          </p>
+
+          <!-- 実行できない場合は、選択条件に応じた理由を表示する。 -->
+          <v-alert
+            v-if="selectionOptionsDisabledReason"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="my-2"
+          >
+            {{ selectionOptionsDisabledReason }}
+          </v-alert>
+
+          <v-row
+            v-for="(opt, i) in selectionOptionDefinitions"
+            :key="`selection_option_${i}`"
+            align="center"
+            class="mx-1"
+          >
+            <v-col
+              cols="12"
+              sm="4"
+            >
+              <v-checkbox
+                v-model="selectionOptionFields[i].checked"
+                :label="`${opt.label}を変更`"
+                density="compact"
+                hide-details
+              />
+            </v-col>
+
+            <v-col
+              cols="12"
+              sm="8"
+            >
+              <!-- 混在値は空欄で表示し、チェック前の入力を無効にする。 -->
+              <v-text-field
+                v-model="selectionOptionFields[i].value"
+                :label="opt.label"
+                :type="opt.type === 'number' ? 'number' : 'text'"
+                :disabled="!selectionOptionFields[i].checked"
+                :placeholder="selectionOptionFields[i].mixed ? '値が混在' : undefined"
+                :hint="[
+                  selectionOptionFields[i].mixed ? '値が混在' : '',
+                  opt.desc,
+                ].filter(Boolean).join('｜')"
+                persistent-hint
+                variant="outlined"
+                density="compact"
+              />
+            </v-col>
+          </v-row>
+
+          <v-btn
+            prepend-icon="mdi-auto-fix"
+            color="primary"
+            class="mt-2"
+            :disabled="
+              Boolean(selectionOptionsDisabledReason) ||
+              !selectionOptionFields.some(field => field.checked)
+            "
+            @click="applySelectionOptions"
+          >
+            選択ノーツのオプションを変更
+          </v-btn>
+        </v-card-text>
+        <v-divider></v-divider>
         <v-card-text>
           <strong>
             レーンの変更
@@ -903,7 +980,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, provide, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, provide, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useGoTo } from 'vuetify'
 
 import Preview from './components/Preview.vue'
@@ -925,9 +1002,10 @@ import { useTextureDB } from './composables/useTextureDB'
 import { useBackup } from './composables/useBackup'
 import { usePersistedRef } from './composables/usePersistedRef'
 import { noteTypes, noteOptions } from './composables/useNoteTypes'
-import { isLanelessNote } from './composables/useNoteCheck'
+import { getOtofudaMismatchWarnings, isLanelessNote } from './composables/useNoteCheck'
 import {
   showSnackbarKey,
+  otofudaWarningKey,
   deleteNotesKey,
   cancelNoteKey,
   appendNotesKey,
@@ -951,6 +1029,8 @@ const {
   musicBpm,
   difficulties,
 } = chartData
+
+const otofudaWarnings = computed(() => getOtofudaMismatchWarnings(chartObject.value, difficulties))
 
 const backup = useBackup(chartData)
 const {
@@ -1009,10 +1089,27 @@ const {
 
 const selection = useSelection(chartData, showSnackbar)
 const {
-  batchSelectTypes, batchSelectStart, batchSelectEnd, batchSelectTarget,
-  selectionNumber, selectionLaneTo, selectionLaneAddition, selectionTypeTo,
-  selectionMeasureAddition, selectionClear, selectionDelete: doSelectionDelete,
-  selectionChangeType, selectionChangeLane, selectionAddLane, selectionAddMeasure, batchSelect,
+  batchSelectTypes,
+  batchSelectStart,
+  batchSelectEnd,
+  batchSelectTarget,
+  selectionNumber,
+  selectionLaneTo,
+  selectionLaneAddition,
+  selectionTypeTo,
+  selectionMeasureAddition,
+  selectionClear,
+  selectionDelete: doSelectionDelete,
+  selectionChangeType,
+  selectionChangeLane,
+  selectionAddLane,
+  selectionAddMeasure,
+  batchSelect,
+  selectionNotes,
+  selectionCommonType,
+  selectionOptionDefinitions,
+  selectionOptionsDisabledReason,
+  selectionChangeOptions,
 } = selection
 
 const previewRef = ref<InstanceType<typeof Preview> | null>(null)
@@ -1039,6 +1136,57 @@ const dialog = ref({
   batchcheck: false,
   texture: false,
 })
+
+/** 一括変更フォームの入力状態。値が混在している項目は空欄で表示する。 */
+type SelectionOptionField = {
+  checked: boolean
+  value: string
+  mixed: boolean
+}
+
+const selectionOptionFields = ref<SelectionOptionField[]>([])
+
+/** 共通値を読み直し、変更対象のチェックと未確定の入力を初期化する。 */
+function resetSelectionOptions(): void {
+  selectionOptionFields.value = selectionOptionDefinitions.value.map((_, index) => {
+    const value = selectionNotes.value[0]?.option[index] ?? ''
+    const mixed = selectionNotes.value.some(note => (note.option[index] ?? '') !== value)
+
+    return {
+      checked: false,
+      value: mixed ? '' : value,
+      mixed,
+    }
+  })
+}
+
+// 件数が同じでも、選択対象の入れ替えやダイアログの再表示で入力を持ち越さない。
+watch(
+  [
+    selectionNotes,
+    selectionCommonType,
+    currentDifficulty,
+    () => dialog.value.checked,
+  ],
+  resetSelectionOptions,
+  { immediate: true }
+)
+
+/** チェックした項目だけを渡し、成功時はダイアログを開いたまま再初期化する。 */
+function applySelectionOptions(): void {
+  const changes: Record<number, string> = {}
+
+  selectionOptionFields.value.forEach((field, index) => {
+    if (field.checked) {
+      // 空欄も値の消去として適用し、チェックしていない項目は渡さない。
+      changes[index] = field.value ?? ''
+    }
+  })
+
+  if (selectionChangeOptions(changes)) {
+    resetSelectionOptions()
+  }
+}
 
 /** 操作履歴を開く際に、同じ位置に表示するメッセージログを閉じる。 */
 function handleHistoryVisibility(isOpen: boolean): void {
@@ -1167,6 +1315,7 @@ function zoomOut() { beatHeight.value = Math.max((beatHeight.value - 10) || 0, 0
 
 // --- Provide (typed) ---
 provide(showSnackbarKey, showSnackbar)
+provide(otofudaWarningKey, note => otofudaWarnings.value.get(note) ?? false)
 provide(chartHistoryKey, history)
 provide(deleteNotesKey, chartData.deleteNotes)
 provide(cancelNoteKey, cancelNote)

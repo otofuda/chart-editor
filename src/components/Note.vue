@@ -2,11 +2,11 @@
 <template>
   <v-menu
     v-model="menu"
-    :close-on-click="false"
     :close-on-content-click="false"
     stick-to-target
-    :nudge-left="50"
     :max-width="240"
+    :target="menuTarget"
+    :location-strategy="locationStrategy"
   >
     <template v-slot:activator="{ props }">
       <!-- 音符を描画 -->
@@ -27,6 +27,8 @@
         }"
         v-bind="props"
         @pointerdown="noteDrag?.start($event, note)"
+        @click="rememberMenuTarget"
+        @keydown="rememberMenuTarget"
       >
         <!-- テクスチャの時 -->
         <img
@@ -72,6 +74,15 @@
             </v-icon>
           </template>
           <span>{{ getDuplicated }}個の重複</span>
+        </v-tooltip>
+
+        <v-tooltip v-if="otofudaWarning" bottom>
+          <template v-slot:activator="{ props }">
+            <v-icon color="warning" dark v-bind="props" class="mt-2" :aria-label="otofudaWarning">
+              mdi-alert
+            </v-icon>
+          </template>
+          <span>{{ otofudaWarning }}</span>
         </v-tooltip>
 
         <v-tooltip v-if="getError" bottom>
@@ -226,8 +237,9 @@ import { stopNumberInputArrowKeys } from '@/composables/useNumberInputKeys'
 import { type ExtendedNoteData, type Measure } from '@/types'
 import { noteTypes, noteOptions } from '@/composables/useNoteTypes'
 import { isDuplicated, hasError, isLanelessNote } from '@/composables/useNoteCheck'
-import { deleteNotesKey, setAppendNoteInfoKey, showSnackbarKey } from '@/composables/injectionKeys'
+import { deleteNotesKey, otofudaWarningKey, setAppendNoteInfoKey, showSnackbarKey } from '@/composables/injectionKeys'
 import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
+import { useNoteMenuLocation } from '@/composables/useNoteMenuLocation'
 import { noteDragKey } from '@/composables/useNoteDrag'
 import { canDragNote } from '@/composables/noteMovement'
 import { useHistoryFields, vHistoryField } from '@/composables/useHistoryField'
@@ -241,6 +253,7 @@ const props = defineProps<{
 const deleteNotes = inject(deleteNotesKey)!
 const setAppendNoteInfo = inject(setAppendNoteInfoKey)!
 const showSnackbar = inject(showSnackbarKey)!
+const getOtofudaWarning = inject(otofudaWarningKey, () => false)
 const noteDrag = inject(noteDragKey, null)
 
 const { history, field, change } = useHistoryFields()
@@ -251,6 +264,12 @@ const {
   commitMeasure,
   isMeasureDirty,
 } = useNoteMeasureEdit(() => props.note, history)
+
+const {
+  menuTarget,
+  locationStrategy,
+  rememberMenuTarget,
+} = useNoteMenuLocation(menu, 240)
 
 function deleteThisNote() {
   deleteNotes(props.note.index)
@@ -363,6 +382,7 @@ const noteOrbit = computed(() => {
 
 const getDuplicated = computed(() => isDuplicated(props.note, props.currentChart, [], { checkPreAppend: false }))
 const getError = computed(() => hasError(props.note))
+const otofudaWarning = computed(() => getOtofudaWarning(props.note))
 const getOptions = computed(() => noteOptions(props.note))
 const getNoteTypes = computed(() => noteTypes)
 const getIsLanelessNote = computed(() => isLanelessNote(props.note))

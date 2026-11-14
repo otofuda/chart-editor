@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import { useChartData } from '../useChartData'
 import { useFileIO } from '../useFileIO'
+import { useSelection } from '../useSelection'
 import { ControlledFileReader } from './controlledFileReader'
 
 function setup() {
@@ -11,6 +12,52 @@ function setup() {
 }
 
 describe('useFileIO', () => {
+  it('一括変更した空欄は保存時に補完され、編集中のoptionは保持する', async () => {
+    const { chartData, fileIO, showSnackbar } = setup()
+    chartData.chartObject.value.easy = [
+      {
+        type: 3,
+        lane: 1,
+        measure: 0,
+        position: 0,
+        split: 4,
+        option: ['3', '2', '4', '2'],
+        end: [],
+        isSelected: true,
+      },
+    ]
+
+    // 編集中は、空欄を既定値へ置き換えずに保持する。
+    const selection = useSelection(chartData, showSnackbar)
+    expect(selection.selectionChangeOptions({ 0: '', 3: '', 4: '0.5' })).toBe(true)
+
+    const option = ['', '2', '4', '', '0.5']
+    expect(chartData.currentChart.value[0].option).toEqual(option)
+
+    // ダウンロード用のJSONだけが、既存の保存処理で補完されることを確認する。
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:test')
+    vi.stubGlobal('URL', class extends URL {
+      static createObjectURL = createObjectURL
+    })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    try {
+      fileIO.saveFile()
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = () => reject(reader.error)
+        reader.readAsText(createObjectURL.mock.calls[0][0])
+      })
+
+      expect(JSON.parse(text).easy[0].option).toEqual(['-1', '2', '4', '1', '0.5'])
+      expect(chartData.currentChart.value[0].option).toEqual(option)
+    } finally {
+      vi.restoreAllMocks()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('newFileを呼ぶとisLoadedがtrueになる', () => {
     const { fileIO } = setup()
     expect(fileIO.isLoaded.value).toBe(false)

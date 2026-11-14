@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { isDuplicated, hasError, getValidatedOptions, getValidatedNote } from '../useNoteCheck'
-import type { ExtendedNoteData } from '../../types'
+import { isDuplicated, hasError, getOtofudaMismatchWarnings, getValidatedOptions, getValidatedNote } from '../useNoteCheck'
+import type { DifficultyString, ExtendedChartData, ExtendedNoteData } from '../../types'
 
 function makeNote(overrides: Partial<ExtendedNoteData> = {}): ExtendedNoteData {
   return {
@@ -57,6 +57,103 @@ describe('isDuplicated', () => {
     const note = makeNote({ index: 2, lane: 2 })
     const chart = [makeNote({ index: 1, lane: 1 })]
     expect(isDuplicated(note, chart, [], { checkPreAppend: false })).toBe(0)
+  })
+})
+
+describe('getOtofudaMismatchWarnings', () => {
+  const difficulties: DifficultyString[] = ['raku', 'easy', 'normal', 'hard', 'extra']
+
+  function makeChart(withOtofuda = true): ExtendedChartData {
+    return {
+      ...Object.fromEntries(difficulties.map(difficulty => [
+        difficulty,
+        withOtofuda ? [makeNote({ type: 5, lane: 3, position: 1, split: 4 })] : [],
+      ])),
+      info: { version: 2, bpm: 120, beat: 4, offset: 0 },
+    } as ExtendedChartData
+  }
+
+  it('全難易度が空、または音札以外のみの場合は警告しない', () => {
+    const chart = makeChart(false)
+    expect(getOtofudaMismatchWarnings(chart, difficulties).size).toBe(0)
+    chart.easy = [makeNote(), makeNote({ type: 90, option: ['5'] })]
+    expect(getOtofudaMismatchWarnings(chart, difficulties).size).toBe(0)
+  })
+
+  it('約分・レーン・オプション・配列順・indexの差を無視し、入力を変更しない', () => {
+    const chart = makeChart()
+    difficulties.forEach((difficulty, i) => {
+      chart[difficulty][0] = makeNote({
+        type: 5, lane: (i + 1) as ExtendedNoteData['lane'], index: i,
+        position: i + 1, split: (i + 1) * 4, option: [String(i + 1)],
+      })
+      const other = makeNote({ index: 10 + i })
+      if (i % 2) chart[difficulty].push(other)
+      else chart[difficulty].unshift(other)
+    })
+    const original = structuredClone(chart)
+    expect(getOtofudaMismatchWarnings(chart, difficulties).size).toBe(0)
+    expect(chart).toEqual(original)
+  })
+
+  it('空の難易度も含め、不足する難易度を固定順で既存の音札に通知する', () => {
+    const chart = makeChart()
+    chart.raku = []
+    chart.hard = [makeNote()]
+    const warnings = getOtofudaMismatchWarnings(chart, difficulties)
+    expect(warnings.size).toBe(3)
+    for (const difficulty of ['easy', 'normal', 'extra'] as const) {
+      expect(warnings.get(chart[difficulty][0])).toBe('音札ノーツ位置が一致していません：RAKU、HARD')
+    }
+    expect(warnings.has(chart.hard[0])).toBe(false)
+  })
+
+  it.each([
+    { measure: 1 },
+    { position: 2 },
+    { split: 8 },
+  ])('音札の位置ずれを両側で検出し、基準難易度を設けない: %j', difference => {
+    const chart = makeChart()
+    Object.assign(chart.hard[0], difference)
+    const warnings = getOtofudaMismatchWarnings(chart, difficulties)
+    expect(warnings.size).toBe(5)
+    expect(warnings.get(chart.easy[0])).toBe('音札ノーツ位置が一致していません：HARD')
+    expect(warnings.get(chart.hard[0])).toBe('音札ノーツ位置が一致していません：RAKU、EASY、NORMAL、EXTRA')
+  })
+
+  it('音札ダミーは音札の代わりに数えず、ダミー自身にも警告しない', () => {
+    const chart = makeChart()
+    chart.hard[0].type = 90
+    chart.hard[0].option = ['5']
+    const warnings = getOtofudaMismatchWarnings(chart, difficulties)
+    expect(warnings.size).toBe(4)
+    expect(warnings.get(chart.easy[0])).toBe('音札ノーツ位置が一致していません：HARD')
+    expect(warnings.has(chart.hard[0])).toBe(false)
+  })
+
+  it('重複数の差を無視し、同じ難易度の重複で他難易度の欠落を埋めない', () => {
+    const chart = makeChart()
+    chart.easy.push(makeNote({ ...chart.easy[0], index: 2 }))
+    expect(getOtofudaMismatchWarnings(chart, difficulties).size).toBe(0)
+    chart.hard = []
+    const warnings = getOtofudaMismatchWarnings(chart, difficulties)
+    expect(warnings.size).toBe(5)
+    expect(warnings.get(chart.easy[0])).toBe('音札ノーツ位置が一致していません：HARD')
+    expect(warnings.get(chart.easy[1])).toBe(warnings.get(chart.easy[0]))
+  })
+
+  it.each([
+    { measure: NaN }, { measure: Infinity }, { measure: -1 },
+    { position: NaN }, { position: Infinity }, { position: -1 }, { position: 4 },
+    { split: NaN }, { split: Infinity }, { split: 0 }, { split: -4 },
+    { position: '' as unknown as number }, { split: '' as unknown as number },
+  ])('比較不能な位置の音札を集計と警告から除外する: %j', difference => {
+    const chart = makeChart()
+    Object.assign(chart.hard[0], difference)
+    const warnings = getOtofudaMismatchWarnings(chart, difficulties)
+    expect(warnings.size).toBe(4)
+    expect(warnings.get(chart.easy[0])).toBe('音札ノーツ位置が一致していません：HARD')
+    expect(warnings.has(chart.hard[0])).toBe(false)
   })
 })
 

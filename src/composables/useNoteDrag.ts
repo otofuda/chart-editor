@@ -39,6 +39,8 @@ export const noteDragKey: InjectionKey<NoteDrag> = Symbol('noteDrag')
 export function useNoteDrag(options: {
   content: Ref<HTMLElement | null>
   chart: Ref<ExtendedNoteData[]>
+  /** 配置欄と連動するシャドー。仮配置済みノーツは含めない。 */
+  draft?: Ref<ExtendedNoteData | null>
   measures: Ref<Measure[]>
   enabled: Ref<boolean>
   /** 配置欄で指定されている split。 */
@@ -266,7 +268,7 @@ export function useNoteDrag(options: {
     if (final.error) {
       options.showSnackbar(final.error)
     } else {
-      if (options.history) {
+      if (options.history && final.source === 'chart') {
         options.history.run(
           { label: 'ノーツをドラッグ移動' },
           () => commitNoteMove(final)
@@ -291,9 +293,11 @@ export function useNoteDrag(options: {
     node: NoteData = root,
     whole = false,
   ) {
+    const source = root === options.draft?.value ? 'draft' : 'chart'
+
     if (
       !options.enabled.value ||
-      !canDragNote(root) ||
+      !canDragNote(root, source) ||
       pointerId !== null ||
       event.isPrimary === false ||
       event.button !== 0
@@ -321,6 +325,7 @@ export function useNoteDrag(options: {
       options.measures.value,
       split,
       whole,
+      source,
     )
 
     if (!session) {
@@ -373,6 +378,8 @@ export function useNoteDrag(options: {
   watch(
     [
       () => JSON.stringify(options.chart.value),
+      () => options.draft?.value,
+      () => JSON.stringify(options.draft?.value),
       () => JSON.stringify(options.measures.value),
       options.context,
       options.enabled,

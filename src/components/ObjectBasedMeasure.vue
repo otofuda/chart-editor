@@ -15,9 +15,12 @@
           <template v-if="note.index !== undefined">#{{ note.index }} </template>
           {{ noteTypeName(note) }}
           <span>（{{ note.position }}/{{ note.split }}）</span>
-          <template v-if="hasError(note)" v-slot:actions>
-            <v-icon color="error">
+          <template v-if="hasError(note) || getOtofudaWarning(note)" v-slot:actions>
+            <v-icon v-if="hasError(note)" color="error">
               mdi-alert-circle
+            </v-icon>
+            <v-icon v-if="getOtofudaWarning(note)" color="warning" :aria-label="getOtofudaWarning(note)">
+              mdi-alert
             </v-icon>
           </template>
         </v-expansion-panel-title>
@@ -25,6 +28,10 @@
         <v-expansion-panel-text>
           <v-alert type="error" v-if="hasError(note)" class="mb-3">
             {{ hasError(note) }}
+          </v-alert>
+
+          <v-alert type="warning" v-if="getOtofudaWarning(note)" class="mb-3">
+            {{ getOtofudaWarning(note) }}
           </v-alert>
 
           <v-text-field
@@ -132,7 +139,7 @@ import { ref, inject } from 'vue'
 import { type DifficultyString, type ExtendedNoteData, type Measure } from '@/types'
 import { noteTypes, noteOptions } from '@/composables/useNoteTypes'
 import { hasError } from '@/composables/useNoteCheck'
-import { deleteNotesKey, showSnackbarKey } from '@/composables/injectionKeys'
+import { deleteNotesKey, otofudaWarningKey, showSnackbarKey } from '@/composables/injectionKeys'
 
 const props = defineProps<{
   notes?: ExtendedNoteData[]
@@ -144,6 +151,7 @@ const props = defineProps<{
 
 const deleteNotes = inject(deleteNotesKey)!
 const showSnackbar = inject(showSnackbarKey)!
+const getOtofudaWarning = inject(otofudaWarningKey, () => false)
 
 const localMeasures = ref<Record<string, number>>({})
 

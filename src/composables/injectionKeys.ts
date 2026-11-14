@@ -10,6 +10,10 @@ export const chartHistoryKey: InjectionKey<ChartHistory> = Symbol('chartHistory'
 export const showSnackbarKey: InjectionKey<(message: string) => void> =
   Symbol('showSnackbar')
 
+/** 全難易度の音札位置が一致していない場合の警告を取得する。 */
+export const otofudaWarningKey: InjectionKey<(note: NoteData) => string | false> =
+  Symbol('otofudaWarning')
+
 /** インデックスを指定してノートを削除する */
 export const deleteNotesKey: InjectionKey<(...indices: number[]) => void> =
   Symbol('deleteNotes')
