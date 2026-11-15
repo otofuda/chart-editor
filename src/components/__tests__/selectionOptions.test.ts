@@ -157,7 +157,8 @@ function apply() {
 describe('オプションの一括変更フォーム', () => {
   it.each([
     { notes: [], reason: '1つ以上' },
-    { notes: [note(), note({ type: 4 })], reason: '同一' },
+    { notes: [note(), note({ type: 1 })], reason: '同一' },
+    { notes: [note(), note({ type: 4 }), note({ type: 5 })], reason: '同一' },
     { notes: [note({ type: 90, option: ['90'] })], reason: '対象外' },
     { notes: [note({ type: 99 })], reason: 'ありません' },
   ])('無効理由を表示して実行ボタンを無効化する: $reason', async ({ notes, reason }) => {
@@ -165,6 +166,43 @@ describe('オプションの一括変更フォーム', () => {
     expect(section().text()).toContain(reason)
     expect(apply().element.disabled).toBe(true)
     expect(section().findAll('input')).toHaveLength(0)
+  })
+
+  it('上下左右フリックをまとめて編集し、混在する方向の変更でもフォームを初期化する', async () => {
+    const types = [3, 4, 6, 7]
+    const data = await setup(types.map(type => note({
+      type,
+      option: ['2', '0', '1', '1', '0'],
+    })))
+
+    expect(section().findAll('input[type="checkbox"]')).toHaveLength(5)
+    await input('widthを変更').setValue(true)
+    await input('width').setValue('3')
+    await input('orbitを変更').setValue(true)
+    await input('orbit').setValue('0.5')
+    expect(apply().element.disabled).toBe(false)
+    await apply().trigger('click')
+
+    expect(data.currentChart.value.map(n => n.type)).toEqual(types)
+    data.currentChart.value.forEach(n => {
+      expect(n.option).toEqual(['3', '0', '1', '1', '0.5'])
+    })
+
+    // 共通typeがnullのままでも、方向変更前の未確定入力を持ち越さない。
+    await input('widthを変更').setValue(true)
+    await input('width').setValue('9')
+    data.currentChart.value[0].type = 7
+    await nextTick()
+
+    expect(input('widthを変更').element.checked).toBe(false)
+    expect(input('width').element.value).toBe('3')
+
+    // フリック以外が混ざった場合は、その時点で一括変更を無効にする。
+    data.currentChart.value[0].type = 1
+    await nextTick()
+
+    expect(section().text()).toContain('同一')
+    expect(apply().element.disabled).toBe(true)
   })
 
   it('共通値と混在値を表示し、チェックした項目だけ変更してチェックを解除する', async () => {

@@ -13,6 +13,8 @@ import { useFileIO } from '../../composables/useFileIO'
 import { ControlledFileReader } from '../../composables/__tests__/controlledFileReader'
 import { FakeAudioContext } from '../../composables/__tests__/fakeAudioContext'
 
+vi.mock('vuetify', () => ({ useGoTo: () => vi.fn() }))
+
 function note(overrides: Partial<ExtendedNoteData> = {}): ExtendedNoteData {
   return { index: 1, type: 1, lane: 1, measure: 0, position: 0, split: 4, option: [], end: [], ...overrides }
 }

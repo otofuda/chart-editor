@@ -38,6 +38,8 @@ export const noteDragKey: InjectionKey<NoteDrag> = Symbol('noteDrag')
  */
 export function useNoteDrag(options: {
   content: Ref<HTMLElement | null>
+  /** 未指定時はページ全体をスクロールする。 */
+  scrollContainer?: Ref<HTMLElement | null>
   chart: Ref<ExtendedNoteData[]>
   /** 配置欄と連動するシャドー。仮配置済みノーツは含めない。 */
   draft?: Ref<ExtendedNoteData | null>
@@ -211,7 +213,7 @@ export function useNoteDrag(options: {
   }
 
   /**
-   * 画面端に近いほど速くページをスクロールし、移動候補を再計算する。
+   * 譜面の表示領域の端に近いほど速くスクロールし、移動候補を再計算する。
    *
    * @param now アニメーションフレームが渡す時刻（ミリ秒）
    */
@@ -227,16 +229,25 @@ export function useNoteDrag(options: {
     previousFrame = now
     const { x, y } = pointer
 
-    if (x >= bounds.left - 40 && x <= bounds.right + 40) {
+    const container = options.scrollContainer?.value
+    const viewport = container?.getBoundingClientRect()
+    const top = viewport?.top ?? 0
+    const bottom = viewport?.bottom ?? window.innerHeight
+    const left = viewport ? Math.max(viewport.left, bounds.left - 40) : bounds.left - 40
+    const right = viewport ? Math.min(viewport.right, bounds.right + 40) : bounds.right + 40
+
+    // 分割表示では、操作パネル上にポインターがある間はスクロールしない。
+    if (x >= left && x <= right && (!container || (y >= top && y <= bottom))) {
       const edge = 56
-      const speed = y < edge
-        ? -Math.min(1, (edge - y) / edge)
-        : y > window.innerHeight - edge
-          ? Math.min(1, (y - window.innerHeight + edge) / edge)
+      const speed = y < top + edge
+        ? -Math.min(1, (top + edge - y) / edge)
+        : y > bottom - edge
+          ? Math.min(1, (y - bottom + edge) / edge)
           : 0
 
       if (speed) {
-        window.scrollBy({ top: speed * elapsed * 0.8, behavior: 'instant' })
+        const target = container ?? window
+        target.scrollBy({ top: speed * elapsed * 0.8, behavior: 'instant' })
         update()
       }
     }

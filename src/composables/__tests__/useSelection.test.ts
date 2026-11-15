@@ -91,7 +91,9 @@ describe('optionの一括変更', () => {
 
   it.each([
     { notes: [], reason: '1つ以上' },
-    { notes: [{ type: 3 }, { type: 4 }], reason: '同一' },
+    { notes: [{ type: 3 }, { type: 1 }], reason: '同一' },
+    { notes: [{ type: 3 }, { type: 4 }, { type: 5 }], reason: '同一' },
+    { notes: [{ type: 1 }, { type: 89 }], reason: '同一' },
     { notes: [{ type: 90, option: ['90'] }], reason: '対象外' },
     { notes: [{ type: 99 }], reason: 'ありません' },
     { notes: [{ type: 92 }], reason: 'ありません' },
@@ -103,6 +105,37 @@ describe('optionの一括変更', () => {
     expect(s.selection.selectionChangeOptions({ 0: '2' })).toBe(false)
     expect(JSON.stringify(s.chartData.chartObject.value)).toBe(before)
     expect(s.chartData.history.canUndo.value).toBe(false)
+  })
+
+  it.each([
+    [3, 4],
+    [6, 7],
+    [3, 4, 6, 7],
+    [7, 6, 4, 3],
+  ])('方向が混在するフリックのoptionを変更し、各typeと未指定項目を保持する: %j', (...types) => {
+    const s = setupSelected(types.map((type, index) => ({
+      type,
+      option: ['2', String(index), '4', '1.5', '0'],
+    })))
+
+    // 共通typeはなくても、フリック同士なら既存の5項目を編集できる。
+    expect(s.selection.selectionCommonType.value).toBeNull()
+    expect(s.selection.selectionOptionsDisabledReason.value).toBe('')
+    expect(s.selection.selectionOptionDefinitions.value.map(opt => opt.label))
+      .toEqual(['width', 'offsetNumer', 'offsetDenom', 'speed', 'orbit'])
+    expect(s.selection.selectionChangeOptions({ 0: '3', 4: '-0.5' })).toBe(true)
+
+    expect(s.chartData.currentChart.value.map(note => note.type)).toEqual(types)
+    expect(s.chartData.currentChart.value.map(note => note.option)).toEqual(
+      types.map((_, index) => ['3', String(index), '4', '1.5', '-0.5'])
+    )
+
+    // 混在フリックの変更も、1回の操作で元のoptionへ戻せる。
+    s.chartData.history.undo()
+    expect(s.chartData.currentChart.value.map(note => note.type)).toEqual(types)
+    expect(s.chartData.currentChart.value.map(note => note.option)).toEqual(
+      types.map((_, index) => ['2', String(index), '4', '1.5', '0'])
+    )
   })
 
   it('共通typeと既存定義を返し、フリックの指定項目だけを変更する', () => {

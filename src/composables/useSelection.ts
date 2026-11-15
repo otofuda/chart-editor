@@ -65,10 +65,23 @@ export function useSelection(
     return type
   })
 
-  /** 共通typeの既存定義を使い、一括変更できる項目を取得する。 */
+  /** 同じtypeに加え、optionの並びが共通する上下左右フリックの混在を許可する。 */
+  const selectionOptionsCompatible = computed(() => {
+    const targets = selectionNotes.value
+
+    return (
+      selectionCommonType.value !== null ||
+      (
+        targets.length > 0 &&
+        targets.every(note => [3, 4, 6, 7].includes(note.type))
+      )
+    )
+  })
+
+  /** 互換性のある選択ノーツの既存定義から、一括変更できる項目を取得する。 */
   const selectionOptionDefinitions = computed(() => {
     // ダミーは擬態先によって項目が変わるため、今回の一括変更には含めない。
-    if (selectionCommonType.value === null || selectionCommonType.value === 90) {
+    if (!selectionOptionsCompatible.value || selectionCommonType.value === 90) {
       return []
     }
 
@@ -81,8 +94,8 @@ export function useSelection(
       return 'ノーツを1つ以上選択してください。'
     }
 
-    if (selectionCommonType.value === null) {
-      return '選択ノーツのtypeをすべて同一にしてください。'
+    if (!selectionOptionsCompatible.value) {
+      return '選択ノーツのtypeを同一にするか、上下左右のフリックだけを選択してください。'
     }
 
     if (selectionCommonType.value === 90) {

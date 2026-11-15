@@ -19,6 +19,8 @@ import NoteShadow from '../NoteShadow.vue'
 import { useChartData } from '@/composables/useChartData'
 import { useNoteEditor } from '@/composables/useNoteEditor'
 
+vi.mock('vuetify', () => ({ useGoTo: () => vi.fn() }))
+
 /** テストごとの差分だけを指定して、画面に配置するノーツを作る。 */
 function note(overrides: Partial<ExtendedNoteData> = {}): ExtendedNoteData {
   return {
@@ -196,13 +198,14 @@ function setup(
 
   wrappers.push(wrapper)
   const content = wrapper.get('.preview-content').element as HTMLElement
+  const viewport = wrapper.get('.preview-scroll').element as HTMLElement
   let scroll = 0
 
   vi.spyOn(content, 'getBoundingClientRect').mockImplementation(() => ({
     x: 100,
     y: -scroll,
-    left: 100,
-    right: 520,
+    left: 100 - viewport.scrollLeft,
+    right: 520 - viewport.scrollLeft,
     top: -scroll,
     bottom: 1200 - scroll,
     width: 420,
@@ -239,6 +242,7 @@ function setup(
     capture,
     release,
     scrollBy,
+    viewport,
   }
 }
 
@@ -941,5 +945,33 @@ describe('譜面のドラッグ操作', () => {
     expect(frames.size).toBe(0)
     pointer(window, 'pointerup', 310, 550)
     expect(chart.value[0].lane).toBe(2)
+  })
+
+  it('分割領域の端だけで自動スクロールし、操作パネル上では発動しない', () => {
+    const { viewport, bar, scrollBy } = setup([note()], { contained: true, layout: 'stacked' })
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 375, 400))
+    const localScroll = vi.fn()
+    Object.assign(viewport, { scrollBy: localScroll })
+    pointer(bar().element, 'pointerdown', 250, 350)
+    pointer(window, 'pointermove', 250, 390)
+    frames.get(frameId)!(16)
+    expect(localScroll).toHaveBeenCalledWith({ top: expect.any(Number), behavior: 'instant' })
+    expect(scrollBy).not.toHaveBeenCalled()
+    localScroll.mockClear()
+    pointer(window, 'pointermove', 250, 450)
+    frames.get(frameId)!(32)
+    expect(localScroll).not.toHaveBeenCalled()
+    pointer(window, 'pointerup', 250, 450)
+  })
+
+  it('譜面領域の横スクロール分をノーツのドラッグ座標に反映する', async () => {
+    const { viewport, chart, bar } = setup([note()], { contained: true, layout: 'stacked' })
+    viewport.scrollLeft = 60
+    pointer(bar().element, 'pointerdown', 250, 600)
+    viewport.scrollLeft = 120
+    viewport.dispatchEvent(new Event('scroll'))
+    pointer(window, 'pointerup', 250, 600)
+    await nextTick()
+    expect(chart.value[0]).toMatchObject({ lane: 3, position: 1, split: 4 })
   })
 })

@@ -1,385 +1,433 @@
 <template>
-  <div>
-    <!-- プレビュー(オブジェクト表示) -->
+  <div
+    class="preview-host"
+    :class="{ contained, playing: isPreviewing }"
+  >
+    <!-- 専用のスクロール領域と、幅420pxの譜面を描画する領域を分ける。 -->
     <div
-      v-if="isObjectBasedPreview"
-      class="object-based-preview"
-      :style="{
-        position: 'relative'
-      }"
-    >
-      <!-- 各小節 -->
-      <ObjectBasedMeasure
-        v-for="measure in measureData"
-        :key="`measure_${measure.measure}`"
-        :measure="measure"
-        :notes="getMeasureNotes(measure.measure)"
-        :currentDifficulty="currentDifficulty"
-      />
-    </div>
-    <!-- プレビュー(通常) -->
-    <div
-      v-else
-      class="preview"
-      ref="preview"
-      :style="{
-        position: isPreviewing ? 'fixed' : 'relative',
-        bottom: '0px',
-        height: `${entireHeight}px`,
-        marginBottom: `${lift}px`,
-        transform: drawOffset === 0 ? null : `translateY(${drawOffset}px)`
-      }"
-      :class="{
-        detail: isShowDetail,
-        capture_mode: isCaptureMode,
-        preview_mode: isPreviewMode,
-        image_mode: isImageMode,
-        checkbox: isShowCheckbox
-      }"
+      ref="scrollViewport"
+      class="preview-scroll"
+      @scroll="updateViewport"
     >
       <div
-        ref="previewContent"
-        class="preview-content"
-        :style="{ height: `${entireHeight}px`, willChange: isPreviewing ? 'transform' : null }"
+        class="preview-stage"
+        :style="contained ? {
+          minHeight: `${viewportHeight}px`,
+          height: isPreviewing ? `${viewportHeight}px` : undefined
+        } : undefined"
       >
-        <!-- 各小節 -->
-        <MeasureComponent
-          v-for="measure in measureData"
-          :key="`measure_${measure.measure}`"
-          :measure="measure"
-          :notes="getMeasureNotes(measure.measure)"
-          :currentDifficulty="currentDifficulty"
-        />
-
-        <!-- ロングノーツ -->
-        <!-- FIXME: 多分負荷でかい -->
-        <LongNote
-          v-for="note in longNotes"
-          :key="note.index"
-          :note="note"
-          :measureData="measureData"
-        />
-
-        <!-- 配置前のシャドー -->
-        <NoteShadow
-          v-if="appendNote"
-          :note="appendNote"
-          :measureData="measureData"
-          :isDraggable="dragEnabled"
-        />
-
-        <!-- 仮配置ノーツ -->
-        <NoteShadow
-          v-for="(note, i) in preAppendNotes"
-          :key="`shadow_${note.measure}_${i}`"
-          :note="note"
-          :measureData="measureData"
-          :isPreAppend="true"
-        />
-
+        <!-- プレビュー(オブジェクト表示) -->
         <div
-          v-if="dragCandidate"
-          class="note-drag-preview"
-          :class="{ invalid: dragCandidate.error }"
+          v-if="isObjectBasedPreview"
+          class="object-based-preview"
+          :style="{
+            position: 'relative'
+          }"
         >
-          <NoteShadow
-            v-for="(note, i) in dragCandidate.roots"
-            :key="i"
-            :note="note"
-            :measureData="measures"
+          <!-- 各小節 -->
+          <ObjectBasedMeasure
+            v-for="measure in measureData"
+            :key="`measure_${measure.measure}`"
+            :measure="measure"
+            :notes="getMeasureNotes(measure.measure)"
+            :currentDifficulty="currentDifficulty"
           />
-          <span
-            class="note-drag-anchor"
+        </div>
+        <!-- プレビュー(通常) -->
+        <div
+          v-else
+          class="preview"
+          ref="preview"
+          :style="{
+            position: isPreviewing ? (contained ? 'absolute' : 'fixed') : 'relative',
+            bottom: '0px',
+            height: `${entireHeight}px`,
+            marginBottom: `${lift}px`,
+            transform: drawOffset === 0 ? null : `translateY(${drawOffset}px)`
+          }"
+          :class="{
+            detail: isShowDetail,
+            capture_mode: isCaptureMode,
+            preview_mode: isPreviewMode,
+            image_mode: isImageMode,
+            checkbox: isShowCheckbox
+          }"
+        >
+          <div
+            ref="previewContent"
+            class="preview-content"
             :style="{
-              left: `${
-                hasMovableLane(dragCandidate.anchor)
-                  ? 60 + (dragCandidate.anchor.lane - 1) * 60 + 30
-                  : 210
-              }px`,
-              bottom: `${noteBottom(dragCandidate.anchor, measures)}px`
+              height: `${entireHeight}px`,
+              willChange: isPreviewing ? 'transform' : null
             }"
-          />
+          >
+            <!-- 各小節 -->
+            <MeasureComponent
+              v-for="measure in measureData"
+              :key="`measure_${measure.measure}`"
+              :measure="measure"
+              :notes="getMeasureNotes(measure.measure)"
+              :currentDifficulty="currentDifficulty"
+            />
+
+            <!-- ロングノーツ -->
+            <!-- FIXME: 多分負荷でかい -->
+            <LongNote
+              v-for="note in longNotes"
+              :key="note.index"
+              :note="note"
+              :measureData="measureData"
+            />
+
+            <!-- 配置前のシャドー -->
+            <NoteShadow
+              v-if="appendNote"
+              :note="appendNote"
+              :measureData="measureData"
+              :isDraggable="dragEnabled"
+            />
+
+            <!-- 仮配置ノーツ -->
+            <NoteShadow
+              v-for="(note, i) in preAppendNotes"
+              :key="`shadow_${note.measure}_${i}`"
+              :note="note"
+              :measureData="measureData"
+              :isPreAppend="true"
+            />
+
+            <div
+              v-if="dragCandidate"
+              class="note-drag-preview"
+              :class="{ invalid: dragCandidate.error }"
+            >
+              <NoteShadow
+                v-for="(note, i) in dragCandidate.roots"
+                :key="i"
+                :note="note"
+                :measureData="measures"
+              />
+              <span
+                class="note-drag-anchor"
+                :style="{
+                  left: `${
+                    hasMovableLane(dragCandidate.anchor)
+                      ? 60 + (dragCandidate.anchor.lane - 1) * 60 + 30
+                      : 210
+                  }px`,
+                  bottom: `${noteBottom(dragCandidate.anchor, measures)}px`
+                }"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- LED -->
+    <!-- 再生エフェクトは表示領域に固定し、横方向だけ譜面に追従させる。 -->
     <div
-      v-show="!isObjectBasedPreview && !isImageMode"
-      class="led left"
-      ref="LEDLeft"
-    ></div>
-    <div
-      v-show="!isObjectBasedPreview && !isImageMode"
-      class="led right"
-      ref="LEDRight"
-    ></div>
-
-    <!-- LED(プレビュー時シャドー) -->
-    <div
-      v-if="!isObjectBasedPreview && isPreviewMode"
-      class="led left -s"
-      ref="LEDLeftShadow"
-    ></div>
-    <div
-      v-if="!isObjectBasedPreview && isPreviewMode"
-      class="led right -s"
-      ref="LEDRightShadow"
-    ></div>
-
-    <div class="control">
-      <v-expansion-panels accordionn tile>
-        <v-expansion-panel>
-          <v-expansion-panel-title>
-            <v-btn
-              class="mr-1"
-              variant="outlined"
-              color="success"
-              @click.stop="previewStart"
-              :disabled="isPreviewing || isObjectBasedPreview"
-            >
-              <v-icon left>mdi-play</v-icon> 再生
-            </v-btn>
-            <v-btn
-              class="ml-2 mr-2"
-              variant="outlined"
-              color="error"
-              @click.stop="previewStop()"
-            >
-              <v-icon left>mdi-stop</v-icon> 停止
-            </v-btn>
-          </v-expansion-panel-title>
-
-          <v-expansion-panel-text>
-            <v-text-field
-              class="mb-4"
-              v-model.number="startFrom"
-              hide-details
-              prepend-icon="mdi-numeric-0-box-multiple-outline"
-              label="再生開始小節"
-              suffix="小節から"
-              variant="outlined"
-              density="compact"
-            ></v-text-field>
-
-            <h4 class="d-flex my-2">
-              <v-icon>mdi-music-note</v-icon>
-              表示とサウンド
-            </h4>
-            <v-checkbox
-              v-model="isShowCheckbox"
-              label="チェックボックスを表示"
-              hide-details
-              density="compact"
-            ></v-checkbox>
-            <v-checkbox
-              v-model="isPlayKeySound"
-              label="打鍵音を再生 (β)"
-              hide-details
-              density="compact"
-            ></v-checkbox>
-            <v-checkbox
-              v-model="isPlayKeySoundEnd"
-              label="LN終点音を再生 (α)"
-              hide-details
-              density="compact"
-            ></v-checkbox>
-            <v-checkbox
-              v-model="isShowKeybeam"
-              label="キービームとコンボを表示"
-              density="compact"
-              persistent-hint
-              hint="以下2つはこの機能が有効でない場合効果がありません"
-            ></v-checkbox>
-            <v-checkbox
-              class="ml-6"
-              v-model="isShowFlickEffect"
-              :disabled="!isShowKeybeam"
-              label="フリックエフェクト (β)"
-              hide-details
-              density="compact"
-            ></v-checkbox>
-            <v-checkbox
-              class="ml-6"
-              v-model="isShowHandguide"
-              :disabled="!isShowKeybeam"
-              label="LeapMotion補助線をシミュレート (α)"
-              hide-details
-              density="compact"
-            ></v-checkbox>
-            <v-checkbox
-              v-model="isSimulateLED"
-              label="LED制御をシミュレート (β)"
-              hide-details
-              density="compact"
-            ></v-checkbox>
-            <v-checkbox
-              v-model="isPlayGuide"
-              label="小節ガイド音を再生"
-              hide-details
-              density="compact"
-            ></v-checkbox>
-
-            <v-switch
-              v-model="useOwnDragSplit"
-              label="ドラッグ移動で各ノーツの split を使う"
-              persistent-hint
-              hint="オフの場合は配置欄の split に吸着します"
-              density="compact"
-            />
-            <v-switch
-              v-model="isObjectBasedPreview"
-              label="Object表示モード"
-              hide-details
-              density="compact"
-            ></v-switch>
-
-            <h4 class="d-flex my-2">
-              <v-icon>mdi-tune</v-icon>
-              再生オプション
-            </h4>
-            <v-text-field
-              class="my-2"
-              v-model.number="lift"
-              hint="判定ラインを上に押し上げます"
-              persistent-hint
-              append-icon="mdi-arrow-collapse-up"
-              label="LIFT"
-              variant="outlined"
-              density="compact"
-            ></v-text-field>
-            <v-text-field
-              class="mb-2"
-              v-model.number="sudden"
-              hint="譜面領域上部を隠します"
-              persistent-hint
-              append-icon="mdi-arrow-collapse-down"
-              label="SUDDEN"
-              variant="outlined"
-              density="compact"
-            ></v-text-field>
-            <v-text-field
-              v-model.number="hidden"
-              hint="譜面領域下部を隠します"
-              persistent-hint
-              append-icon="mdi-eye-off"
-              label="HIDDEN"
-              variant="outlined"
-              density="compact"
-            ></v-text-field>
-
-            <h4 class="d-flex my-2">
-              <v-icon>mdi-tune</v-icon>
-              詳細設定
-            </h4>
-
-            <v-text-field
-              class="mb-2"
-              v-model.number="comboOffset"
-              hint="判定ラインの上側に移動します"
-              persistent-hint
-              append-icon="mdi-arrow-up"
-              label="コンボ表示位置"
-              variant="outlined"
-              density="compact"
-            ></v-text-field>
-            <v-text-field
-              class="mb-2"
-              v-model.number="drawOffset"
-              hint="描画のみ位置をずらします"
-              persistent-hint
-              append-icon="mdi-arrow-expand-up"
-              label="判定位置調整(β)"
-              variant="outlined"
-              density="compact"
-            ></v-text-field>
-            <v-text-field
-              v-model.number="keybeamLength"
-              append-icon="mdi-arrow-expand-vertical"
-              label="キービームの長さ"
-              suffix="px"
-              variant="outlined"
-              hide-details
-              density="compact"
-            ></v-text-field>
-            <div class="my-4">
-              コンボ数の透明度
-            </div>
-            <v-slider
-              v-model.number="comboOpacity"
-              hide-details
-              max="100"
-              min="0"
-              step="5"
-              thumb-label="always"
-            ></v-slider>
-          </v-expansion-panel-text>
-        </v-expansion-panel>
-      </v-expansion-panels>
-    </div>
-
-    <div
-      class="lift"
-      v-show="isPreviewing"
-      :style="{
-        height: `${lift}px`
-      }"
-    ></div>
-
-    <div
-      class="sudden"
-      v-show="isPreviewing"
-      :style="{
-        height: `${sudden}px`
-      }"
-    ></div>
-
-    <div
-      class="hidden"
-      v-show="isPreviewing"
-      :style="{
-        height: `${hidden}px`,
-        bottom: `${lift - 2}px`
-      }"
-    ></div>
-
-    <div
-      class="combo"
-      v-show="isPreviewing && isShowKeybeam"
-      :style="{
-        opacity: String(Number(comboOpacity) / 100),
-        bottom: `${Number(lift) + Number(comboOffset)}px`
-      }"
+      class="preview-effects"
+      :style="contained ? {
+        left: `${effectsLeft}px`,
+        height: `${viewportHeight}px`,
+        '--guide-shift': `${viewportHeight * 0.12}px`
+      } : undefined"
     >
-      <strong ref="currentComboEl">0</strong>
-      COMBO
+      <!-- LED -->
+      <div
+        v-show="!isObjectBasedPreview && !isImageMode"
+        class="led left"
+        ref="LEDLeft"
+      ></div>
+      <div
+        v-show="!isObjectBasedPreview && !isImageMode"
+        class="led right"
+        ref="LEDRight"
+      ></div>
+
+      <!-- LED(プレビュー時シャドー) -->
+      <div
+        v-if="!isObjectBasedPreview && isPreviewMode"
+        class="led left -s"
+        ref="LEDLeftShadow"
+      ></div>
+      <div
+        v-if="!isObjectBasedPreview && isPreviewMode"
+        class="led right -s"
+        ref="LEDRightShadow"
+      ></div>
+
+      <div
+        class="lift"
+        v-show="isPreviewing"
+        :style="{
+          height: `${lift}px`
+        }"
+      ></div>
+
+      <div
+        class="sudden"
+        v-show="isPreviewing"
+        :style="{
+          height: `${sudden}px`
+        }"
+      ></div>
+
+      <div
+        class="hidden"
+        v-show="isPreviewing"
+        :style="{
+          height: `${hidden}px`,
+          bottom: `${lift - 2}px`
+        }"
+      ></div>
+
+      <div
+        class="combo"
+        v-show="isPreviewing && isShowKeybeam"
+        :style="{
+          opacity: String(Number(comboOpacity) / 100),
+          bottom: `${Number(lift) + Number(comboOffset)}px`
+        }"
+      >
+        <strong ref="currentComboEl">0</strong>
+        COMBO
+      </div>
+
+      <div
+        class="keybeams"
+        ref="keybeams"
+        v-show="isShowKeybeam"
+        :style="{
+          bottom: `${lift - 2}px`,
+          height: `${keybeamLength}px`
+        }"
+      >
+        <div v-for="i in 6" :key="`keybeam${i}`"></div>
+      </div>
+
+      <div
+        class="handguide"
+        v-show="isPreviewing && isShowHandguide"
+        ref="handguide"
+        :style="{
+          bottom: `${lift - 1}px`
+        }"
+      ></div>
     </div>
 
-    <div
-      class="keybeams"
-      ref="keybeams"
-      v-show="isShowKeybeam"
-      :style="{
-        bottom: `${lift - 2}px`,
-        height: `${keybeamLength}px`
-      }"
+    <!-- 操作設定の状態を保ったまま、専用領域を使う場合は操作パネルへ移動する。 -->
+    <Teleport
+      :to="controlsTarget || 'body'"
+      :disabled="!contained || !controlsTarget"
+      defer
     >
-      <div v-for="i in 6" :key="`keybeam${i}`"></div>
-    </div>
+      <div class="control" :class="{ contained }">
+        <v-expansion-panels accordionn tile>
+          <v-expansion-panel>
+            <v-expansion-panel-title>
+              <v-btn
+                class="mr-1"
+                variant="outlined"
+                color="success"
+                @click.stop="previewStart"
+                :disabled="isPreviewing || isObjectBasedPreview"
+              >
+                <v-icon left>mdi-play</v-icon> 再生
+              </v-btn>
+              <v-btn
+                class="ml-2 mr-2"
+                variant="outlined"
+                color="error"
+                @click.stop="previewStop()"
+              >
+                <v-icon left>mdi-stop</v-icon> 停止
+              </v-btn>
+            </v-expansion-panel-title>
 
-    <div
-      class="handguide"
-      v-show="isPreviewing && isShowHandguide"
-      ref="handguide"
-      :style="{
-        bottom: `${lift - 1}px`
-      }"
-    ></div>
+            <v-expansion-panel-text>
+              <v-text-field
+                class="mb-4"
+                v-model.number="startFrom"
+                hide-details
+                prepend-icon="mdi-numeric-0-box-multiple-outline"
+                label="再生開始小節"
+                suffix="小節から"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+
+              <h4 class="d-flex my-2">
+                <v-icon>mdi-music-note</v-icon>
+                表示とサウンド
+              </h4>
+              <v-checkbox
+                v-model="isShowCheckbox"
+                label="チェックボックスを表示"
+                hide-details
+                density="compact"
+              ></v-checkbox>
+              <v-checkbox
+                v-model="isPlayKeySound"
+                label="打鍵音を再生 (β)"
+                hide-details
+                density="compact"
+              ></v-checkbox>
+              <v-checkbox
+                v-model="isPlayKeySoundEnd"
+                label="LN終点音を再生 (α)"
+                hide-details
+                density="compact"
+              ></v-checkbox>
+              <v-checkbox
+                v-model="isShowKeybeam"
+                label="キービームとコンボを表示"
+                density="compact"
+                persistent-hint
+                hint="以下2つはこの機能が有効でない場合効果がありません"
+              ></v-checkbox>
+              <v-checkbox
+                class="ml-6"
+                v-model="isShowFlickEffect"
+                :disabled="!isShowKeybeam"
+                label="フリックエフェクト (β)"
+                hide-details
+                density="compact"
+              ></v-checkbox>
+              <v-checkbox
+                class="ml-6"
+                v-model="isShowHandguide"
+                :disabled="!isShowKeybeam"
+                label="LeapMotion補助線をシミュレート (α)"
+                hide-details
+                density="compact"
+              ></v-checkbox>
+              <v-checkbox
+                v-model="isSimulateLED"
+                label="LED制御をシミュレート (β)"
+                hide-details
+                density="compact"
+              ></v-checkbox>
+              <v-checkbox
+                v-model="isPlayGuide"
+                label="小節ガイド音を再生"
+                hide-details
+                density="compact"
+              ></v-checkbox>
+
+              <v-switch
+                v-model="useOwnDragSplit"
+                label="ドラッグ移動で各ノーツの split を使う"
+                persistent-hint
+                hint="オフの場合は配置欄の split に吸着します"
+                density="compact"
+              />
+              <v-switch
+                v-model="isObjectBasedPreview"
+                label="Object表示モード"
+                hide-details
+                density="compact"
+              ></v-switch>
+
+              <h4 class="d-flex my-2">
+                <v-icon>mdi-tune</v-icon>
+                再生オプション
+              </h4>
+              <v-text-field
+                class="my-2"
+                v-model.number="lift"
+                hint="判定ラインを上に押し上げます"
+                persistent-hint
+                append-icon="mdi-arrow-collapse-up"
+                label="LIFT"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+              <v-text-field
+                class="mb-2"
+                v-model.number="sudden"
+                hint="譜面領域上部を隠します"
+                persistent-hint
+                append-icon="mdi-arrow-collapse-down"
+                label="SUDDEN"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+              <v-text-field
+                v-model.number="hidden"
+                hint="譜面領域下部を隠します"
+                persistent-hint
+                append-icon="mdi-eye-off"
+                label="HIDDEN"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+
+              <h4 class="d-flex my-2">
+                <v-icon>mdi-tune</v-icon>
+                詳細設定
+              </h4>
+
+              <v-text-field
+                class="mb-2"
+                v-model.number="comboOffset"
+                hint="判定ラインの上側に移動します"
+                persistent-hint
+                append-icon="mdi-arrow-up"
+                label="コンボ表示位置"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+              <v-text-field
+                class="mb-2"
+                v-model.number="drawOffset"
+                hint="描画のみ位置をずらします"
+                persistent-hint
+                append-icon="mdi-arrow-expand-up"
+                label="判定位置調整(β)"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+              <v-text-field
+                v-model.number="keybeamLength"
+                append-icon="mdi-arrow-expand-vertical"
+                label="キービームの長さ"
+                suffix="px"
+                variant="outlined"
+                hide-details
+                density="compact"
+              ></v-text-field>
+              <div class="my-4">
+                コンボ数の透明度
+              </div>
+              <v-slider
+                v-model.number="comboOpacity"
+                hide-details
+                max="100"
+                min="0"
+                step="5"
+                thumb-label="always"
+              ></v-slider>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, provide, onBeforeUnmount, watch } from 'vue'
+import {
+  ref,
+  computed,
+  inject,
+  provide,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+} from 'vue'
+import { useGoTo } from 'vuetify'
+import type { EditorLayout } from '@/composables/useEditorLayout'
 import {
   type DifficultyString,
   type ExtendedNoteData,
@@ -413,11 +461,52 @@ const props = defineProps<{
   isPreviewMode?: boolean
   isImageMode?: boolean
   placementSplit?: number
+  /** 自動判定と手動選択から決まった、実際のレイアウト。 */
+  layout?: EditorLayout
+  /** 譜面をページ全体ではなく、専用領域内でスクロールするか。 */
+  contained?: boolean
+  /** 再生コントロールを移動する操作パネル内のセレクター。 */
+  controlsTarget?: string
 }>()
 
 const showSnackbar = inject(showSnackbarKey)!
 
-// refs for DOM elements
+// スクロール領域の寸法と、エフェクトの表示位置を管理する。
+const scrollViewport = ref<HTMLElement | null>(null)
+const viewportHeight = ref(0)
+const effectsLeft = ref(0)
+const scrollContainer = computed(() => props.contained ? scrollViewport.value : null)
+const goTo = useGoTo()
+
+/** 譜面とエフェクトを、横スクロール後も同じ原寸の座標に揃える。 */
+function updateViewport() {
+  const element = scrollViewport.value
+  if (!element || !props.contained) return
+  viewportHeight.value = element.clientHeight
+  effectsLeft.value = Math.max(0, (element.clientWidth - 420) / 2) - element.scrollLeft
+}
+
+/** 広い画面のページスクロールと、分割領域内のスクロールを共通化する。 */
+function scrollToMeasure(measureNumber: number) {
+  const measure = measures.value[measureNumber]
+  const last = measures.value.at(-1)
+  if (!measure || !last) return
+  if (isObjectBasedPreview.value) {
+    const target = scrollViewport.value
+      ?.querySelectorAll<HTMLElement>('.object-based-preview > .object-based-measure')[measureNumber]
+    if (target) {
+      const top = target.getBoundingClientRect().top
+        - (scrollContainer.value?.getBoundingClientRect().top ?? 0)
+        + (scrollContainer.value?.scrollTop ?? window.scrollY)
+      goTo(top, { container: scrollContainer.value ?? undefined })
+    }
+    return
+  }
+  goTo(last.measurePositionBottom - measure.measurePositionBottom, {
+    container: scrollContainer.value ?? undefined,
+  })
+}
+
 const preview = ref<HTMLElement | null>(null)
 const previewContent = ref<HTMLElement | null>(null)
 const keybeams = ref<HTMLElement | null>(null)
@@ -492,6 +581,7 @@ const dragEnabled = computed(() =>
 
 const noteDrag = useNoteDrag({
   content: previewContent,
+  scrollContainer,
   chart,
   draft: computed(() => props.appendNote ?? null),
   measures,
@@ -661,7 +751,8 @@ function previewStart() {
     return false
   }
   clearPlayback()
-  returnPosition.value = window.scrollY // 停止後に戻る座標
+  returnPosition.value = scrollContainer.value?.scrollTop ?? window.scrollY
+  if (scrollContainer.value) scrollContainer.value.scrollTop = 0
   isPreviewing.value = true
   if (preview.value) preview.value.style.transition = 'none'
   currentCombo.value = 0
@@ -704,7 +795,7 @@ function previewStop(restoreScroll = true) {
 
   if (restoreScroll && position >= 0) {
     timeoutIds.value.push(setTimeout(() => {
-      window.scrollTo({ top: position, behavior: 'auto' })
+      (scrollContainer.value ?? window).scrollTo({ top: position, behavior: 'auto' })
     }, 50) as unknown as number)
   }
 }
@@ -745,8 +836,82 @@ watch(isPlayGuide, (enabled, _, onCleanup) => {
   })
 })
 
+let layoutTransition = 0
+
+/** 親のクラスが変わる前に位置を記録し、更新後に同じ小節内の位置へ戻す。 */
+function prepareLayoutChange(nextLayout: EditorLayout) {
+  const transition = ++layoutTransition
+  const oldContainer = scrollContainer.value
+  const wasPlaying = isPreviewing.value
+  const layoutChanged = nextLayout !== props.layout
+  const position = wasPlaying && returnPosition.value >= 0
+    ? returnPosition.value
+    : oldContainer?.scrollTop ?? window.scrollY
+  const contentTop = !wasPlaying && preview.value
+    ? preview.value.getBoundingClientRect().top
+      - (oldContainer?.getBoundingClientRect().top ?? 0) + position
+    : 0
+  const offset = Math.max(0, position - contentTop)
+  // Object表示は小節の高さが可変なので、表示中の小節要素を基準に復元する。
+  const visibleTop = oldContainer?.getBoundingClientRect().top ?? 0
+  const objects = scrollViewport.value
+    ?.querySelectorAll<HTMLElement>('.object-based-preview > .object-based-measure')
+  const objectIndex = isObjectBasedPreview.value && objects
+    ? Array.from(objects).findIndex(element => element.getBoundingClientRect().bottom > visibleTop)
+    : -1
+  const objectAnchor = objectIndex >= 0 ? objects?.[objectIndex] : undefined
+  const objectOffset = objectAnchor ? visibleTop - objectAnchor.getBoundingClientRect().top : 0
+  const left = oldContainer?.scrollLeft ?? 0
+
+  // スクロール先だけが変わる場合は、手動で選択したレイアウトの再生を継続する。
+  if (layoutChanged) {
+    noteDrag.cancel()
+    previewStop(false)
+  }
+
+  return () => {
+    // 短時間に切り替えが続いた場合は、最後の切り替えだけを復元する。
+    if (transition !== layoutTransition) return
+    updateViewport()
+    const container = scrollContainer.value
+    let top = offset
+    if (objectAnchor) {
+      top = objectAnchor.getBoundingClientRect().top
+        - (container?.getBoundingClientRect().top ?? 0)
+        + (container?.scrollTop ?? window.scrollY) + objectOffset
+    } else if (!isPreviewing.value && preview.value) {
+      top += preview.value.getBoundingClientRect().top
+        - (container?.getBoundingClientRect().top ?? 0)
+        + (container?.scrollTop ?? window.scrollY)
+    }
+    if (wasPlaying && !layoutChanged) {
+      returnPosition.value = top
+      if (container) container.scrollTop = 0
+    } else {
+      const target = container ?? window
+      target.scrollTo({ top, behavior: 'instant' })
+    }
+    if (container) container.scrollLeft = left
+    updateViewport()
+  }
+}
+
+let viewportObserver: ResizeObserver | undefined
+onMounted(() => {
+  updateViewport()
+  if (typeof ResizeObserver !== 'undefined' && scrollViewport.value) {
+    viewportObserver = new ResizeObserver(updateViewport)
+    viewportObserver.observe(scrollViewport.value)
+  }
+})
+
 // ファイル選択時はデータの変更通知を待たず、スクロール予約も残さずに終了する。
-defineExpose({ stop: () => previewStop(false), cancelDrag: noteDrag.cancel })
+defineExpose({
+  stop: () => previewStop(false),
+  cancelDrag: noteDrag.cancel,
+  scrollToMeasure,
+  prepareLayoutChange,
+})
 
 // 全体からロングノーツ（＋ロングのダミー）だけを取得
 const longNotes = computed(() =>
@@ -761,6 +926,8 @@ const previewEvents = computed((): PreviewEvents =>
 )
 
 onBeforeUnmount(() => {
+  layoutTransition++
+  viewportObserver?.disconnect()
   clearPlayback()
   previewSounds.dispose()
 })
@@ -773,6 +940,70 @@ const entireHeight = computed(() => {
 </script>
 
 <style lang="scss" scoped>
+.preview-scroll,
+.preview-stage,
+.preview-effects {
+  display: contents;
+}
+.preview-host.contained {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+
+  .preview-scroll {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .preview-stage {
+    display: block;
+    position: relative;
+    width: 420px;
+    margin-inline: auto;
+  }
+  .preview,
+  .object-based-preview {
+    margin-left: 0;
+    right: auto;
+  }
+  .preview-effects {
+    display: block;
+    position: absolute;
+    top: 0;
+    width: 420px;
+    // エフェクトの fixed 配置を、この原寸の譜面領域を基準に解決する。
+    transform: translateZ(0);
+    z-index: 112;
+    pointer-events: none;
+  }
+  .led {
+    height: 100%;
+  }
+  .handguide.-left {
+    transform: skewX(4deg) translateX(calc(-1 * var(--guide-shift)));
+  }
+  .handguide.-right {
+    transform: skewX(-4deg) translateX(var(--guide-shift));
+  }
+
+  &.playing {
+    .preview-scroll {
+      overflow-y: hidden;
+    }
+  }
+}
+.control.contained {
+  position: static;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+  border: 0;
+  margin-bottom: 12px;
+}
 :deep(.note-draggable) {
   touch-action: none;
   user-select: none;

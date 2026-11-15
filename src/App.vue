@@ -1,620 +1,705 @@
 <template>
-  <v-app id="app">
-    <Preview
-      ref="previewRef"
-      :currentChart="currentChart"
-      :currentDifficulty="currentDifficulty"
-      :infoObject="chartInfo"
-      :measureData="measureData"
-      :audioVolume="audioVolume"
-      :previewAudio="previewAudio"
-      :appendNote="getAppendNote"
-      :preAppendNotes="preAppendNotes"
-      :isShowDetail="isShowDetail"
-      :isCaptureMode="isCaptureMode"
-      :isPreviewMode="isPreviewMode"
-      :isImageMode="isImageMode"
-      :placementSplit="appendNote.split"
-    />
+  <v-app
+    id="app"
+    :class="{
+      'layout-stacked': layout === 'stacked',
+      'layout-narrow-side': layout === 'side-by-side' && narrow
+    }"
+  >
+    <div class="editor-layout">
+      <!-- 狭い画面で左右分割を選んだ場合は、この領域全体を横スクロールする。 -->
+      <div class="editor-canvas">
+        <!-- 譜面は、画面幅と手動選択から決まるレイアウトで表示する。 -->
+        <Preview
+          ref="previewRef"
+          :layout="layout"
+          :contained="contained"
+          controlsTarget="#preview-controls"
+          :currentChart="currentChart"
+          :currentDifficulty="currentDifficulty"
+          :infoObject="chartInfo"
+          :measureData="measureData"
+          :audioVolume="audioVolume"
+          :previewAudio="previewAudio"
+          :appendNote="getAppendNote"
+          :preAppendNotes="preAppendNotes"
+          :isShowDetail="isShowDetail"
+          :isCaptureMode="isCaptureMode"
+          :isPreviewMode="isPreviewMode"
+          :isImageMode="isImageMode"
+          :placementSplit="appendNote.split"
+        />
 
-    <v-container fluid class="panel">
-      <img
-        src="https://otofuda.github.io/chart-editor/logo.png"
-        alt="Otofuda Chart Editor V2"
-        class="logo"
-      />
+        <!-- 編集用の操作パネル。上下分割では譜面と独立してスクロールする。 -->
+        <v-container fluid class="panel">
+          <!-- Previewの再生コントロールを、状態を保ったまま受け入れる移動先。 -->
+          <div id="preview-controls"></div>
 
-      <h3>譜面ファイル</h3>
+          <img
+            src="https://otofuda.github.io/chart-editor/logo.png"
+            alt="Otofuda Chart Editor V2"
+            class="logo"
+          />
 
-      <v-row>
-        <v-file-input
-          accept=".json, application/json"
-          label="ファイルを選択"
-          hide-details
-          variant="outlined"
-          density="compact"
-          prepend-icon="mdi-folder"
-          @update:model-value="readFile"
-        ></v-file-input>
-        <v-col>
-          <v-select
-            :items="difficulties"
-            label="難易度"
-            v-model="currentDifficulty"
-            align="left"
-            hide-details
-            variant="outlined"
-            density="compact"
-            :menu-props="{}"
-          ></v-select>
-        </v-col>
-      </v-row>
+          <h3>譜面ファイル</h3>
 
-      <v-btn-group density="compact" class="difficulty-select">
-        <v-btn size="small" theme="dark" color="blue" @click="currentDifficulty = 'raku'">
-          RAKU
-        </v-btn>
-        <v-btn size="small" theme="dark" color="green" @click="currentDifficulty = 'easy'">
-          EASY
-        </v-btn>
-        <v-btn size="small" theme="dark" color="orange" @click="currentDifficulty = 'normal'">
-          NORMAL
-        </v-btn>
-        <v-btn size="small" theme="dark" color="#ff0984" @click="currentDifficulty = 'hard'">
-          HARD
-        </v-btn>
-        <v-btn size="small" theme="dark" color="purple" @click="currentDifficulty = 'extra'">
-          EXTRA
-        </v-btn>
-      </v-btn-group>
+          <v-row>
+            <v-file-input
+              accept=".json, application/json"
+              label="ファイルを選択"
+              hide-details
+              variant="outlined"
+              density="compact"
+              prepend-icon="mdi-folder"
+              @update:model-value="readFile"
+            ></v-file-input>
+            <v-col>
+              <v-select
+                :items="difficulties"
+                label="難易度"
+                v-model="currentDifficulty"
+                align="left"
+                hide-details
+                variant="outlined"
+                density="compact"
+                :menu-props="{}"
+              ></v-select>
+            </v-col>
+          </v-row>
 
-      <HistoryControls
-        v-model:open="dialog.history"
-        :history="history"
-        @undo="undo"
-        @redo="redo"
-        @update:open="handleHistoryVisibility"
-      />
+          <v-btn-group density="compact" class="difficulty-select">
+            <v-btn size="small" theme="dark" color="blue" @click="currentDifficulty = 'raku'">
+              RAKU
+            </v-btn>
+            <v-btn size="small" theme="dark" color="green" @click="currentDifficulty = 'easy'">
+              EASY
+            </v-btn>
+            <v-btn size="small" theme="dark" color="orange" @click="currentDifficulty = 'normal'">
+              NORMAL
+            </v-btn>
+            <v-btn size="small" theme="dark" color="#ff0984" @click="currentDifficulty = 'hard'">
+              HARD
+            </v-btn>
+            <v-btn size="small" theme="dark" color="purple" @click="currentDifficulty = 'extra'">
+              EXTRA
+            </v-btn>
+          </v-btn-group>
 
-      <h3>ノートの挿入（仮配置：{{ preAppendNotes.length }}個）</h3>
+          <HistoryControls
+            v-model:open="dialog.history"
+            :history="history"
+            @undo="undo"
+            @redo="redo"
+            @update:open="handleHistoryVisibility"
+          />
 
-      <v-checkbox
-        v-model="isAppendMode"
-        label="ノート挿入モード"
-        density="compact"
-        hide-details
-        class="mb-2"
-      />
+          <h3>ノートの挿入（仮配置：{{ preAppendNotes.length }}個）</h3>
 
-      <v-card v-show="isAppendMode" style="margin: 0 -32px" class="pa-4" rounded="0">
-        <v-row justify="space-between">
           <v-checkbox
-            v-model="isAutoFollow"
-            label="編集小節を自動追従"
-            class="mt-0"
-            hide-details
+            v-model="isAppendMode"
+            label="ノート挿入モード"
             density="compact"
-          ></v-checkbox>
-          <v-btn
-            color="orange"
-            size="small"
-            variant="outlined"
-            append-icon="mdi-plus-circle-outline"
-            @click="appendSimultaneously(appendNote)"
-          >
-            このノートのみを全難易度に同時挿入
-          </v-btn>
-        </v-row>
-        <v-row>
-          <!-- Type -->
-          <v-col cols="12" sm="3">
-            <v-select
-              :items="noteTypes"
-              hide-details
-              label="ノート種別"
-              @update:model-value="changeAppendNoteType"
-              v-model="appendNote.type"
-              variant="outlined"
-              density="compact"
-            >
-            </v-select>
-          </v-col>
-          <!-- Measure -->
-          <v-col cols="12" sm="3">
-            <v-text-field
-              v-model.number="appendNote.measure"
-              label="measure"
-              variant="outlined"
-              density="compact"
-              hide-details
-              type="number"
-              min="0"
-            ></v-text-field>
-          </v-col>
-          <!-- Position -->
-          <v-col cols="12" sm="3">
-            <v-text-field
-              v-model.number="appendNote.position"
-              label="position"
-              variant="outlined"
-              density="compact"
-              hide-details
-              min="0"
-              :max="appendNote.split - 1"
-              bg-color="editor-highlight"
-              @keydown.enter="placeNotes(appendNote)"
-              @keydown.left="appendNoteToLeft"
-              @keydown.right="appendNoteToRight"
-              @keydown.up="appendNoteToUp"
-              @keydown.down="appendNoteToDown"
-            ></v-text-field>
-          </v-col>
-          <!-- Split -->
-          <v-col cols="12" sm="3">
-            <v-combobox
-              v-model.number="appendNote.split"
-              :items="[4, 8, 16, 32, 12, 24, 48]"
-              label="split"
-              variant="outlined"
-              hide-details
-              density="compact"
-              :menu-props="{}"
-            ></v-combobox>
-          </v-col>
-        </v-row>
-
-        <!-- オプション入力欄(汎用) -->
-        <div
-          v-for="(opt, i) in noteOptionsForAppendNote"
-          :key="`option_${i}`"
-          class="my-4"
-        >
-          <v-text-field
-            v-model="appendNote.option[i]"
             hide-details
-            :label="opt.label"
-            :type="opt.type"
-            append-outer-icon="mdi-help"
-            variant="outlined"
-            density="compact"
-            @click:append-outer="
-              showSnackbar(`${opt.label}の説明：${opt.desc}`)
-            "
-          ></v-text-field>
-        </div>
+            class="mb-2"
+          />
 
-        <!-- Type94 テクスチャ選択 -->
-        <v-menu
-          v-if="appendNote.type === 94"
-          v-model="dialog.texture"
-          :close-on-content-click="false"
-          max-width="600"
-          offset-overflow
-        >
-          <template v-slot:activator="{ props }">
-            <v-btn color="indigo" variant="outlined" v-bind="props">
-              テクスチャをデータベースから探す
-            </v-btn>
-          </template>
-
-          <v-card rounded="lg">
-            <v-tabs v-model="textureCurrentTab" show-arrows color="primary">
-              <v-tab v-for="tabName in textureTabs" :key="tabName">
-                {{ tabName }}
-              </v-tab>
-            </v-tabs>
-
-            <v-window v-model="textureCurrentTab">
-              <v-window-item
-                v-for="tabName in textureTabs"
-                :key="tabName"
-                class="px-2"
-              >
-                <v-row>
-                  <v-col
-                    v-for="texture in texturePayload.contents.filter(tx =>
-                      tx.tab.includes(tabName)
-                    )"
-                    :key="texture.id"
-                    cols="12"
-                    sm="6"
-                    md="4"
-                  >
-                    <v-card rounded="lg" class="texture-card" elevation="2">
-                      <v-img
-                        :src="
-                          texture.url.startsWith('texture')
-                          ? `https://db.otofuda.com/${texture.url}`
-                          : texture.url
-                        "
-                        height="100px"
-                      >
-                        <span class="texture-card__name">
-                          {{ texture.name }}
-                        </span>
-                      </v-img>
-
-                      <v-card-actions class="justify-end pa-0">
-                        <v-btn
-                          small
-                          variant="text"
-                          color="primary"
-                          @click="setTexture(texture)"
-                        >
-                          これにする
-                        </v-btn>
-                      </v-card-actions>
-                    </v-card>
-                  </v-col>
-                </v-row>
-              </v-window-item>
-            </v-window>
-          </v-card>
-        </v-menu>
-
-        <!-- Type96 カラーピッカー -->
-        <v-row v-if="appendNote.type === 96" class="pl-2">
-          <v-color-picker
-            v-model="appendNoteColorOption"
-            :swatches="colorSwatches"
-            show-swatches
-            elevation="2"
-            class="mr-4 mb-2"
-            hide-inputs
-          ></v-color-picker>
-          <div>
-            <div><strong>特殊な色を設定</strong></div>
-            <v-btn
-              variant="outlined"
-              color="primary"
-              @click="appendNote.option = ['-1', '-1', '-1']"
-              class="my-2"
-            >
-              青赤(default)に戻す
-            </v-btn>
-            <p><code>['-1', '-1', '-1']</code> を設定します</p>
-          </div>
-        </v-row>
-
-        <v-row>
-          <v-radio-group
-            v-model="appendNote.lane"
-            inline
-            :max-width="240"
-            hide-details
-            prepend-icon="mdi-view-column-outline"
-            :disabled="isLanelessNote(appendNote)"
-          >
-            <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
-          </v-radio-group>
-          <v-spacer></v-spacer>
-          <div>
-            <v-btn
-              class="ml-1"
-              color="green"
-              @click="placeNotes(appendNote)"
-            >
-              ノートを仮配置
-              <v-icon right>mdi-keyboard-return</v-icon>
-            </v-btn>
-            <v-badge
-              overlap
-              color="orange darken-4"
-              :model-value="preAppendNotes.length > 0"
-              :content="preAppendNotes.length"
-            >
+          <v-card v-show="isAppendMode" class="append-card pa-4" rounded="0">
+            <v-row justify="space-between">
+              <v-checkbox
+                v-model="isAutoFollow"
+                label="編集小節を自動追従"
+                class="mt-0"
+                hide-details
+                density="compact"
+              ></v-checkbox>
               <v-btn
-                class="ml-4"
                 color="orange"
-                theme="dark"
+                size="small"
+                variant="outlined"
                 append-icon="mdi-plus-circle-outline"
-                @click="appendNotes(...preAppendNotes)"
+                @click="appendSimultaneously(appendNote)"
               >
-                挿入する
+                このノートのみを全難易度に同時挿入
               </v-btn>
-            </v-badge>
-          </div>
-        </v-row>
+            </v-row>
+            <v-row>
+              <!-- Type -->
+              <v-col cols="12" sm="3">
+                <v-select
+                  :items="noteTypes"
+                  hide-details
+                  label="ノート種別"
+                  @update:model-value="changeAppendNoteType"
+                  v-model="appendNote.type"
+                  variant="outlined"
+                  density="compact"
+                >
+                </v-select>
+              </v-col>
+              <!-- Measure -->
+              <v-col cols="12" sm="3">
+                <v-text-field
+                  v-model.number="appendNote.measure"
+                  label="measure"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  type="number"
+                  min="0"
+                ></v-text-field>
+              </v-col>
+              <!-- Position -->
+              <v-col cols="12" sm="3">
+                <v-text-field
+                  v-model.number="appendNote.position"
+                  label="position"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  min="0"
+                  :max="appendNote.split - 1"
+                  bg-color="editor-highlight"
+                  @keydown.enter="placeNotes(appendNote)"
+                  @keydown.left="appendNoteToLeft"
+                  @keydown.right="appendNoteToRight"
+                  @keydown.up="appendNoteToUp"
+                  @keydown.down="appendNoteToDown"
+                ></v-text-field>
+              </v-col>
+              <!-- Split -->
+              <v-col cols="12" sm="3">
+                <v-combobox
+                  v-model.number="appendNote.split"
+                  :items="[4, 8, 16, 32, 12, 24, 48]"
+                  label="split"
+                  variant="outlined"
+                  hide-details
+                  density="compact"
+                  :menu-props="{}"
+                ></v-combobox>
+              </v-col>
+            </v-row>
 
-        <div class="my-4" v-show="appendNote.type === 2 || (appendNote.type == 90 && Number(appendNote.option[0]) === 2)">
-          <v-row align="center" justify="space-between">
-            <h4>ロングノーツ編集</h4>
-            <v-btn
-              color="green"
-              prepend-icon="mdi-plus-circle-outline"
-              @click="addEndToAppendNote"
+            <!-- オプション入力欄(汎用) -->
+            <div
+              v-for="(opt, i) in noteOptionsForAppendNote"
+              :key="`option_${i}`"
+              class="my-4"
             >
-              終点を追加
+              <v-text-field
+                v-model="appendNote.option[i]"
+                hide-details
+                :label="opt.label"
+                :type="opt.type"
+                append-outer-icon="mdi-help"
+                variant="outlined"
+                density="compact"
+                @click:append-outer="
+                  showSnackbar(`${opt.label}の説明：${opt.desc}`)
+                "
+              ></v-text-field>
+            </div>
+
+            <!-- Type94 テクスチャ選択 -->
+            <v-menu
+              v-if="appendNote.type === 94"
+              v-model="dialog.texture"
+              :close-on-content-click="false"
+              max-width="600"
+              offset-overflow
+            >
+              <template v-slot:activator="{ props }">
+                <v-btn color="indigo" variant="outlined" v-bind="props">
+                  テクスチャをデータベースから探す
+                </v-btn>
+              </template>
+
+              <v-card rounded="lg">
+                <v-tabs v-model="textureCurrentTab" show-arrows color="primary">
+                  <v-tab v-for="tabName in textureTabs" :key="tabName">
+                    {{ tabName }}
+                  </v-tab>
+                </v-tabs>
+
+                <v-window v-model="textureCurrentTab">
+                  <v-window-item
+                    v-for="tabName in textureTabs"
+                    :key="tabName"
+                    class="px-2"
+                  >
+                    <v-row>
+                      <v-col
+                        v-for="texture in texturePayload.contents.filter(tx =>
+                          tx.tab.includes(tabName)
+                        )"
+                        :key="texture.id"
+                        cols="12"
+                        sm="6"
+                        md="4"
+                      >
+                        <v-card rounded="lg" class="texture-card" elevation="2">
+                          <v-img
+                            :src="
+                              texture.url.startsWith('texture')
+                              ? `https://db.otofuda.com/${texture.url}`
+                              : texture.url
+                            "
+                            height="100px"
+                          >
+                            <span class="texture-card__name">
+                              {{ texture.name }}
+                            </span>
+                          </v-img>
+
+                          <v-card-actions class="justify-end pa-0">
+                            <v-btn
+                              small
+                              variant="text"
+                              color="primary"
+                              @click="setTexture(texture)"
+                            >
+                              これにする
+                            </v-btn>
+                          </v-card-actions>
+                        </v-card>
+                      </v-col>
+                    </v-row>
+                  </v-window-item>
+                </v-window>
+              </v-card>
+            </v-menu>
+
+            <!-- Type96 カラーピッカー -->
+            <v-row v-if="appendNote.type === 96" class="pl-2">
+              <v-color-picker
+                v-model="appendNoteColorOption"
+                :swatches="colorSwatches"
+                show-swatches
+                elevation="2"
+                class="mr-4 mb-2"
+                hide-inputs
+              ></v-color-picker>
+              <div>
+                <div><strong>特殊な色を設定</strong></div>
+                <v-btn
+                  variant="outlined"
+                  color="primary"
+                  @click="appendNote.option = ['-1', '-1', '-1']"
+                  class="my-2"
+                >
+                  青赤(default)に戻す
+                </v-btn>
+                <p><code>['-1', '-1', '-1']</code> を設定します</p>
+              </div>
+            </v-row>
+
+            <v-row>
+              <v-radio-group
+                v-model="appendNote.lane"
+                inline
+                :max-width="240"
+                hide-details
+                prepend-icon="mdi-view-column-outline"
+                :disabled="isLanelessNote(appendNote)"
+              >
+                <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
+              </v-radio-group>
+              <v-spacer></v-spacer>
+              <div>
+                <v-btn
+                  class="ml-1"
+                  color="green"
+                  @click="placeNotes(appendNote)"
+                >
+                  ノートを仮配置
+                  <v-icon right>mdi-keyboard-return</v-icon>
+                </v-btn>
+                <v-badge
+                  overlap
+                  color="orange darken-4"
+                  :model-value="preAppendNotes.length > 0"
+                  :content="preAppendNotes.length"
+                >
+                  <v-btn
+                    class="ml-4"
+                    color="orange"
+                    theme="dark"
+                    append-icon="mdi-plus-circle-outline"
+                    @click="appendNotes(...preAppendNotes)"
+                  >
+                    挿入する
+                  </v-btn>
+                </v-badge>
+              </div>
+            </v-row>
+
+            <div
+              class="my-4"
+              v-show="appendNote.type === 2 || (appendNote.type == 90 && Number(appendNote.option[0]) === 2)"
+            >
+              <v-row align="center" justify="space-between">
+                <h4>ロングノーツ編集</h4>
+                <v-btn
+                  color="green"
+                  prepend-icon="mdi-plus-circle-outline"
+                  @click="addEndToAppendNote"
+                >
+                  終点を追加
+                </v-btn>
+              </v-row>
+
+              <EndForm
+                v-for="(end, i) in appendNote.end"
+                :key="`append_end_${i}`"
+                :end="end"
+                :parent="appendNote"
+                :index="i"
+                :max-measure="maxMeasure"
+                @delete-end="deleteEndOfAppendNote"
+                @append-to-left="appendNoteToLeft"
+                @append-to-right="appendNoteToRight"
+                @append-to-up="appendNoteToUp"
+                @append-to-down="appendNoteToDown"
+                @place-notes="placeNotes(appendNote)"
+              >
+              </EndForm>
+
+              <v-alert
+                v-if="appendNote.end.length === 0"
+                class="mt-2"
+                density="compact"
+                type="warning"
+                rounded="lg"
+              >
+                終点が1つもありません
+              </v-alert>
+            </div>
+          </v-card>
+
+          <h3>プレビュー領域の設定</h3>
+
+          <h5>現在のハイスピードの速度値:{{ (musicBpm * beatHeight) / 100 }}</h5>
+
+          <v-slider
+            v-model="beatHeight"
+            :thumb-size="24"
+            color="primary"
+            thumb-label="always"
+            min="20"
+            max="300"
+            append-icon="mdi-magnify-plus-outline"
+            prepend-icon="mdi-magnify-minus-outline"
+            @click:append="zoomIn"
+            @click:prepend="zoomOut"
+            step="10"
+            hide-details
+          ></v-slider>
+
+          <v-row align="center">
+            <v-col cols="12" sm="6">
+              <v-file-input
+                accept="audio/*"
+                label="楽曲ファイル選択"
+                variant="outlined"
+                density="compact"
+                prepend-icon="mdi-music"
+                @update:model-value="readAudioFile"
+                hide-details
+              ></v-file-input>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-slider
+                v-model="audioVolume"
+                :thumb-size="24"
+                color="primary"
+                thumb-label="hover"
+                min="0"
+                max="100"
+                prepend-icon="mdi-volume-high"
+                step="5"
+                hide-details
+              ></v-slider>
+            </v-col>
+          </v-row>
+
+          <v-row align="center" class="mb-4">
+            <v-text-field
+              v-model.number="scrollTo"
+              suffix="小節へ"
+              variant="outlined"
+              density="compact"
+              hide-details
+            ></v-text-field>
+            <v-btn
+              prepend-icon="mdi-arrow-right"
+              color="primary"
+              @click="scrollToMeasure(scrollTo)"
+            >
+              遷移
             </v-btn>
           </v-row>
 
-          <EndForm
-            v-for="(end, i) in appendNote.end"
-            :key="`append_end_${i}`"
-            :end="end"
-            :parent="appendNote"
-            :index="i"
-            :max-measure="maxMeasure"
-            @delete-end="deleteEndOfAppendNote"
-            @append-to-left="appendNoteToLeft"
-            @append-to-right="appendNoteToRight"
-            @append-to-up="appendNoteToUp"
-            @append-to-down="appendNoteToDown"
-            @place-notes="placeNotes(appendNote)"
-          >
-          </EndForm>
+          <h3>プレビュー表示モード</h3>
 
-          <v-alert
-            v-if="appendNote.end.length === 0"
-            class="mt-2"
-            density="compact"
-            type="warning"
-            rounded="lg"
-          >
-            終点が1つもありません
-          </v-alert>
-        </div>
-      </v-card>
+          <v-row class="my-0">
+            <v-checkbox
+              prepend-icon="mdi-format-align-justify"
+              v-model="isShowDetail"
+              label="ノーツ詳細を表示"
+              hide-details
+              density="compact"
+            ></v-checkbox>
+          </v-row>
+          <v-row class="my-0">
+            <v-checkbox
+              prepend-icon="mdi-camera"
+              :disabled="!isShowDetail"
+              v-model="isCaptureMode"
+              label="キャプチャ用モード"
+              hide-details
+              density="compact"
+            ></v-checkbox>
+          </v-row>
+          <v-row class="my-0">
+            <v-checkbox
+              prepend-icon="mdi-play-circle-outline"
+              :disabled="!isShowDetail || !isCaptureMode || isImageMode"
+              v-model="isPreviewMode"
+              label="譜面プレビュー用"
+              hide-details
+              density="compact"
+            ></v-checkbox>
+          </v-row>
+          <v-row class="my-0">
+            <v-checkbox
+              prepend-icon="mdi-image"
+              :disabled="!isShowDetail || !isCaptureMode || isPreviewMode"
+              v-model="isImageMode"
+              label="譜面画像生成用"
+              hide-details
+              density="compact"
+            ></v-checkbox>
+          </v-row>
+          <v-row class="my-0">
+            <v-checkbox
+              prepend-icon="mdi-stop-circle"
+              v-model="isSimulateStop"
+              label="譜面停止をシミュレート"
+              density="compact"
+            ></v-checkbox>
+          </v-row>
 
-      <h3>プレビュー領域の設定</h3>
+          <h3>選択ノーツ（選択中：{{ selectionNumber }}個）</h3>
 
-      <h5>現在のハイスピードの速度値:{{ (musicBpm * beatHeight) / 100 }}</h5>
-
-      <v-slider
-        v-model="beatHeight"
-        :thumb-size="24"
-        color="primary"
-        thumb-label="always"
-        min="20"
-        max="300"
-        append-icon="mdi-magnify-plus-outline"
-        prepend-icon="mdi-magnify-minus-outline"
-        @click:append="zoomIn"
-        @click:prepend="zoomOut"
-        step="10"
-        hide-details
-      ></v-slider>
-
-      <v-row align="center">
-        <v-col cols="12" sm="6">
-          <v-file-input
-            accept="audio/*"
-            label="楽曲ファイル選択"
-            variant="outlined"
-            density="compact"
-            prepend-icon="mdi-music"
-            @update:model-value="readAudioFile"
-            hide-details
-          ></v-file-input>
-        </v-col>
-        <v-col cols="12" sm="6">
-          <v-slider
-            v-model="audioVolume"
-            :thumb-size="24"
-            color="primary"
-            thumb-label="hover"
-            min="0"
-            max="100"
-            prepend-icon="mdi-volume-high"
-            step="5"
-            hide-details
-          ></v-slider>
-        </v-col>
-      </v-row>
-
-      <v-row align="center" class="mb-4">
-        <v-text-field
-          v-model.number="scrollTo"
-          suffix="小節へ"
-          variant="outlined"
-          density="compact"
-          hide-details
-        ></v-text-field>
-        <v-btn prepend-icon="mdi-arrow-right" color="primary" @click="scrollToMeasure(scrollTo)">
-          遷移
-        </v-btn>
-      </v-row>
-
-      <h3>プレビュー表示モード</h3>
-
-      <v-row class="my-0">
-        <v-checkbox
-          prepend-icon="mdi-format-align-justify"
-          v-model="isShowDetail"
-          label="ノーツ詳細を表示"
-          hide-details
-          density="compact"
-        ></v-checkbox>
-      </v-row>
-      <v-row class="my-0">
-        <v-checkbox
-          prepend-icon="mdi-camera"
-          :disabled="!isShowDetail"
-          v-model="isCaptureMode"
-          label="キャプチャ用モード"
-          hide-details
-          density="compact"
-        ></v-checkbox>
-      </v-row>
-      <v-row class="my-0">
-        <v-checkbox
-          prepend-icon="mdi-play-circle-outline"
-          :disabled="!isShowDetail || !isCaptureMode || isImageMode"
-          v-model="isPreviewMode"
-          label="譜面プレビュー用"
-          hide-details
-          density="compact"
-        ></v-checkbox>
-      </v-row>
-      <v-row class="my-0">
-        <v-checkbox
-          prepend-icon="mdi-image"
-          :disabled="!isShowDetail || !isCaptureMode || isPreviewMode"
-          v-model="isImageMode"
-          label="譜面画像生成用"
-          hide-details
-          density="compact"
-        ></v-checkbox>
-      </v-row>
-      <v-row class="my-0">
-        <v-checkbox
-          prepend-icon="mdi-stop-circle"
-          v-model="isSimulateStop"
-          label="譜面停止をシミュレート"
-          density="compact"
-        ></v-checkbox>
-      </v-row>
-
-      <h3>選択ノーツ（選択中：{{ selectionNumber }}個）</h3>
-
-      <v-row align="center" class="py-2">
-        <v-btn color="primary" variant="outlined" prepend-icon="mdi-checkbox-marked-circle-outline" @click="dialog.batchcheck = true">
-          ノーツの一括選択
-        </v-btn>
-
-        <v-btn color="warning" variant="outlined" prepend-icon="mdi-select-off" @click="selectionClear">
-          すべて選択解除
-        </v-btn>
-
-        <v-dialog v-model="dialog.selectionDelete" width="500">
-          <template v-slot:activator="{ props }">
+          <v-row align="center" class="py-2">
             <v-btn
-              color="error"
+              color="primary"
               variant="outlined"
-              prepend-icon="mdi-delete-forever"
-              @click="dialog.selectionDelete = true"
-              v-bind="props"
+              prepend-icon="mdi-checkbox-marked-circle-outline"
+              @click="dialog.batchcheck = true"
             >
-              選択ノーツを削除
+              ノーツの一括選択
             </v-btn>
-          </template>
-          <v-card>
-            <v-card-title class="headline">確認</v-card-title>
-            <v-card-text>
-              本当に選択したノーツ{{ selectionNumber }}個をすべて削除しますか？
-            </v-card-text>
-            <v-divider></v-divider>
-            <v-card-actions>
-              <v-spacer></v-spacer>
-              <v-btn
-                color="primary"
+
+            <v-btn
+              color="warning"
+              variant="outlined"
+              prepend-icon="mdi-select-off"
+              @click="selectionClear"
+            >
+              すべて選択解除
+            </v-btn>
+
+            <v-dialog v-model="dialog.selectionDelete" width="500">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  color="error"
+                  variant="outlined"
+                  prepend-icon="mdi-delete-forever"
+                  @click="dialog.selectionDelete = true"
+                  v-bind="props"
+                >
+                  選択ノーツを削除
+                </v-btn>
+              </template>
+              <v-card>
+                <v-card-title class="headline">確認</v-card-title>
+                <v-card-text>
+                  本当に選択したノーツ{{ selectionNumber }}個をすべて削除しますか？
+                </v-card-text>
+                <v-divider></v-divider>
+                <v-card-actions>
+                  <v-spacer></v-spacer>
+                  <v-btn
+                    color="primary"
+                    variant="outlined"
+                    @click="dialog.selectionDelete = false"
+                  >
+                    キャンセル
+                  </v-btn>
+                  <v-btn color="error" variant="outlined" @click="selectionDelete">
+                    削除する
+                  </v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+
+            <v-btn
+              color="primary"
+              variant="outlined"
+              prepend-icon="mdi-auto-fix"
+              @click="dialog.checked = true"
+            >
+              ノーツの一括操作
+            </v-btn>
+          </v-row>
+
+          <h3>譜面情報</h3>
+
+          <v-row align="center">
+            <v-col>
+              <v-text-field
+                v-model.number="chartObject.info.offset"
+                v-history-field="infoField('オフセットを変更')"
+                label="オフセット"
+                required
                 variant="outlined"
-                @click="dialog.selectionDelete = false"
+                density="compact"
+                hide-details
+              ></v-text-field>
+            </v-col>
+            <v-col>
+              <v-text-field
+                v-model.number="chartObject.info.bpm"
+                v-history-field="infoField('BPMを変更')"
+                label="BPM"
+                required
+                variant="outlined"
+                density="compact"
+                hide-details
+              ></v-text-field>
+            </v-col>
+            <v-col>
+              <v-text-field
+                v-model.number="chartObject.info.beat"
+                v-history-field="infoField('拍子を変更')"
+                label="拍子"
+                required
+                variant="outlined"
+                density="compact"
+                hide-details
+              ></v-text-field>
+            </v-col>
+            <v-col>
+              <v-text-field
+                v-model.number="chartObject.info.version"
+                label="譜面ver"
+                variant="outlined"
+                density="compact"
+                disabled
+                hide-details
+              ></v-text-field>
+            </v-col>
+          </v-row>
+
+          <v-row>
+            <v-btn
+              color="primary"
+              @click="dialog.help = true"
+              variant="outlined"
+              prepend-icon="mdi-help-circle"
+            >
+              使い方
+            </v-btn>
+            <v-btn
+              color="primary"
+              @click="toggleMessageLog"
+              variant="outlined"
+              prepend-icon="mdi-message-outline"
+            >
+              メッセージログ
+            </v-btn>
+            <v-btn
+              color="primary"
+              @click="analyze"
+              variant="outlined"
+              prepend-icon="mdi-chart-timeline-variant"
+            >
+              譜面分析
+            </v-btn>
+            <ThemeToggle />
+            <!-- ダークモードの隣で、自動判定と手動のレイアウト指定を切り替える。 -->
+            <v-btn-group
+              class="layout-switch"
+              rounded="lg"
+              divided
+              density="compact"
+              role="group"
+              aria-label="レイアウト"
+            >
+              <!-- 共通の角丸設定を上書きし、グループの両端だけを丸める。 -->
+              <v-btn
+                v-for="option in layoutOptions"
+                :key="option.value"
+                :aria-pressed="preference === option.value"
+                :variant="preference === option.value ? 'flat' : 'outlined'"
+                :prepend-icon="option.icon"
+                color="primary"
+                size="small"
+                rounded
+                @click="preference = option.value"
               >
-                キャンセル
+                {{ option.label }}
               </v-btn>
-              <v-btn color="error" variant="outlined" @click="selectionDelete">
-                削除する
-              </v-btn>
-            </v-card-actions>
+            </v-btn-group>
+          </v-row>
+          <v-row>
+            <v-btn
+              color="success"
+              @click="saveFile"
+              variant="outlined"
+              prepend-icon="mdi-content-save"
+            >
+              名前をつけて保存
+            </v-btn>
+            <v-btn
+              color="success"
+              @click="restoreBackup"
+              variant="outlined"
+              prepend-icon="mdi-file-restore"
+            >
+              復元
+            </v-btn>
+          </v-row>
+
+          <v-card
+            v-if="dialog.logs"
+            class="mx-auto message-log"
+            elevation="2"
+            rounded="lg"
+            title="メッセージログ"
+          >
+            <template #prepend>
+              <v-btn icon="mdi-close" variant="text" @click="dialog.logs = false" />
+            </template>
+
+            <v-list subheader>
+              <v-list-item v-for="item in logs.slice().reverse()" :key="item.date.getTime()">
+                <p class="mb-2 d-flex">
+                  <v-chip class="flex-shrink-0 mr-2" label>
+                    {{ item.type }}
+                  </v-chip>
+                  {{ item.message }}
+                </p>
+                <v-list-item-subtitle>
+                  {{ item.date.toLocaleString("ja-JP") }}
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
           </v-card>
-        </v-dialog>
-
-        <v-btn color="primary" variant="outlined" prepend-icon="mdi-auto-fix" @click="dialog.checked = true">
-          ノーツの一括操作
-        </v-btn>
-      </v-row>
-
-      <h3>譜面情報</h3>
-
-      <v-row align="center">
-        <v-col>
-          <v-text-field
-            v-model.number="chartObject.info.offset"
-            v-history-field="infoField('オフセットを変更')"
-            label="オフセット"
-            required
-            variant="outlined"
-            density="compact"
-            hide-details
-          ></v-text-field>
-        </v-col>
-        <v-col>
-          <v-text-field
-            v-model.number="chartObject.info.bpm"
-            v-history-field="infoField('BPMを変更')"
-            label="BPM"
-            required
-            variant="outlined"
-            density="compact"
-            hide-details
-          ></v-text-field>
-        </v-col>
-        <v-col>
-          <v-text-field
-            v-model.number="chartObject.info.beat"
-            v-history-field="infoField('拍子を変更')"
-            label="拍子"
-            required
-            variant="outlined"
-            density="compact"
-            hide-details
-          ></v-text-field>
-        </v-col>
-        <v-col>
-          <v-text-field
-            v-model.number="chartObject.info.version"
-            label="譜面ver"
-            variant="outlined"
-            density="compact"
-            disabled
-            hide-details
-          ></v-text-field>
-        </v-col>
-      </v-row>
-
-      <v-row>
-        <v-btn color="primary" @click="dialog.help = true" variant="outlined" prepend-icon="mdi-help-circle">
-          使い方
-        </v-btn>
-        <v-btn
-          color="primary"
-          @click="toggleMessageLog"
-          variant="outlined"
-          prepend-icon="mdi-message-outline"
-        >
-          メッセージログ
-        </v-btn>
-        <v-btn color="primary" @click="analyze" variant="outlined" prepend-icon="mdi-chart-timeline-variant">
-          譜面分析
-        </v-btn>
-        <ThemeToggle />
-      </v-row>
-      <v-row>
-        <v-btn color="success" @click="saveFile" variant="outlined" prepend-icon="mdi-content-save">
-          名前をつけて保存
-        </v-btn>
-        <v-btn color="success" @click="restoreBackup" variant="outlined" prepend-icon="mdi-file-restore">
-          復元
-        </v-btn>
-      </v-row>
-
-      <v-card
-        v-if="dialog.logs"
-        class="mx-auto message-log"
-        elevation="2"
-        rounded="lg"
-        title="メッセージログ"
-      >
-        <template #prepend>
-          <v-btn icon="mdi-close" variant="text" @click="dialog.logs = false" />
-        </template>
-
-        <v-list subheader>
-          <v-list-item v-for="item in logs.slice().reverse()" :key="item.date.getTime()">
-              <p class="mb-2 d-flex">
-                <v-chip class="flex-shrink-0 mr-2" label>
-                  {{ item.type }}
-                </v-chip>
-                {{ item.message }}
-              </p>
-              <v-list-item-subtitle>
-                {{ item.date.toLocaleString("ja-JP") }}
-              </v-list-item-subtitle>
-          </v-list-item>
-        </v-list>
-      </v-card>
-    </v-container>
+        </v-container>
+      </div>
+    </div>
 
     <v-dialog v-model="dialog.help" width="800" scrollable>
       <v-card rounded="xl" title="エディタの使い方" prepend-icon="mdi-help-circle">
@@ -629,7 +714,11 @@
     </v-dialog>
 
     <v-dialog v-model="dialog.analyzer" width="800" scrollable>
-      <v-card rounded="xl" prepend-icon="mdi-chart-timeline-variant" :title="`譜面分析 (${currentDifficulty})`">
+      <v-card
+        rounded="xl"
+        prepend-icon="mdi-chart-timeline-variant"
+        :title="`譜面分析 (${currentDifficulty})`"
+      >
         <v-divider></v-divider>
         <v-card-text>
           ノーツ数：{{ analysisData.notesCount }}
@@ -722,14 +811,14 @@
           </v-row>
         </v-card-text>
         <v-divider></v-divider>
-        <!-- 共通typeのoption定義を使い、チェックした項目だけを一括変更する。 -->
+        <!-- 同じtype、または上下左右フリックの共通optionを一括変更する。 -->
         <v-card-text data-testid="selection-options">
           <strong>
             オプションの変更
           </strong>
 
           <p>
-            同じtypeのノーツを1つ以上選択すると、チェックした項目だけを一括変更できます。
+            同じtypeのノーツ、または上下左右のフリックを1つ以上選択すると、チェックした項目だけを一括変更できます。
             チェックした項目が空欄の場合は値を消去します。保存時は既存の規則で省略・既定値補完されます。
             ロングノーツは始点のオプションのみ変更します。
           </p>
@@ -961,7 +1050,12 @@
         </v-card-text>
         <template #actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" variant="outlined" prepend-icon="mdi-checkbox-marked-circle-outline" @click="batchSelect">
+          <v-btn
+            color="primary"
+            variant="outlined"
+            prepend-icon="mdi-checkbox-marked-circle-outline"
+            @click="batchSelect"
+          >
             すべて選択する
           </v-btn>
         </template>
@@ -980,8 +1074,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, provide, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useGoTo } from 'vuetify'
+import {
+  ref,
+  computed,
+  provide,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+} from 'vue'
 
 import Preview from './components/Preview.vue'
 import EndForm from './components/EndForm.vue'
@@ -1001,6 +1102,7 @@ import { useFileIO } from './composables/useFileIO'
 import { useTextureDB } from './composables/useTextureDB'
 import { useBackup } from './composables/useBackup'
 import { usePersistedRef } from './composables/usePersistedRef'
+import { useEditorLayout, type LayoutPreference } from './composables/useEditorLayout'
 import { noteTypes, noteOptions } from './composables/useNoteTypes'
 import { getOtofudaMismatchWarnings, isLanelessNote } from './composables/useNoteCheck'
 import {
@@ -1016,6 +1118,13 @@ import {
 } from './composables/injectionKeys'
 
 // --- composable の初期化 ---
+// 自動判定・手動選択と、ボタングループの表示項目をまとめて管理する。
+const { preference, layout, narrow, contained } = useEditorLayout()
+const layoutOptions: { value: LayoutPreference; label: string; icon: string }[] = [
+  { value: 'auto', label: '自動', icon: 'mdi-monitor-cellphone' },
+  { value: 'side-by-side', label: '左右', icon: 'mdi-view-column' },
+  { value: 'stacked', label: '上下', icon: 'mdi-view-agenda' },
+]
 const chartData = useChartData()
 const { history } = chartData
 const {
@@ -1069,13 +1178,11 @@ function redo() {
 
 useHistoryShortcuts({ undo, redo, saveBackup })
 
-// scrollToMeasure 関数 (goTo は Vuetify 4 composable)
-const goTo = useGoTo()
 function scrollToMeasure(measureNumber: number): void {
   const m = measureData.value[measureNumber]
   const last = measureData.value.at(-1)
   if (!m || !last) { showSnackbar(`${measureNumber}小節はありません`); return }
-  goTo(last.measurePositionBottom - m.measurePositionBottom)
+  previewRef.value?.scrollToMeasure(measureNumber)
 }
 
 const noteEditor = useNoteEditor(chartData, showSnackbar, scrollToMeasure)
@@ -1106,13 +1213,20 @@ const {
   selectionAddMeasure,
   batchSelect,
   selectionNotes,
-  selectionCommonType,
   selectionOptionDefinitions,
   selectionOptionsDisabledReason,
   selectionChangeOptions,
 } = selection
 
 const previewRef = ref<InstanceType<typeof Preview> | null>(null)
+
+// 親のクラスを書き換える前に譜面位置を記録し、DOM更新後に復元する。
+watch([layout, contained], async ([nextLayout]) => {
+  const restore = previewRef.value?.prepareLayoutChange(nextLayout)
+  await nextTick()
+  restore?.()
+}, { flush: 'sync' })
+
 const removeHistoryRestore = history.onBeforeRestore(() => {
   previewRef.value?.stop()
   previewRef.value?.cancelDrag()
@@ -1161,10 +1275,11 @@ function resetSelectionOptions(): void {
 }
 
 // 件数が同じでも、選択対象の入れ替えやダイアログの再表示で入力を持ち越さない。
+// 混在フリック間で方向だけが変わった場合も、各ノーツのtypeを監視して初期化する。
 watch(
   [
     selectionNotes,
-    selectionCommonType,
+    () => selectionNotes.value.map(note => note.type),
     currentDifficulty,
     () => dialog.value.checked,
   ],
@@ -1341,6 +1456,16 @@ onMounted(() => {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: #202020;
+  .layout-switch {
+    flex-shrink: 0;
+    margin-left: 8px;
+    .v-btn {
+      min-width: 0;
+    }
+  }
+  .append-card {
+    margin: 0 -32px;
+  }
   .panel {
     position: fixed;
     background: rgb(var(--v-theme-editor-panel));
@@ -1380,6 +1505,145 @@ onMounted(() => {
   .row {
     margin-top: 0;
     margin-bottom: 10px;
+  }
+}
+
+// 通常の左右分割は従来の固定配置を使い、分割領域が必要な場合だけ上書きする。
+#app.layout-stacked {
+  .editor-layout {
+    position: fixed;
+    inset: 0;
+    height: 100vh;
+    height: 100dvh;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .editor-canvas {
+    display: contents;
+  }
+  .panel {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    overscroll-behavior: contain;
+    border-top: 1px solid rgba(var(--v-theme-on-surface), 0.25);
+    .logo {
+      max-width: 100%;
+    }
+  }
+}
+
+// 狭い画面の手動左右分割では、操作パネル348pxと譜面420pxの幅を確保する。
+#app.layout-narrow-side {
+  .editor-layout {
+    position: fixed;
+    inset: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .editor-canvas {
+    position: relative;
+    width: 768px;
+    height: 100%;
+  }
+  .preview-host {
+    position: absolute;
+    top: 0;
+    left: 348px;
+    width: 420px;
+  }
+  .panel {
+    position: absolute;
+    width: 348px;
+    height: 100%;
+  }
+}
+
+#app.layout-stacked,
+#app.layout-narrow-side {
+  .panel {
+    container-type: inline-size;
+    .logo {
+      max-width: 100%;
+    }
+    .message-log,
+    .history-log {
+      position: relative;
+      top: auto;
+      left: auto;
+      width: 100%;
+      > .v-list {
+        height: auto;
+        max-height: 300px;
+        max-height: min(300px, 30dvh);
+      }
+    }
+  }
+}
+
+// 画面幅ではなく操作パネルの幅に合わせて、入力欄やボタンを折り返す。
+@container (width < 600px) {
+  #app .panel {
+    .difficulty-select {
+      width: 100%;
+      .v-btn {
+        width: auto;
+        min-width: 0;
+        flex: 1;
+        padding-inline: 4px;
+      }
+    }
+    > .v-row {
+      gap: 8px 0;
+    }
+    > .v-row > .v-col {
+      flex: 1 1 140px;
+      max-width: 100%;
+    }
+    > .v-row > .v-file-input {
+      flex: 1 1 100%;
+    }
+    .v-row {
+      min-width: 0;
+    }
+    .v-input {
+      min-width: 0;
+    }
+    .v-btn:not(.v-btn--icon) {
+      white-space: normal;
+      height: auto;
+      min-height: 32px;
+      max-width: 100%;
+    }
+    .v-btn__content {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+  }
+}
+
+// スマートフォンでは余白を減らし、メニューとダイアログを画面内に収める。
+@media (width < 768px) {
+  #app .panel {
+    padding-inline: 16px;
+    .append-card {
+      margin-inline: -16px;
+    }
+  }
+  .v-overlay__content {
+    max-width: calc(100vw - 24px);
+  }
+  .v-dialog > .v-overlay__content {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+  .v-dialog > .v-overlay__content > .v-card {
+    overflow-y: auto;
   }
 }
 
