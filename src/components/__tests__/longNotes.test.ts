@@ -445,10 +445,21 @@ describe('Previewとの接続と後始末', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  function setupLiveSettings(notes = [note({ measure: 1 }), note({ type: 99, measure: 5 })]) {
+  /**
+   * 音源の現在時刻と表示設定を操作できる、プレビューの検証環境を作る。
+   *
+   * @param notes プレビューへ渡すノーツ。末尾のEOFも含めて再生範囲を定める。
+   * @param renderNotes trueなら実際のノーツと帯を描き、falseなら再生制御だけを検証する。
+   */
+  function setupLiveSettings(
+    notes = [note({ measure: 1 }), note({ type: 99, measure: 5 })],
+    renderNotes = false,
+  ) {
     const data = useChartData()
+
     data.beatHeight.value = 100
     data.chartObject.value.easy = notes
+
     const volume = ref(100)
     const track = loadedTrack()
     const host = defineComponent({
@@ -456,17 +467,45 @@ describe('Previewとの接続と後始末', () => {
         currentChart: data.currentChart.value,
         currentDifficulty: data.currentDifficulty.value,
         measureData: data.measureData.value,
+        beatHeight: data.beatHeight.value,
         infoObject: { ...data.chartObject.value.info, version: data.chartObject.value.info.version ?? 2 },
         previewAudio: track as unknown as HTMLAudioElement,
         audioVolume: volume.value,
       }),
     })
-    const wrapper = mount(host, { global: {
-      stubs: { ...stubs, MeasureComponent: true, ObjectBasedMeasure: true, LongNote: true, NoteShadow: true },
-      provide: { [showSnackbarKey as symbol]: vi.fn() },
-    } })
+
+    const wrapper = mount(host, {
+      global: {
+        stubs: {
+          ...stubs,
+          'v-switch': checkbox,
+          ObjectBasedMeasure: true,
+          NoteShadow: true,
+          'v-tooltip': layout,
+          'v-list-item-title': layout,
+          'v-card-text': layout,
+          'v-radio': layout,
+          'v-radio-group': layout,
+          'v-textarea': layout,
+          ...(renderNotes ? {} : { MeasureComponent: true, LongNote: true }),
+        },
+        provide: {
+          [showSnackbarKey as symbol]: vi.fn(),
+          [deleteNotesKey as symbol]: vi.fn(),
+          [setAppendNoteInfoKey as symbol]: vi.fn(),
+          [appendNotesKey as symbol]: vi.fn(),
+          [getMovedNoteKey as symbol]: vi.fn(),
+          [copyNotesToDifficultyKey as symbol]: vi.fn(),
+        },
+      },
+    })
+
     const view = wrapper.findComponent(Preview)
+
+    /** 操作パネルの再生ボタンから、通常のユーザー操作と同じ経路で再生を開始する。 */
     const start = () => view.findAll('button').find(button => button.text().endsWith('再生'))!.trigger('click')
+
+    /** メディア準備とカウントインを進め、音源による時刻更新へ移るまで待つ。 */
     const begin = async () => {
       await start()
       await flushMedia()
@@ -474,16 +513,172 @@ describe('Previewとの接続と後始末', () => {
       await flushMedia()
       vi.advanceTimersByTime(16)
     }
+
+    /** 音源の時刻を秒単位で指定し、次の描画フレームまで進める。 */
     const at = async (seconds: number) => {
       track.currentTime = seconds
       vi.advanceTimersByTime(16)
       await flushMedia()
     }
+
+    /** 譜面全体のtransformから、実際に描画した現在位置を読み取る。 */
     const position = () => Number.parseFloat((view.get('.preview-content').element as HTMLElement).style.transform.split(',')[1] ?? '0')
+
+    /** 補助音の発音回数。表示設定を変えた際の音への影響も検証する。 */
     const sounds = soundCount
+
+    /** 再生時の固定配置を確認し、再生が継続しているかを判定する。 */
     const isPlaying = () => (view.get('.preview').element as HTMLElement).style.position === 'fixed'
+
     return { data, volume, track, wrapper, view, start, begin, at, position, sounds, isPlaying }
   }
+
+  /** 実際のラベルに結び付いた、個別描画設定の入力要素のセレクター。 */
+  const motionLabel = 'input[aria-label="ノーツ個別の speed・orbit を再現"]'
+
+  /** 分岐・曲線・不可視端点と装飾を、一つのプレビューで検証するための譜面。 */
+  function motionChart() {
+    return [
+      note({ index: 1, measure: 2, option: ['2', '1'] }),
+      note({
+        index: 2,
+        type: 2,
+        measure: 1,
+        position: 2,
+        option: ['2', '1'],
+        end: [
+          note({
+            measure: 2,
+            option: ['0.5', '-1', 'ease'],
+            end: [
+              note({ type: 89, measure: 3, option: ['3', '1', 'easeOut'] }),
+            ],
+          }),
+          note({ measure: 3, option: ['1.5', '0', 'easeIn'] }),
+        ],
+      }),
+      note({ index: 3, type: 95, measure: 2, position: 1, option: ['2', '0.5', '-1'] }),
+      note({ index: 4, type: 94, measure: 2, position: 1, option: ['image', '1', '1', '0', '1', '0.5', '1'] }),
+      note({ index: 5, type: 99, measure: 5 }),
+    ]
+  }
+
+  it('再生中だけ全端点・分岐・画像・区切り線を補正し、即時OFFと停止で戻す', async () => {
+    const s = setupLiveSettings(motionChart(), true)
+    const tap = s.view.findComponent(Note).get('.note').element as HTMLElement
+    const long = s.view.getComponent(LongNote)
+    const root = long.get('.note').element as HTMLElement
+    const midpoint = long.get('.note-midpoint').element as HTMLElement
+
+    /** Vueの計算結果ではなく、更新後のDOMに設定された帯のパスを取得する。 */
+    const paths = () => long.findAll('path').map(path => path.attributes('d'))
+
+    const original = paths()
+
+    try {
+      // 設定をONにしても、再生を始めるまでは編集時の座標と帯を保つ。
+      expect((s.view.get(motionLabel).element as HTMLInputElement).checked).toBe(false)
+
+      await s.view.get(motionLabel).setValue(true)
+
+      expect(tap.style.transform).toBe('')
+      expect(paths()).toEqual(original)
+
+      await s.begin()
+      await s.at(0.5)
+
+      expect(s.position()).toBe(500)
+      expect(tap.style.transform).toBe('translate3d(46.875px, -300px, 0)')
+      expect(root.style.transform).toBe('translate3d(15.625px, -100px, 0)')
+      expect(midpoint.style.transform).toBe('translate3d(-46.875px, 150px, 0)')
+      expect(paths()).not.toEqual(original)
+      expect(paths().some(path => path?.includes('C '))).toBe(true)
+      expect((s.view.get('.note.type95').element as HTMLElement).style.transform).toBe('translate3d(-62.5px, 200px, 0)')
+      expect((s.view.get('.note.type94 img').element as HTMLImageElement).style.transform).toBe('scaleY(0.5)')
+
+      // 再生を継続したまま解除でき、再度ONにすると現在位置の補正へ戻る。
+      await s.view.get(motionLabel).setValue(false)
+
+      expect(tap.style.transform).toBe('')
+      expect(midpoint.style.transform).toBe('')
+      expect(paths()).toEqual(original)
+      expect(s.isPlaying()).toBe(true)
+
+      await s.view.get(motionLabel).setValue(true)
+
+      expect(tap.style.transform).toBe('translate3d(46.875px, -300px, 0)')
+
+      // 停止後の復元と再再生を確認し、最後にアンマウント後のスタイルも確認する。
+      s.view.vm.stop()
+
+      expect(root.style.transform).toBe('')
+      expect(paths()).toEqual(original)
+      expect(tap.style.visibility).toBe('')
+
+      await nextTick()
+      await s.begin()
+      await s.at(0.5)
+
+      expect(s.isPlaying()).toBe(true)
+      expect(s.position()).toBe(500)
+      expect(s.view.findComponent(Note).get('.note').element).toBe(tap)
+      expect(tap.style.transform).not.toBe('')
+    } finally {
+      s.wrapper.unmount()
+    }
+
+    expect(tap.style.transform).toBe('')
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('高さ・offset変更後の静的SVGを正しく復元し、譜面変更では補正を解除する', async () => {
+    vi.stubGlobal('innerHeight', 2000)
+
+    const s = setupLiveSettings(motionChart(), true)
+
+    try {
+      await s.view.get(motionLabel).setValue(true)
+      await s.begin()
+      await s.at(0.5)
+
+      s.data.beatHeight.value = 200
+      await flushMedia()
+
+      const tap = s.view.findComponent(Note).get('.note').element as HTMLElement
+
+      expect(s.position()).toBe(1000)
+      expect(tap.style.transform).toBe('translate3d(46.875px, -600px, 0)')
+
+      s.data.chartObject.value.info.offset = 100
+      await flushMedia()
+
+      expect(s.isPlaying()).toBe(true)
+
+      await s.view.get(motionLabel).setValue(false)
+
+      const restored = s.view.getComponent(LongNote).findAll('path').map(path => path.attributes('d'))
+
+      // 別の静的描画と比較し、変更前のSVGへ巻き戻っていないことを確かめる。
+      const staticLong = mount(LongNote, {
+        props: { note: s.data.currentChart.value[1], measureData: s.data.measureData.value },
+        global: { stubs, provide: { [deleteNotesKey as symbol]: vi.fn() } },
+      })
+
+      expect(restored).toEqual(staticLong.findAll('path').map(path => path.attributes('d')))
+
+      staticLong.unmount()
+
+      await s.view.get(motionLabel).setValue(true)
+
+      s.data.chartObject.value.easy[0].option[0] = '3'
+      await flushMedia()
+
+      expect(s.isPlaying()).toBe(false)
+      expect(tap.style.transform).toBe('')
+    } finally {
+      s.wrapper.unmount()
+    }
+  })
 
   it('ハイスピードを変更しても音源を止めず、最新の高さで次の描画から追従する', async () => {
     const s = setupLiveSettings()

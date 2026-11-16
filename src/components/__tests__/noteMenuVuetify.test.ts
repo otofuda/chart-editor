@@ -11,6 +11,7 @@ import {
 } from '../../composables/injectionKeys'
 import Note from '../Note.vue'
 import LongNote from '../LongNote.vue'
+import { createPreviewNoteMotion, motionSourceKey } from '../../composables/usePreviewNoteMotion'
 
 const measure: Measure = {
   measure: 0,
@@ -75,9 +76,10 @@ afterEach(() => {
  * 実際のVMenuとノーツを描画し、譜面の表示位置を変更できる状態にする。
  *
  * @param long - ロングノーツを検証する場合はtrue。
+ * @param motion - 個別のspeedとorbitを持つノーツで検証する場合はtrue。
  * @returns 描画したコンポーネントと、譜面の左端を指定する矩形情報。
  */
-function setup(long = false) {
+function setup(long = false, motion = false) {
   const data = long
     ? note({
       type: 2,
@@ -90,6 +92,12 @@ function setup(long = false) {
       ],
     })
     : note()
+
+  if (motion) {
+    data.option = ['2', '1']
+  }
+
+  const renderer = createPreviewNoteMotion()
 
   const host = defineComponent({
     setup: () => () => h('div', { class: 'preview' }, [
@@ -128,6 +136,7 @@ function setup(long = false) {
         [deleteNotesKey as symbol]: vi.fn(),
         [setAppendNoteInfoKey as symbol]: vi.fn(),
         [showSnackbarKey as symbol]: vi.fn(),
+        [motionSourceKey as symbol]: renderer.register,
       },
     },
   })
@@ -138,7 +147,7 @@ function setup(long = false) {
     () => new DOMRect(geometry.left, 0, 420, 3000),
   )
 
-  return { wrapper, geometry }
+  return { wrapper, geometry, renderer }
 }
 
 /** Vueの描画更新と、Vuetify内部の非同期処理の完了を待つ。 */
@@ -148,6 +157,33 @@ async function settle() {
 }
 
 describe('実際のVuetifyメニューの配置', () => {
+  it.each([false, true])('個別描画とメニューが同じノーツ要素を参照できる（ロング=%s）', async long => {
+    const { wrapper, renderer } = setup(long, true)
+    const target = wrapper.get('.note').element as HTMLElement
+
+    try {
+      await settle()
+
+      renderer.configure({ beatHeight: 100, bpm: 120, viewportHeight: 900, lift: 0, drawOffset: 0 })
+      renderer.update(-100)
+
+      expect(wrapper.getComponent(VMenu).vm.activatorEl).toBe(target)
+      expect(target.style.transform).toBe(long
+        ? 'translate3d(15.625px, -100px, 0)'
+        : 'translate3d(31.25px, -200px, 0)')
+
+      await wrapper.get('.note').trigger('click')
+      await settle()
+
+      expect(wrapper.getComponent(VMenu).props('modelValue')).toBe(true)
+      expect(wrapper.getComponent(VMenu).props('target')).toBe(target)
+    } finally {
+      renderer.reset()
+    }
+
+    expect(target.style.transform).toBe('')
+  })
+
   it.each([
     [false, '.note', 240],
     [true, '.note', 420],

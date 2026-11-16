@@ -321,18 +321,27 @@
                 persistent-hint
                 hint="オフの場合は配置欄の split に吸着します"
                 density="compact"
+                color="primary"
               />
               <v-switch
                 v-model="isObjectBasedPreview"
                 label="Object表示モード"
                 hide-details
                 density="compact"
+                color="primary"
               ></v-switch>
 
               <h4 class="d-flex my-2">
                 <v-icon>mdi-tune</v-icon>
                 再生オプション
               </h4>
+              <v-switch
+                v-model="isSimulateNoteMotion"
+                label="ノーツ個別の speed・orbit を再現 (β)"
+                :disabled="isObjectBasedPreview"
+                density="compact"
+                color="primary"
+              />
               <v-text-field
                 class="my-2"
                 v-model.number="lift"
@@ -446,6 +455,7 @@ import { createPreviewSounds } from '@/composables/usePreviewSounds'
 import { readLegacyNumber, usePersistedRef, writeLegacyNumber } from '@/composables/usePersistedRef'
 import { noteDragKey, useNoteDrag } from '@/composables/useNoteDrag'
 import { hasMovableLane, noteBottom } from '@/composables/noteMovement'
+import { createPreviewNoteMotion, motionSourceKey } from '@/composables/usePreviewNoteMotion'
 
 const props = defineProps<{
   currentChart?: ExtendedNoteData[]
@@ -461,6 +471,8 @@ const props = defineProps<{
   isPreviewMode?: boolean
   isImageMode?: boolean
   placementSplit?: number
+  /** 個別orbitを本体の描画距離から換算するための1拍の高さ。 */
+  beatHeight?: number
   /** 自動判定と手動選択から決まった、実際のレイアウト。 */
   layout?: EditorLayout
   /** 譜面をページ全体ではなく、専用領域内でスクロールするか。 */
@@ -481,9 +493,10 @@ const goTo = useGoTo()
 /** 譜面とエフェクトを、横スクロール後も同じ原寸の座標に揃える。 */
 function updateViewport() {
   const element = scrollViewport.value
-  if (!element || !props.contained) return
-  viewportHeight.value = element.clientHeight
-  effectsLeft.value = Math.max(0, (element.clientWidth - 420) / 2) - element.scrollLeft
+  viewportHeight.value = props.contained && element ? element.clientHeight : window.innerHeight
+  if (element && props.contained) {
+    effectsLeft.value = Math.max(0, (element.clientWidth - 420) / 2) - element.scrollLeft
+  }
 }
 
 /** 広い画面のページスクロールと、分割領域内のスクロールを共通化する。 */
@@ -561,6 +574,46 @@ const comboOpacity = usePersistedRef('chart-editor__combo-opacity', 50, {
 }) // コンボ数の透明度
 const isObjectBasedPreview = usePersistedRef('chart-editor__object-based-preview', false)
 
+/** ノーツ固有のspeed・orbitを再現する、次回起動時にも保持する設定。 */
+const isSimulateNoteMotion = usePersistedRef('chart-editor__simulate-note-motion', false)
+
+/** 子コンポーネントの描画情報を集め、単一の再生フレームから更新する制御。 */
+const noteMotion = createPreviewNoteMotion()
+
+provide(motionSourceKey, noteMotion.register)
+
+/** 設定がONでも、停止中とObject表示では個別の座標補正を行わない。 */
+const noteMotionEnabled = computed(() =>
+  isSimulateNoteMotion.value && isPreviewing.value && !isObjectBasedPreview.value,
+)
+
+/** 最新の表示設定を個別描画へ渡し、停止中なら補正を解除する。 */
+function refreshNoteMotion() {
+  if (!noteMotionEnabled.value) {
+    noteMotion.reset()
+    return
+  }
+
+  noteMotion.configure({
+    beatHeight: props.beatHeight ?? 100,
+    bpm: props.infoObject.bpm,
+    viewportHeight: viewportHeight.value,
+    lift: Number(lift.value) || 0,
+    drawOffset: Number(drawOffset.value) || 0,
+  })
+
+  noteMotion.update(getPreviewPosition(props.measureData ?? [], lastChartTime))
+}
+
+// Vueが子の静的座標を書き換える前に補正を戻し、以前のSVGパスの復元が変更後の座標を覆わないようにする。
+watch([() => props.measureData, () => props.beatHeight], () => noteMotion.reset())
+
+// 子のDOM更新が終わってから最新の参照を読み直すと、倍率変更後も正しい座標で再構築できる。
+watch([
+  noteMotionEnabled, () => props.measureData, () => props.beatHeight,
+  () => props.infoObject.bpm, viewportHeight, lift, drawOffset,
+], refreshNoteMotion, { flush: 'post' })
+
 // LIFT・SUDDEN・HIDDEN は、既存の保存形式との互換性を保つ。
 watch(lift, (v) => writeLegacyNumber('chart-editor__lift', v))
 watch(sudden, (v) => writeLegacyNumber('chart-editor__sudden', v))
@@ -622,13 +675,21 @@ function setLEDColor(color?: string) {
   }
 }
 
+/** 同じ譜面時刻から全体移動・個別描画・到達イベントを更新し、表示と音を同期する。 */
 function updatePreview(time: number) {
   lastChartTime = time
   const liveMeasures = measures.value
+  const position = getPreviewPosition(liveMeasures, time)
+
   if (previewContent.value) {
-    const transform = `translate3d(0, ${getPreviewPosition(liveMeasures, time)}px, 0)`
+    const transform = `translate3d(0, ${position}px, 0)`
     if (previewContent.value.style.transform !== transform) previewContent.value.style.transform = transform
   }
+
+  if (noteMotionEnabled.value) {
+    noteMotion.update(position)
+  }
+
   if (playback.phase === 'preparing' || playback.phase === 'starting') return
   const eventTime = time - (musicOffset.value - playbackOffset)
   if (eventOffset !== musicOffset.value) {
@@ -736,6 +797,7 @@ function clearNoteEffects() {
 
 function clearPlayback() {
   playback.stop()
+  noteMotion.reset()
   noteEventPlayer?.stop()
   noteEventsStarted = false
   previewSounds.stop()
@@ -764,6 +826,8 @@ function previewStart() {
   playbackOffset = eventOffset = musicOffset.value
   const countInMs = (60 / props.infoObject.bpm) * props.infoObject.beat * 1000
   setNoteEvents(startFrom.value === 0 ? 0 : selected.measureReachTime)
+  updateViewport()
+  refreshNoteMotion()
   void playback.start({
     audio: props.previewAudio,
     prepare: isPlayKeySound.value || isPlayGuide.value ? previewSounds.prepare : undefined,
@@ -899,6 +963,7 @@ function prepareLayoutChange(nextLayout: EditorLayout) {
 let viewportObserver: ResizeObserver | undefined
 onMounted(() => {
   updateViewport()
+  window.addEventListener('resize', updateViewport)
   if (typeof ResizeObserver !== 'undefined' && scrollViewport.value) {
     viewportObserver = new ResizeObserver(updateViewport)
     viewportObserver.observe(scrollViewport.value)
@@ -927,6 +992,7 @@ const previewEvents = computed((): PreviewEvents =>
 
 onBeforeUnmount(() => {
   layoutTransition++
+  window.removeEventListener('resize', updateViewport)
   viewportObserver?.disconnect()
   clearPlayback()
   previewSounds.dispose()

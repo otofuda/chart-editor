@@ -80,7 +80,7 @@ const previewCheckboxes = [
   'チェックボックスを表示', '打鍵音を再生 (β)', 'LN終点音を再生 (α)',
   'キービームとコンボを表示', 'フリックエフェクト (β)',
   'LeapMotion補助線をシミュレート (α)', 'LED制御をシミュレート (β)',
-  '小節ガイド音を再生', 'Object表示モード',
+  '小節ガイド音を再生', 'ノーツ個別の speed・orbit を再現', 'Object表示モード',
 ]
 
 function input(wrapper: ReturnType<typeof mount>, label: string) {

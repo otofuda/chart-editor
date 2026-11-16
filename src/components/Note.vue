@@ -26,6 +26,7 @@
           background: dispColor
         }"
         v-bind="props"
+        :ref="element => setMotionElement(element, props.ref)"
         @pointerdown="noteDrag?.start($event, note)"
         @click="rememberMenuTarget"
         @keydown="rememberMenuTarget"
@@ -33,6 +34,7 @@
         <!-- テクスチャの時 -->
         <img
           v-if="drawType === 94"
+          ref="textureElement"
           :src="
             String(drawOptions[0]).startsWith('texture')
             ? `https://db.otofuda.com/${drawOptions[0]}`
@@ -232,7 +234,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, ref, type ComponentPublicInstance } from 'vue'
 import { stopNumberInputArrowKeys } from '@/composables/useNumberInputKeys'
 import { type ExtendedNoteData, type Measure } from '@/types'
 import { noteTypes, noteOptions } from '@/composables/useNoteTypes'
@@ -243,6 +245,11 @@ import { useNoteMenuLocation } from '@/composables/useNoteMenuLocation'
 import { noteDragKey } from '@/composables/useNoteDrag'
 import { canDragNote } from '@/composables/noteMovement'
 import { useHistoryFields, vHistoryField } from '@/composables/useHistoryField'
+import {
+  getNoteMotion,
+  usePreviewMotionSource,
+  type MotionSource,
+} from '@/composables/usePreviewNoteMotion'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -255,6 +262,59 @@ const setAppendNoteInfo = inject(setAppendNoteInfoKey)!
 const showSnackbar = inject(showSnackbarKey)!
 const getOtofudaWarning = inject(otofudaWarningKey, () => false)
 const noteDrag = inject(noteDragKey, null)
+
+/** 個別の位置補正を適用するノーツ本体の要素。 */
+const motionElement = ref<HTMLElement | null>(null)
+
+/** speedに合わせて、下面を基準に拡縮するテクスチャ画像。 */
+const textureElement = ref<HTMLImageElement | null>(null)
+
+/**
+ * 描画補正とVuetifyのメニューで、同じノーツ要素を共有する。
+ * activatorのpropsにはrefも含まれるため、v-bindとは別に両方の参照を更新する。
+ *
+ * @param element マウント時のノーツ要素。アンマウント時にはnullを受け取る。
+ * @param activatorRef Vuetifyがメニューのフォーカスや配置に使う参照の更新関数。
+ */
+function setMotionElement(
+  element: Element | ComponentPublicInstance | null,
+  activatorRef?: (element: Element | ComponentPublicInstance | null) => void,
+) {
+  motionElement.value = element instanceof HTMLElement ? element : null
+
+  activatorRef?.(element)
+}
+
+/**
+ * 現在のノーツ要素と補正前の座標を、個別描画のキャッシュへ提供する。
+ * 小節内の縦位置を譜面全体の位置へ変換する。単独ノーツの横位置と幅は既存CSSに任せる。
+ */
+function collectMotionSource(): MotionSource {
+  const modifiers = getNoteMotion(props.note)
+
+  if (!modifiers || !motionElement.value) {
+    return {}
+  }
+
+  return {
+    nodes: [{
+      element: motionElement.value,
+      point: {
+        ...modifiers,
+        bottom: props.measure.measurePositionBottom + positionBottom.value,
+        left: 0,
+        width: 0,
+      },
+      texture: textureElement.value ? {
+        element: textureElement.value,
+        height: props.measure.measureHeight * Number(drawOptions.value[2]),
+      } : undefined,
+    }],
+  }
+}
+
+// ここでは取得関数だけを登録し、個別描画が有効になるまで情報の生成を待つ。
+usePreviewMotionSource(collectMotionSource)
 
 const { history, field, change } = useHistoryFields()
 const {

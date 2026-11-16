@@ -28,6 +28,7 @@
           :isPreviewMode="isPreviewMode"
           :isImageMode="isImageMode"
           :placementSplit="appendNote.split"
+          :beatHeight="beatHeight"
         />
 
         <!-- 編集用の操作パネル。上下分割では譜面と独立してスクロールする。 -->

@@ -23,6 +23,7 @@
           width: `${getWidth(note)}px`
         }"
         v-bind="props"
+        :ref="element => setMotionRoot(element, props.ref)"
         @pointerdown="noteDrag?.start($event, note)"
         @click="rememberMenuTarget"
         @keydown="rememberMenuTarget"
@@ -43,6 +44,7 @@
         <!-- 中継点かつ type: 1 の場合は小さな〇（コンボ加算中点） -->
         <span
           v-if="ep.isIntermediate && ep.note.type === 1"
+          :ref="el => setMotionNode(ep.id, el)"
           class="note-midpoint"
           :class="{ 'note-draggable': noteDrag?.enabled.value }"
           :style="{
@@ -60,6 +62,7 @@
         <!-- 末端終点（type !== 89）の場合は通常のノートバー -->
         <span
           v-else-if="!ep.isIntermediate && ep.note.type !== 89"
+          :ref="el => setMotionNode(ep.id, el)"
           class="note"
           :class="[
             `type${ep.note.type}`,
@@ -80,6 +83,7 @@
         <!-- 不可視ノード（type: 89）だが speed または orbit が指定されている場合はバッジのみ表示 -->
         <span
           v-else-if="hasSpeedOrOrbit(ep.note)"
+          :ref="el => setMotionNode(ep.id, el)"
           class="note-invisible-badge"
           :class="{ 'note-draggable': noteDrag?.enabled.value }"
           :style="{
@@ -118,7 +122,12 @@
         }"
         @pointerdown="noteDrag?.startWhole($event, note)"
       >
-        <g v-for="seg in treeData.segments" :key="seg.id" @click.stop="openMenu">
+        <g
+          v-for="seg in treeData.segments"
+          :key="seg.id"
+          :ref="el => setMotionSegment(seg.id, el)"
+          @click.stop="openMenu"
+        >
           <path :d="seg.paths.fillPath" class="hold-fill" />
           <path :d="seg.paths.leftBorderPath" class="hold-border" />
           <path :d="seg.paths.rightBorderPath" class="hold-border" />
@@ -266,7 +275,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, ref, type ComponentPublicInstance } from 'vue'
 import { stopNumberInputArrowKeys } from '@/composables/useNumberInputKeys'
 import type { NoteData } from 'chart-types'
 import { type ExtendedNoteData, type Measure } from '@/types'
@@ -277,6 +286,12 @@ import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
 import { useNoteMenuLocation } from '@/composables/useNoteMenuLocation'
 import { noteDragKey } from '@/composables/useNoteDrag'
 import { numberInputValue, useHistoryFields, vHistoryField } from '@/composables/useHistoryField'
+import {
+  getNoteMotion,
+  usePreviewMotionSource,
+  type MotionPoint,
+  type MotionSource,
+} from '@/composables/usePreviewNoteMotion'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -286,6 +301,112 @@ const props = defineProps<{
 
 const deleteNotes = inject(deleteNotesKey)!
 const noteDrag = inject(noteDragKey, null)
+
+/** ロング始点の位置補正を適用する要素。 */
+const motionRoot = ref<HTMLElement | null>(null)
+
+/** ツリー内の経路IDと、現在表示している中点・終点の要素との対応。 */
+const motionNodes = new Map<string, HTMLElement>()
+
+/** ツリー内の区間IDと、その帯を構成するSVGグループとの対応。 */
+const motionSegments = new Map<string, SVGGElement>()
+
+/**
+ * ロング始点を描画補正へ渡し、同じ要素をVuetifyのactivatorにも保持させる。
+ * v-bindによるrefの上書きを避け、メニューの配置やフォーカスにも必要な参照を残す。
+ *
+ * @param element マウント時の始点要素。アンマウント時にはnullを受け取る。
+ * @param activatorRef Vuetifyが渡す参照の更新関数。
+ */
+function setMotionRoot(
+  element: Element | ComponentPublicInstance | null,
+  activatorRef?: (element: Element | ComponentPublicInstance | null) => void,
+) {
+  motionRoot.value = element instanceof HTMLElement ? element : null
+
+  activatorRef?.(element)
+}
+
+/** 中点・終点の表示切り替えや破棄に合わせて、要素の参照を更新する。 */
+function setMotionNode(id: string, element: Element | ComponentPublicInstance | null) {
+  if (element instanceof HTMLElement) {
+    motionNodes.set(id, element)
+  } else {
+    motionNodes.delete(id)
+  }
+}
+
+/** 帯の生成・破棄に合わせて、パスを更新するSVGグループの参照を更新する。 */
+function setMotionSegment(id: string, element: Element | ComponentPublicInstance | null) {
+  if (element instanceof SVGElement) {
+    motionSegments.set(id, element as SVGGElement)
+  } else {
+    motionSegments.delete(id)
+  }
+}
+
+/**
+ * ロングの全端点と帯の接続関係を、その時点の座標とともに収集する。
+ * 不可視端点に対応する要素がなくても、帯を結ぶ座標は取得しておく。
+ */
+function collectMotionSource(): MotionSource {
+  /** 複数の帯から共有する端点について、同じ座標情報の生成を繰り返さないための対応表。 */
+  const points = new Map<NoteData, MotionPoint>()
+
+  /** 端点ごとの速度を独立して読み、帯の中心位置と幅を含む描画情報を取得する。 */
+  function point(note: NoteData): MotionPoint {
+    let result = points.get(note)
+
+    if (!result) {
+      result = {
+        ...(getNoteMotion(note, note !== props.note) ?? { speed: 1, orbit: 0 }),
+        bottom: getBottom(note),
+        left: getMidpointLeft(note) + 5,
+        width: getHoldNodeWidth(note) * 38,
+      }
+
+      points.set(note, result)
+    }
+
+    return result
+  }
+
+  const nodes: NonNullable<MotionSource['nodes']> = []
+
+  if (motionRoot.value) {
+    nodes.push({ element: motionRoot.value, point: point(props.note) })
+  }
+
+  for (const endpoint of treeData.value.endpoints) {
+    const element = motionNodes.get(endpoint.id)
+
+    if (element) {
+      nodes.push({ element, point: point(endpoint.note) })
+    }
+  }
+
+  // 帯は親と子の補正後の座標を結ぶ。曲線の種類と幅は編集時の指定を引き継ぐ。
+  const segments: NonNullable<MotionSource['segments']> = []
+
+  for (const segment of treeData.value.segments) {
+    const element = motionSegments.get(segment.id)
+
+    if (element) {
+      segments.push({
+        element,
+        start: point(segment.parent),
+        end: point(segment.child),
+        curve: segment.curveType,
+        height: entireHeight.value,
+      })
+    }
+  }
+
+  return { nodes, segments }
+}
+
+// 通常の編集表示では参照の登録だけを行い、収集処理は個別描画の有効化まで実行しない。
+usePreviewMotionSource(collectMotionSource)
 
 const { history, field, change, input } = useHistoryFields()
 const {
