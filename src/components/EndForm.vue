@@ -88,7 +88,7 @@
           min="0"
           :max="end.split - 1"
           bg-color="editor-highlight"
-          @keydown.enter="placeNotes"
+          @keydown.enter="handlePositionEnter($event, placeNotes)"
           @keydown.left="endToLeft"
           @keydown.right="endToRight"
           @keydown.up.stop="endToUp"
@@ -183,6 +183,7 @@ import { computed } from 'vue'
 import type { LaneType, NoteData } from 'chart-types'
 import { curveTypeOptions, getCurveType, type CurveType } from '@/composables/useNoteTypes'
 import { numberInputValue, useHistoryFields, vHistoryField } from '@/composables/useHistoryField'
+import { handlePositionEnter } from '@/composables/useEditorShortcuts'
 
 const props = withDefaults(
   defineProps<{

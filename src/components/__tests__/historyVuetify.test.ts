@@ -5,7 +5,7 @@ import { createVuetify } from 'vuetify'
 import { VTextField } from 'vuetify/components/VTextField'
 import { useChartData } from '../../composables/useChartData'
 import { vHistoryField } from '../../composables/useHistoryField'
-import { useHistoryShortcuts } from '../../composables/useHistoryShortcuts'
+import { useEditorShortcuts } from '../../composables/useEditorShortcuts'
 import HistoryControls from '../HistoryControls.vue'
 
 let wrapper: VueWrapper | undefined
@@ -28,7 +28,7 @@ describe('Vuetify入力欄と譜面履歴の接続', () => {
     const data = useChartData()
     const host = defineComponent({
       setup() {
-        useHistoryShortcuts({ undo: data.history.undo, redo: data.history.redo, saveBackup: vi.fn() })
+        useEditorShortcuts({ undo: data.history.undo, redo: data.history.redo, saveBackup: vi.fn() })
         return () => h('div', [
           withDirectives(h(VTextField, {
             label: 'BPM', modelValue: data.chartObject.value.info.bpm,

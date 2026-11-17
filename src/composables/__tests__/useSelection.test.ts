@@ -3,18 +3,92 @@ import { useChartData } from '../useChartData'
 import { useSelection } from '../useSelection'
 import type { ExtendedNoteData } from '../../types'
 
+/**
+ * 選択操作の検証用に、必要な項目だけを変更したノーツを作る。
+ *
+ * @param overrides 種別・位置・選択状態など、初期値から変更する項目
+ * @returns 選択処理へ渡すノーツデータ
+ */
 function makeNote(overrides: Partial<ExtendedNoteData> = {}): ExtendedNoteData {
-  return { index: 1, type: 1, lane: 1, measure: 0, position: 0, split: 8, option: [], end: [], ...overrides }
+  return {
+    index: 1,
+    type: 1,
+    lane: 1,
+    measure: 0,
+    position: 0,
+    split: 8,
+    option: [],
+    end: [],
+    ...overrides,
+  }
 }
 
+/** 譜面・選択処理・通知先を生成し、選択操作の状態を確認できるようにする。 */
 function setup() {
   const chartData = useChartData()
   const showSnackbar = vi.fn()
   const selection = useSelection(chartData, showSnackbar)
+
   return { chartData, selection, showSnackbar }
 }
 
 describe('useSelection', () => {
+  it('全選択は条件やTypeに関係なく現在の難易度のルートだけを選び、参照と履歴を保つ', () => {
+    const { chartData, selection } = setup()
+    const child = makeNote({ isSelected: false })
+    chartData.chartObject.value.easy = [
+      makeNote({ type: 1, measure: 0 }),
+      makeNote({ index: 2, type: 2, measure: 1, end: [child] }),
+      makeNote({ index: 3, type: 5, measure: 10 }),
+      makeNote({ index: 4, type: 100, measure: 20 }),
+      makeNote({ index: 5, type: 999, measure: 100, isSelected: true }),
+    ]
+    chartData.chartObject.value.hard = [makeNote({ isSelected: false })]
+
+    // 全選択が、条件付き一括選択の絞り込み設定を参照・変更しないことを確認する。
+    selection.batchSelectTypes.value = [1]
+    selection.batchSelectStart.value = 5
+    selection.batchSelectEnd.value = 10
+
+    const chart = chartData.currentChart.value
+    const roots = [...chart]
+    const history = [...chartData.history.entries.value]
+
+    selection.selectionAll()
+    selection.selectionAll()
+
+    expect(selection.selectionNumber.value).toBe(5)
+    expect(chart.every(note => note.isSelected)).toBe(true)
+    expect(chartData.currentChart.value).toBe(chart)
+
+    // 参照・子ノーツ・他難易度・選択条件・履歴を保っていることを確認する。
+    chart.forEach((note, index) => expect(note).toBe(roots[index]))
+    expect((chart[1].end[0] as ExtendedNoteData).isSelected).toBe(false)
+    expect(chartData.chartObject.value.hard[0].isSelected).toBe(false)
+    expect(selection.batchSelectTypes.value).toEqual([1])
+    expect(selection.batchSelectStart.value).toBe(5)
+    expect(selection.batchSelectEnd.value).toBe(10)
+    expect(chartData.history.entries.value).toEqual(history)
+    expect(chartData.history.canUndo.value).toBe(false)
+  })
+
+  it('空譜面の全選択は履歴を作らず、切り替え後の難易度を対象にできる', () => {
+    const { chartData, selection } = setup()
+
+    selection.selectionAll()
+
+    expect(selection.selectionNumber.value).toBe(0)
+    expect(chartData.history.canUndo.value).toBe(false)
+
+    chartData.chartObject.value.extra = [makeNote({ isSelected: false })]
+    chartData.currentDifficulty.value = 'extra'
+
+    selection.selectionAll()
+
+    expect(selection.selectionNumber.value).toBe(1)
+    expect(chartData.history.canUndo.value).toBe(false)
+  })
+
   it('初期状態でバッチ選択リストは空', () => {
     const { selection } = setup()
     expect(selection.batchSelectTarget.value.length).toBe(0)

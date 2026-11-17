@@ -230,6 +230,7 @@
                 class="mr-1"
                 variant="outlined"
                 color="success"
+                :title="shortcutTitle('togglePlayback')"
                 @click.stop="previewStart"
                 :disabled="isPreviewing || isObjectBasedPreview"
               >
@@ -239,6 +240,7 @@
                 class="ml-2 mr-2"
                 variant="outlined"
                 color="error"
+                :title="shortcutTitle('togglePlayback')"
                 @click.stop="previewStop()"
               >
                 <v-icon left>mdi-stop</v-icon> 停止
@@ -429,6 +431,7 @@
 import {
   ref,
   computed,
+  readonly,
   inject,
   provide,
   onMounted,
@@ -454,6 +457,7 @@ import { createPreviewPlayback, getPreviewMeasureIndex, getPreviewPosition } fro
 import { createPreviewSounds } from '@/composables/usePreviewSounds'
 import { readLegacyNumber, usePersistedRef, writeLegacyNumber } from '@/composables/usePersistedRef'
 import { noteDragKey, useNoteDrag } from '@/composables/useNoteDrag'
+import { shortcutTitle } from '@/composables/useEditorShortcuts'
 import { hasMovableLane, noteBottom } from '@/composables/noteMovement'
 import { createPreviewNoteMotion, motionSourceKey } from '@/composables/usePreviewNoteMotion'
 
@@ -806,7 +810,12 @@ function clearPlayback() {
   clearNoteEffects()
 }
 
+/** 再生可能な表示状態で、設定した開始小節からプレビューの準備と再生を始める。 */
 function previewStart() {
+  if (isPreviewing.value || isObjectBasedPreview.value) {
+    return false
+  }
+
   const selected = measures.value[startFrom.value]
   if (!selected) {
     showSnackbar(`${startFrom.value}小節はありません`)
@@ -842,6 +851,11 @@ function previewStart() {
   })
 }
 
+/**
+ * 再生状態とエフェクトを解除し、必要なら再生前のスクロール位置へ戻す。
+ *
+ * @param restoreScroll ファイル変更などで位置復元を予約したくない場合はfalse
+ */
 function previewStop(restoreScroll = true) {
   const position = returnPosition.value
   returnPosition.value = -1
@@ -861,6 +875,22 @@ function previewStop(restoreScroll = true) {
     timeoutIds.value.push(setTimeout(() => {
       (scrollContainer.value ?? window).scrollTo({ top: position, behavior: 'auto' })
     }, 50) as unknown as number)
+  }
+}
+
+/** 停止ボタンと同じく、再生前のスクロール位置へ戻す。 */
+function stopPlayback(): void {
+  if (isPreviewing.value) {
+    previewStop()
+  }
+}
+
+/** 現在の再生状態に応じて、通常の開始またはスクロール位置を復元する停止を行う。 */
+function togglePlayback(): void {
+  if (isPreviewing.value) {
+    stopPlayback()
+  } else {
+    previewStart()
   }
 }
 
@@ -973,6 +1003,10 @@ onMounted(() => {
 // ファイル選択時はデータの変更通知を待たず、スクロール予約も残さずに終了する。
 defineExpose({
   stop: () => previewStop(false),
+  togglePlayback,
+  stopPlayback,
+  isPlaying: readonly(isPreviewing),
+  isDragging: noteDrag.isActive,
   cancelDrag: noteDrag.cancel,
   scrollToMeasure,
   prepareLayoutChange,

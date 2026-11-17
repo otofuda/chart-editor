@@ -80,7 +80,7 @@ const previewCheckboxes = [
   'チェックボックスを表示', '打鍵音を再生 (β)', 'LN終点音を再生 (α)',
   'キービームとコンボを表示', 'フリックエフェクト (β)',
   'LeapMotion補助線をシミュレート (α)', 'LED制御をシミュレート (β)',
-  '小節ガイド音を再生', 'ノーツ個別の speed・orbit を再現', 'Object表示モード',
+  '小節ガイド音を再生', 'ノーツ個別の speed・orbit を再現 (β)', 'Object表示モード',
 ]
 
 function input(wrapper: ReturnType<typeof mount>, label: string) {
@@ -251,6 +251,38 @@ describe('分割レイアウトのプレビュー操作', () => {
     await vi.advanceTimersByTimeAsync(50)
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 345, behavior: 'auto' })
     expect(window.scrollTo).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('公開したキー操作用APIで再生準備中にも停止し、開始前の位置を復元する（分割=%s）', async contained => {
+    const { wrapper, viewport, scrollTo } = makePreview(contained)
+    const audio = new Audio()
+
+    // 音源の準備を完了させず、再生開始前でも停止できる条件を作る。
+    audio.src = 'https://example.test/song.mp3'
+    vi.spyOn(audio, 'load').mockImplementation(() => {})
+    vi.spyOn(audio, 'pause').mockImplementation(() => {})
+
+    await wrapper.setProps({ previewAudio: audio })
+    await input(wrapper, '再生開始小節').setValue('1')
+    viewport.scrollTop = 345
+    vi.stubGlobal('scrollY', 345)
+
+    wrapper.vm.togglePlayback()
+    await nextTick()
+    expect(wrapper.vm.isPlaying).toBe(true)
+    expect(wrapper.classes()).toContain('playing')
+    expect(audio.load).toHaveBeenCalledOnce()
+
+    // 左右／上下のどちらでも、通常停止では開始前の位置へ戻る。
+    wrapper.vm.stopPlayback()
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(50)
+
+    expect(wrapper.vm.isPlaying).toBe(false)
+    expect(wrapper.classes()).not.toContain('playing')
+    expect(contained ? scrollTo : window.scrollTo).toHaveBeenLastCalledWith({ top: 345, behavior: 'auto' })
+    expect((input(wrapper, '再生開始小節').element as HTMLInputElement).value).toBe('1')
+    expect(audio.pause).toHaveBeenCalled()
   })
 
   it('エフェクトを横スクロール後の譜面位置と領域高に合わせる', async () => {

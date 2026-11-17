@@ -99,12 +99,18 @@
           <v-checkbox
             v-model="isAppendMode"
             label="ノート挿入モード"
+            :title="shortcutTitle('toggleAppendMode')"
             density="compact"
             hide-details
             class="mb-2"
           />
 
-          <v-card v-show="isAppendMode" class="append-card pa-4" rounded="0">
+          <v-card
+            v-show="isAppendMode"
+            class="append-card pa-4"
+            rounded="0"
+            data-editor-placement
+          >
             <v-row justify="space-between">
               <v-checkbox
                 v-model="isAutoFollow"
@@ -160,7 +166,7 @@
                   min="0"
                   :max="appendNote.split - 1"
                   bg-color="editor-highlight"
-                  @keydown.enter="placeNotes(appendNote)"
+                  @keydown.enter="handlePositionEnter($event, () => placeNotes(appendNote))"
                   @keydown.left="appendNoteToLeft"
                   @keydown.right="appendNoteToRight"
                   @keydown.up="appendNoteToUp"
@@ -310,6 +316,7 @@
                 <v-btn
                   class="ml-1"
                   color="green"
+                  :title="shortcutTitle('placeNotes')"
                   @click="placeNotes(appendNote)"
                 >
                   ノートを仮配置
@@ -326,6 +333,7 @@
                     color="orange"
                     theme="dark"
                     append-icon="mdi-plus-circle-outline"
+                    :title="shortcutTitle('appendNotes')"
                     @click="appendNotes(...preAppendNotes)"
                   >
                     挿入する
@@ -494,6 +502,17 @@
 
           <v-row align="center" class="py-2">
             <v-btn
+              data-testid="select-all"
+              color="primary"
+              variant="outlined"
+              prepend-icon="mdi-select-all"
+              :title="shortcutTitle('selectAll')"
+              @click="selectionAll"
+            >
+              すべて選択
+            </v-btn>
+
+            <v-btn
               color="primary"
               variant="outlined"
               prepend-icon="mdi-checkbox-marked-circle-outline"
@@ -506,6 +525,7 @@
               color="warning"
               variant="outlined"
               prepend-icon="mdi-select-off"
+              :title="shortcutTitle('escape')"
               @click="selectionClear"
             >
               すべて選択解除
@@ -517,7 +537,9 @@
                   color="error"
                   variant="outlined"
                   prepend-icon="mdi-delete-forever"
-                  @click="dialog.selectionDelete = true"
+                  :title="shortcutTitle('deleteSelection')"
+                  :disabled="selectionNumber === 0"
+                  @click="openSelectionDelete"
                   v-bind="props"
                 >
                   選択ノーツを削除
@@ -607,6 +629,7 @@
             <v-btn
               color="primary"
               @click="dialog.help = true"
+              :title="shortcutTitle('help')"
               variant="outlined"
               prepend-icon="mdi-help-circle"
             >
@@ -1092,7 +1115,12 @@ import NoteTypePie from './components/NoteTypePie.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import HistoryControls from './components/HistoryControls.vue'
 import { vHistoryField } from './composables/useHistoryField'
-import { useHistoryShortcuts } from './composables/useHistoryShortcuts'
+import {
+  handlePositionEnter,
+  shortcutTitle,
+  useEditorShortcuts,
+  type EditorShortcutId,
+} from './composables/useEditorShortcuts'
 
 import usageContent from '../Usage.md?raw'
 
@@ -1177,12 +1205,20 @@ function redo() {
   }
 }
 
-useHistoryShortcuts({ undo, redo, saveBackup })
-
+/**
+ * 指定した小節の存在を確認し、譜面領域をスクロールする。
+ *
+ * @param measureNumber 移動先の小節番号
+ */
 function scrollToMeasure(measureNumber: number): void {
-  const m = measureData.value[measureNumber]
+  const measure = measureData.value[measureNumber]
   const last = measureData.value.at(-1)
-  if (!m || !last) { showSnackbar(`${measureNumber}小節はありません`); return }
+
+  if (!measure || !last) {
+    showSnackbar(`${measureNumber}小節はありません`)
+    return
+  }
+
   previewRef.value?.scrollToMeasure(measureNumber)
 }
 
@@ -1206,6 +1242,7 @@ const {
   selectionLaneAddition,
   selectionTypeTo,
   selectionMeasureAddition,
+  selectionAll,
   selectionClear,
   selectionDelete: doSelectionDelete,
   selectionChangeType,
@@ -1219,6 +1256,7 @@ const {
   selectionChangeOptions,
 } = selection
 
+/** 再生・停止・スクロールなど、譜面領域に属する操作の呼び出し先。 */
 const previewRef = ref<InstanceType<typeof Preview> | null>(null)
 
 // 親のクラスを書き換える前に譜面位置を記録し、DOM更新後に復元する。
@@ -1250,6 +1288,65 @@ const dialog = ref({
   checked: false,
   batchcheck: false,
   texture: false,
+})
+
+/** 削除はキー・ボタンとも、対象がある場合だけ確認へ進む。 */
+function openSelectionDelete(): void {
+  if (selectionNumber.value > 0) {
+    dialog.value.selectionDelete = true
+  }
+}
+
+/**
+ * モードや選択数に応じて、現在実行できるショートカットを判断する。
+ *
+ * @param id 利用可否を調べる操作の識別子
+ * @returns 操作対象が存在し、実行できる状態ならtrue
+ */
+function isEditorShortcutEnabled(id: EditorShortcutId): boolean {
+  switch (id) {
+    case 'togglePlayback':
+      return previewRef.value !== null
+    case 'placeNotes':
+      return isAppendMode.value
+    case 'appendNotes':
+      return isAppendMode.value && preAppendNotes.value.length > 0
+    case 'deleteSelection':
+      return selectionNumber.value > 0
+    case 'escape':
+      return Boolean(previewRef.value?.isPlaying) || selectionNumber.value > 0
+    default:
+      return true
+  }
+}
+
+// ボタンと同じ処理を登録し、キー操作専用の履歴や編集経路を作らない。
+useEditorShortcuts({
+  undo,
+  redo,
+  saveBackup,
+  togglePlayback: () => previewRef.value?.togglePlayback(),
+  toggleAppendMode: () => {
+    isAppendMode.value = !isAppendMode.value
+  },
+  placeNotes: () => placeNotes(appendNote.value),
+  appendNotes: () => appendNotes(...preAppendNotes.value),
+  selectAll: selectionAll,
+  deleteSelection: openSelectionDelete,
+  escape: () => {
+    // 一回のEscで再生停止と選択解除の両方を行わない。
+    if (previewRef.value?.isPlaying) {
+      previewRef.value.stopPlayback()
+    } else {
+      selectionClear()
+    }
+  },
+  help: () => {
+    dialog.value.help = true
+  },
+}, {
+  isDragging: () => previewRef.value?.isDragging ?? false,
+  enabled: isEditorShortcutEnabled,
 })
 
 /** 一括変更フォームの入力状態。値が混在している項目は空欄で表示する。 */

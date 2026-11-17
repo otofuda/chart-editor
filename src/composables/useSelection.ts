@@ -160,6 +160,18 @@ export function useSelection(
   }
 
   /**
+   * 条件付き一括選択とは独立して、現在の難易度の全ルートを選択する。
+   * 配列やノーツの参照を保ち、再生の継続と履歴に含めない選択操作を両立する。
+   */
+  function selectionAll(): void {
+    currentChart.value.forEach(note => {
+      note.isSelected = true
+    })
+
+    showSnackbar(`${currentChart.value.length}個のノーツをすべて選択しました`)
+  }
+
+  /**
    * すべて選択解除する
    */
   function selectionClear(): void {
@@ -292,6 +304,7 @@ export function useSelection(
     selectionLaneAddition,
     selectionTypeTo,
     selectionMeasureAddition,
+    selectionAll,
     selectionClear,
     selectionDelete: (close: () => void) => chartData.history.run(
       { label: '選択ノーツを削除' },

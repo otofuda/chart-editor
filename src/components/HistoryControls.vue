@@ -100,6 +100,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ChartHistory, HistoryEntry } from '../composables/useChartHistory'
+import { shortcutKeys } from '../composables/useEditorShortcuts'
 
 const props = defineProps<{ history: ChartHistory }>()
 
@@ -140,14 +141,14 @@ const reversedEntries = computed(() => (
 const undoTitle = computed(() => {
   const entry = props.history.entries.value[props.history.cursor.value - 1]
 
-  return `${entry?.label ?? '元に戻す'} (Ctrl/Cmd+Z)`
+  return `${entry?.label ?? '元に戻す'} (${shortcutKeys('undo')})`
 })
 
 /** やり直す操作名と対応するショートカットをボタンの補足へ表示する。 */
 const redoTitle = computed(() => {
   const entry = props.history.entries.value[props.history.cursor.value]
 
-  return `${entry?.label ?? 'やり直す'} (Ctrl+Y / Ctrl/Cmd+Shift+Z)`
+  return `${entry?.label ?? 'やり直す'} (${shortcutKeys('redo')})`
 })
 </script>
 

@@ -534,7 +534,7 @@ describe('Previewとの接続と後始末', () => {
   }
 
   /** 実際のラベルに結び付いた、個別描画設定の入力要素のセレクター。 */
-  const motionLabel = 'input[aria-label="ノーツ個別の speed・orbit を再現"]'
+  const motionLabel = 'input[aria-label="ノーツ個別の speed・orbit を再現 (β)"]'
 
   /** 分岐・曲線・不可視端点と装飾を、一つのプレビューで検証するための譜面。 */
   function motionChart() {

@@ -1,5 +1,6 @@
 import {
   onBeforeUnmount,
+  readonly,
   shallowRef,
   watch,
   type InjectionKey,
@@ -8,6 +9,7 @@ import {
 import type { NoteData } from 'chart-types'
 import type { ExtendedNoteData, Measure } from '@/types'
 import type { ChartHistory } from './useChartHistory'
+import { hasOpenEditorOverlay, isIgnoredKeyboardEvent } from './useEditorShortcuts'
 import {
   calculateNoteMove,
   canDragNote,
@@ -55,6 +57,9 @@ export function useNoteDrag(options: {
   history?: ChartHistory | null
 }) {
   const candidate = shallowRef<NoteMoveCandidate | null>(null)
+  /** ポインター押下から解除までを表し、移動開始前も別のキー操作を抑止する。 */
+  const isActive = shallowRef(false)
+
   let pointer = { x: 0, y: 0 }
   let session: NoteMoveSession | null = null
   let pointerId: number | null = null
@@ -62,6 +67,7 @@ export function useNoteDrag(options: {
   let captureElement: HTMLElement | null = null
   let touchTarget: EventTarget | null = null
   let dragging = false
+  let shiftPressed = false
   let frame = 0
   let previousFrame = 0
   let suppressTimer: ReturnType<typeof setTimeout> | undefined
@@ -99,10 +105,12 @@ export function useNoteDrag(options: {
     const id = pointerId
 
     session = null
+    isActive.value = false
     pointerId = null
     captureElement = null
     touchTarget = null
     dragging = false
+    shiftPressed = false
     candidate.value = null
     cancelAnimationFrame(frame)
     frame = 0
@@ -110,7 +118,8 @@ export function useNoteDrag(options: {
     window.removeEventListener('pointermove', move)
     window.removeEventListener('pointerup', drop)
     window.removeEventListener('pointercancel', cancel)
-    window.removeEventListener('keydown', keydown, true)
+    window.removeEventListener('keydown', handleKey, true)
+    window.removeEventListener('keyup', handleKey, true)
     window.removeEventListener('blur', cancel)
     window.removeEventListener('scroll', update, true)
     document.removeEventListener('visibilitychange', visibilityChange)
@@ -148,12 +157,32 @@ export function useNoteDrag(options: {
     }
   }
 
-  /** Esc キーをドラッグのキャンセルとして処理する。 */
-  function keydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
+  /**
+   * Escで中断し、Shiftの押下・解除で吸着基準を即時に切り替える。
+   *
+   * @param event ドラッグ操作中に受け取ったキーの押下・解除イベント
+   */
+  function handleKey(event: KeyboardEvent) {
+    if (event.type === 'keydown' && event.key === 'Escape') {
+      // メニューを閉じるEscやIMEの操作を、ドラッグの中断で横取りしない。
+      if (
+        isIgnoredKeyboardEvent(event)
+        || event.repeat
+        || hasOpenEditorOverlay()
+        || event.ctrlKey
+        || event.metaKey
+        || event.altKey
+      ) {
+        return
+      }
+
       event.preventDefault()
       event.stopPropagation()
+
       cancel()
+    } else if (event.key === 'Shift' && shiftPressed !== event.shiftKey) {
+      shiftPressed = event.shiftKey
+      update()
     }
   }
 
@@ -181,6 +210,9 @@ export function useNoteDrag(options: {
     }
 
     dragging = true
+    session.split = options.ownSplit.value !== shiftPressed
+      ? Number(session.anchorBefore.split)
+      : options.split.value
     candidate.value = calculateNoteMove(
       session,
       dx,
@@ -197,6 +229,7 @@ export function useNoteDrag(options: {
     }
 
     pointer = { x: event.clientX, y: event.clientY }
+    shiftPressed = event.shiftKey
     update()
 
     if (dragging) {
@@ -262,6 +295,7 @@ export function useNoteDrag(options: {
     }
 
     pointer = { x: event.clientX, y: event.clientY }
+    shiftPressed = event.shiftKey
     update()
     const final = candidate.value
 
@@ -328,7 +362,7 @@ export function useNoteDrag(options: {
       return
     }
 
-    const split = options.ownSplit.value ? Number(node.split) : options.split.value
+    const split = options.ownSplit.value !== event.shiftKey ? Number(node.split) : options.split.value
     session = createNoteMoveSession(
       options.chart.value,
       root,
@@ -353,14 +387,17 @@ export function useNoteDrag(options: {
       bottom: bounds.bottom - event.clientY,
     }
     pointer = { x: event.clientX, y: event.clientY }
+    shiftPressed = event.shiftKey
     pointerId = event.pointerId
+    isActive.value = true
     captureElement = element
     touchTarget = event.pointerType === 'touch' ? event.target : null
 
     window.addEventListener('pointermove', move, { passive: false })
     window.addEventListener('pointerup', drop)
     window.addEventListener('pointercancel', cancel)
-    window.addEventListener('keydown', keydown, true)
+    window.addEventListener('keydown', handleKey, true)
+    window.addEventListener('keyup', handleKey, true)
     window.addEventListener('blur', cancel)
     window.addEventListener('scroll', update, true)
     document.addEventListener('visibilitychange', visibilityChange)
@@ -413,6 +450,7 @@ export function useNoteDrag(options: {
 
   return {
     enabled: options.enabled,
+    isActive: readonly(isActive),
     start,
     startWhole,
     candidate,

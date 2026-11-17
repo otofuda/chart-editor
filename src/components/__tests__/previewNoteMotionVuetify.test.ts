@@ -18,7 +18,7 @@ import Note from '../Note.vue'
 import LongNote from '../LongNote.vue'
 
 /** 操作パネルの設定と、再生フレームからの描画を結び付けるための選択ラベル。 */
-const MOTION_LABEL = 'ノーツ個別の speed・orbit を再現'
+const MOTION_LABEL = 'ノーツ個別の speed・orbit を再現 (β)'
 
 /** 通常の4拍小節を並べ、途中の再生位置でノーツの変位を比較できるタイムライン。 */
 const measures: Measure[] = Array.from({ length: 6 }, (_, measure) => ({

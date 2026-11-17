@@ -18,6 +18,7 @@ import LongNote from '../LongNote.vue'
 import NoteShadow from '../NoteShadow.vue'
 import { useChartData } from '@/composables/useChartData'
 import { useNoteEditor } from '@/composables/useNoteEditor'
+import { useEditorShortcuts } from '@/composables/useEditorShortcuts'
 
 vi.mock('vuetify', () => ({ useGoTo: () => vi.fn() }))
 
@@ -263,6 +264,84 @@ function placementShadow(wrapper: VueWrapper) {
     .find(component => component.props('isDraggable') === true)!
 }
 
+describe('ドラッグと共通ショートカットの優先順位', () => {
+  it('押下直後から新規操作を抑止し、Shiftを押しながらのEscでも中断だけを行う', () => {
+    const { wrapper, chart, bar } = setup([note({ isSelected: true })])
+    const preview = wrapper.getComponent(Preview)
+    const selectAll = vi.fn()
+    const escape = vi.fn()
+    const togglePlayback = vi.fn()
+    const host = mount(defineComponent({
+      /** 譜面側のドラッグ状態を参照する、アプリ共通ショートカットを登録する。 */
+      setup() {
+        useEditorShortcuts({
+          selectAll,
+          escape,
+          togglePlayback,
+        }, {
+          isDragging: () => preview.vm.isDragging,
+        })
+
+        return () => h('div')
+      },
+    }))
+
+    wrappers.push(host)
+
+    /**
+     * windowのドラッグ処理を経由して、documentの共通処理までキーを伝える。
+     *
+     * @param key 押すキーの名前
+     * @param init 修飾キーや長押しなどのイベント属性
+     * @returns ドラッグ側で消費されたかを確認するためのイベント
+     */
+    const key = (key: string, init: KeyboardEventInit = {}) => {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
+
+      document.body.dispatchEvent(event)
+
+      return event
+    }
+
+    // 移動し始める前のポインター押下中から、別の編集操作を抑止する。
+    pointer(bar().element, 'pointerdown', 250, 600)
+    expect(preview.vm.isDragging).toBe(true)
+
+    key('a', { ctrlKey: true })
+    key(' ')
+
+    expect(selectAll).not.toHaveBeenCalled()
+    expect(togglePlayback).not.toHaveBeenCalled()
+
+    pointer(window, 'pointermove', 310, 550)
+
+    // 表示中のメニューへEscを譲り、その次のEscではドラッグだけを中断する。
+    const overlay = document.createElement('div')
+    overlay.className = 'v-menu v-overlay--active'
+    document.body.append(overlay)
+
+    expect(key('Escape').defaultPrevented).toBe(false)
+    expect(preview.vm.isDragging).toBe(true)
+
+    overlay.remove()
+
+    expect(key('Escape', { shiftKey: true }).defaultPrevented).toBe(true)
+    expect(preview.vm.isDragging).toBe(false)
+    expect(escape).not.toHaveBeenCalled()
+    expect(chart.value[0]).toMatchObject({ lane: 2, position: 1, isSelected: true })
+
+    // 長押しでは選択解除まで進まず、次の独立した押下から共通操作を受け付ける。
+    key('Escape', { repeat: true })
+    expect(escape).not.toHaveBeenCalled()
+
+    key('Escape')
+    expect(escape).toHaveBeenCalledOnce()
+
+    key('a', { ctrlKey: true })
+    expect(selectAll).toHaveBeenCalledOnce()
+  })
+})
+
 describe('配置欄のシャドーのドラッグ操作', () => {
   it.each(['mouse', 'touch'])('%s で配置欄の位置だけを確定し、その位置で仮配置できる', async pointerType => {
     const draft = ref(note({ isSelected: true }))
@@ -329,6 +408,27 @@ describe('配置欄のシャドーのドラッグ操作', () => {
     pointer(window, 'pointermove', 310, 535)
     pointer(window, 'pointerup', 310, 535)
     expect(draft.value).toMatchObject({ lane: 3, position: 3, split: 12 })
+  })
+
+  it('Shift の押下でシャドーの候補を切り替え、配置欄だけに確定する', async () => {
+    const draft = ref(note())
+    const { wrapper, chart, history } = setup([], { appendNote: draft.value })
+
+    pointer(placementShadow(wrapper).get('.note').element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 250, 540)
+    await nextTick()
+    const candidate = () => wrapper.get('.note-drag-preview').getComponent(NoteShadow).props('note')
+    expect(candidate()).toMatchObject({ position: 3, split: 8 })
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true }))
+    await nextTick()
+    expect(candidate()).toMatchObject({ position: 2, split: 4 })
+    expect(draft.value).toMatchObject({ position: 1, split: 4 })
+
+    pointer(window, 'pointerup', 250, 540, { shiftKey: true })
+    expect(draft.value).toMatchObject({ position: 2, split: 4 })
+    expect(chart.value).toEqual([])
+    expect(history.entries.value).toHaveLength(0)
   })
 
   it.each([2, 90])('配置前ロング type %s は各点を個別に、帯から分岐全体を移動できる', async type => {
@@ -753,6 +853,174 @@ describe('譜面のドラッグ操作', () => {
     expect((restoredToggle.element as HTMLInputElement).checked).toBe(true)
   })
 
+  it.each([false, true])('設定 %s で Shift を押しながらドラッグすると基準を反転する', async ownSplit => {
+    const { wrapper, chart, bar } = setup()
+    const toggle = wrapper.get('input[aria-label="ドラッグ移動で各ノーツの split を使う"]')
+    await toggle.setValue(ownSplit)
+    const stored = localStorage.getItem('chart-editor__drag-own-split')
+    const expected = ownSplit ? { position: 3, split: 8 } : { position: 2, split: 4 }
+
+    pointer(bar().element, 'pointerdown', 250, 600, { shiftKey: true })
+    pointer(window, 'pointermove', 250, 540, { shiftKey: true })
+    await nextTick()
+    expect(wrapper.get('.note-drag-preview').getComponent(NoteShadow).props('note'))
+      .toMatchObject(expected)
+    pointer(window, 'pointerup', 250, 540, { shiftKey: true })
+
+    expect(chart.value[0]).toMatchObject(expected)
+    expect((toggle.element as HTMLInputElement).checked).toBe(ownSplit)
+    expect(localStorage.getItem('chart-editor__drag-own-split')).toBe(stored)
+  })
+
+  it.each([false, true])('設定 %s で静止中の Shift 押下・解除を即時反映し、キーリピートでは反転しない', async ownSplit => {
+    const { wrapper, chart, bar, history } = setup()
+    const toggle = wrapper.get('input[aria-label="ドラッグ移動で各ノーツの split を使う"]')
+    await toggle.setValue(ownSplit)
+    const stored = localStorage.getItem('chart-editor__drag-own-split')
+    const normal = ownSplit ? { position: 2, split: 4 } : { position: 3, split: 8 }
+    const shifted = ownSplit ? { position: 3, split: 8 } : { position: 2, split: 4 }
+
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 250, 540)
+    await nextTick()
+    const candidate = () => wrapper.get('.note-drag-preview').getComponent(NoteShadow).props('note')
+    expect(candidate()).toMatchObject(normal)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true }))
+    await nextTick()
+    expect(candidate()).toMatchObject(shifted)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true, repeat: true }))
+    await nextTick()
+    expect(candidate()).toMatchObject(shifted)
+
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }))
+    await nextTick()
+    expect(candidate()).toMatchObject(normal)
+    expect(chart.value[0]).toMatchObject({ position: 1, split: 4 })
+    expect(history.entries.value).toHaveLength(0)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true }))
+    pointer(window, 'pointerup', 250, 540, { shiftKey: true })
+    expect(chart.value[0]).toMatchObject(shifted)
+    expect(history.entries.value).toHaveLength(1)
+    expect((toggle.element as HTMLInputElement).checked).toBe(ownSplit)
+    expect(localStorage.getItem('chart-editor__drag-own-split')).toBe(stored)
+  })
+
+  it.each([false, true])('キーイベントがなくても移動・ドロップ時の Shift 状態 %s を反映する', async shiftKey => {
+    const { wrapper, chart, bar } = setup()
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 250, 540, { shiftKey })
+    await nextTick()
+    expect(wrapper.get('.note-drag-preview').getComponent(NoteShadow).props('note'))
+      .toMatchObject(shiftKey ? { position: 2, split: 4 } : { position: 3, split: 8 })
+
+    pointer(window, 'pointerup', 250, 540, { shiftKey: !shiftKey })
+    expect(chart.value[0])
+      .toMatchObject(shiftKey ? { position: 3, split: 8 } : { position: 2, split: 4 })
+  })
+
+  it('Shift だけではドラッグを開始せず、横移動中に切り替えても元の時刻を保つ', async () => {
+    const { wrapper, chart, bar } = setup([note({ split: 12 })])
+    pointer(bar().element, 'pointerdown', 250, 600)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true }))
+    await nextTick()
+    expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+
+    pointer(window, 'pointermove', 310, 600, { shiftKey: true })
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }))
+    await nextTick()
+    expect(wrapper.get('.note-drag-preview').getComponent(NoteShadow).props('note'))
+      .toMatchObject({ lane: 3, position: 1, split: 12 })
+    pointer(window, 'pointerup', 310, 600)
+    expect(chart.value[0]).toMatchObject({ lane: 3, position: 1, split: 12 })
+  })
+
+  it.each(['drop', 'Escape', 'pointercancel', 'blur'])('%s 後に Shift の状態やキーリスナーを残さない', async reason => {
+    const { wrapper, chart, bar, history } = setup()
+    const removeListener = vi.spyOn(window, 'removeEventListener')
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 250, 540, { shiftKey: true })
+    if (reason === 'drop') {
+      pointer(window, 'pointerup', 250, 540, { shiftKey: true })
+    } else if (reason === 'Escape') {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', shiftKey: true }))
+    } else if (reason === 'blur') {
+      window.dispatchEvent(new Event('blur'))
+    } else {
+      pointer(window, 'pointercancel', 250, 540, { shiftKey: true })
+    }
+    await nextTick()
+    expect(wrapper.find('.note-drag-preview').exists()).toBe(false)
+    expect(removeListener).toHaveBeenCalledWith('keydown', expect.any(Function), true)
+    expect(removeListener).toHaveBeenCalledWith('keyup', expect.any(Function), true)
+    const before = JSON.stringify(chart.value)
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }))
+    expect(JSON.stringify(chart.value)).toBe(before)
+
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 250, 550)
+    pointer(window, 'pointerup', 250, 550)
+    expect(chart.value[0]).toMatchObject({ position: reason === 'drop' ? 5 : 3, split: 8 })
+    expect(history.entries.value).toHaveLength(reason === 'drop' ? 2 : 1)
+  })
+
+  it('Shift で一括移動の基準を切り替えても、異なる split のノーツの間隔を保つ', () => {
+    const { chart, bar, history } = setup([
+      note({ isSelected: true }),
+      note({ index: 2, lane: 3, split: 3, isSelected: true }),
+    ])
+    pointer(bar().element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 250, 540)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true }))
+    pointer(window, 'pointerup', 250, 540, { shiftKey: true })
+
+    expect(chart.value[0]).toMatchObject({ position: 2, split: 4 })
+    expect(chart.value[1]).toMatchObject({ position: 7, split: 12 })
+    expect(history.entries.value).toHaveLength(1)
+  })
+
+  it.each(['chart', 'draft'])('%s のロングの点は始点と異なる自身の split を Shift 中に使う', async source => {
+    const root = note({ type: 2, end: [note({ type: 89, measure: 1, split: 6 })] })
+    const draft = ref(root)
+    const { wrapper, chart } = source === 'draft'
+      ? setup([], { appendNote: draft.value })
+      : setup([root])
+    const handle = source === 'draft'
+      ? placementShadow(wrapper).get('.draft-invisible-handle')
+      : wrapper.getComponent(LongNote).get('.note-invisible-handle')
+    pointer(handle.element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 250, 540)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true }))
+    await nextTick()
+    expect(wrapper.get('.note-drag-preview').getComponent(NoteShadow).props('note').end[0])
+      .toMatchObject({ measure: 1, position: 2, split: 6 })
+    pointer(window, 'pointerup', 250, 540, { shiftKey: true })
+
+    const result = source === 'draft' ? draft.value : chart.value[0]
+    expect(result).toMatchObject({ position: 1, split: 4 })
+    expect(result.end[0]).toMatchObject({ measure: 1, position: 2, split: 6 })
+  })
+
+  it.each(['chart', 'draft'])('%s のロングの帯は Shift 中も各点の間隔を保つ', source => {
+    const root = note({ type: 2, end: [note({ measure: 1, split: 6 })] })
+    const draft = ref(root)
+    const { wrapper, chart } = source === 'draft'
+      ? setup([], { appendNote: draft.value })
+      : setup([root])
+    const band = source === 'draft'
+      ? placementShadow(wrapper).get('.hold-fill')
+      : wrapper.getComponent(LongNote).get('.hold-fill')
+    pointer(band.element, 'pointerdown', 250, 600)
+    pointer(window, 'pointermove', 250, 540)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true }))
+    pointer(window, 'pointerup', 250, 540, { shiftKey: true })
+
+    const result = source === 'draft' ? draft.value : chart.value[0]
+    expect(result).toMatchObject({ position: 2, split: 4 })
+    expect(result.end[0]).toMatchObject({ measure: 1, position: 5, split: 12 })
+  })
+
   it('音札と音札ダミーではドラッグを開始しない', async () => {
     const { wrapper, chart } = setup([
       note({ type: 5, lane: 3 }),
@@ -938,11 +1206,15 @@ describe('譜面のドラッグ操作', () => {
 
   it('アンマウント時にイベントと自動スクロールを解除する', async () => {
     const { wrapper, chart, bar } = setup()
+    const removeListener = vi.spyOn(window, 'removeEventListener')
     pointer(bar().element, 'pointerdown', 250, 600)
-    pointer(window, 'pointermove', 310, 550)
+    pointer(window, 'pointermove', 310, 550, { shiftKey: true })
     wrapper.unmount()
     wrappers = wrappers.filter(w => w !== wrapper)
     expect(frames.size).toBe(0)
+    expect(removeListener).toHaveBeenCalledWith('keydown', expect.any(Function), true)
+    expect(removeListener).toHaveBeenCalledWith('keyup', expect.any(Function), true)
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }))
     pointer(window, 'pointerup', 310, 550)
     expect(chart.value[0].lane).toBe(2)
   })
