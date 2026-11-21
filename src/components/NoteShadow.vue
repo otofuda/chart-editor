@@ -21,35 +21,37 @@
     >
       <!-- テクスチャの時 -->
       <img
-        v-if="note.type === 94"
-        :src="
-          String(note.option[0]).startsWith('texture')
-          ? `https://db.otofuda.com/${note.option[0]}`
-          : note.option[0]
-        "
+        v-if="drawType === 94"
+        :src="textureSrc"
         :style="{
-          height: `${measureData.at(-1)?.measureHeight * Number(note.option[2])}px`
+          height: `${textureHeight}px`
         }"
         alt="texture"
         :draggable="false"
       />
 
       <!-- コメントの時 -->
-      <v-icon v-if="note.type === 100" color="warning" class="mt-2">
+      <v-icon v-if="drawType === 100" color="warning" class="mt-2">
         mdi-comment
       </v-icon>
       <v-textarea
         outlined
         bg-color="editor-highlight"
-        v-if="note.type === 100"
-        v-model="note.option[0]"
+        v-if="drawType === 100"
+        :model-value="drawOptions[0] ?? ''"
         class="elevation-4"
         hide-details
         disabled
       ></v-textarea>
-      <strong v-if="Number(note.option?.[0]) && Number(note.option?.[0]) !== 1" class="speed">x{{ note.option[0] }}</strong>
-      <strong v-if="Number(note.option?.[1]) && Number(note.option?.[1]) !== 0" class="orbit">&gt;{{ note.option[1] }}</strong>
+      <strong v-if="noteSpeed !== 1" class="speed">x{{ noteSpeed }}</strong>
+      <strong v-if="noteOrbit !== 0" class="orbit">&gt;{{ noteOrbit }}</strong>
+      <strong v-if="drawType === 97">BEAT {{ drawOptions[0] }}</strong>
       {{ note.position }}/{{ note.split }}
+      <strong v-if="drawType === 91">SpObj</strong>
+      <strong v-if="drawType === 92">STOP</strong>
+      <strong v-if="drawType === 93">WARP {{ drawOptions[0] }}</strong>
+      <strong v-if="drawType === 98">BPM {{ drawOptions[0] }}</strong>
+      <strong v-if="drawType === 99">EOF</strong>
       <span v-if="isPreAppend" class="preappend__index">#{{ note.index }}</span>
     </span>
 
@@ -84,9 +86,9 @@
           preappend: isPreAppend
         }"
         :style="{
-          left: `${getAbsoluteLeft(ep.note)}px`,
+          left: `${getAbsoluteLeft(ep.note, true)}px`,
           bottom: `${getAbsoluteBottom(ep.note)}px`,
-          width: `${getWidth(ep.note)}px`
+          width: `${getWidth(ep.note, true)}px`
         }"
         @pointerdown="startNodeDrag($event, ep.note)"
       >
@@ -103,9 +105,9 @@
           preappend: isPreAppend
         }"
         :style="{
-          left: `${getAbsoluteLeft(ep.note)}px`,
+          left: `${getAbsoluteLeft(ep.note, true)}px`,
           bottom: `${getAbsoluteBottom(ep.note)}px`,
-          width: `${getWidth(ep.note)}px`
+          width: `${getWidth(ep.note, true)}px`
         }"
         @pointerdown="startNodeDrag($event, ep.note)"
       >
@@ -160,6 +162,7 @@ import { cancelNoteKey } from '@/composables/injectionKeys'
 import { getCurveType, generateHoldSvgPaths, type CurveType } from '@/composables/useNoteTypes'
 import { noteDragKey } from '@/composables/useNoteDrag'
 import { effectiveNoteType } from '@/composables/noteMovement'
+import { getNoteMotion } from '@/composables/usePreviewNoteMotion'
 
 const props = defineProps<{
   note: ExtendedNoteData
@@ -245,50 +248,96 @@ const entireHeight = computed(() => {
   return (last?.measurePositionBottom ?? 0) + (last?.measureHeight ?? 0)
 })
 
-function getHoldNodeWidth(n: NoteData | ExtendedNoteData): number {
-  if (n.type === 2) return 1
-  const drawOptions = (n.type === 90) ? n.option.slice(1) : n.option
-  const w = Number(drawOptions?.[3])
-  if (!w || isNaN(w) || w <= 0 || w === -1) return 1
-  return w
+/**
+ * 分数指定の横オフセット（px）を計算する。
+ * 分母が0や非数値のときは0を返し、不正なCSS座標を防ぐ。
+ */
+function getOptionOffset(numerValue: string | undefined, denomValue: string | undefined): number {
+  const numer = Number(numerValue)
+  const denom = Number(denomValue)
+
+  if (!Number.isFinite(numer) || !Number.isFinite(denom) || !numer || !denom) {
+    return 0
+  }
+
+  return (numer / denom) * 60
 }
 
-function getLeft(note: NoteData | ExtendedNoteData) {
-  const drawType = (note.type === 90) ? Number(note.option[0]) : note.type
-  const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option
+/** ロングの帯に接続する各ノードのレーン幅倍率を返す。始点（ダミー含む）は常に1とする。 */
+function getHoldNodeWidth(n: NoteData | ExtendedNoteData): number {
+  const nodeDrawType = n.type === 90 ? Number(n.option[0]) : n.type
+
+  if (nodeDrawType === 2) {
+    return 1
+  }
+
+  const nodeOptions = n.type === 90 ? n.option.slice(1) : n.option
+  const width = Number(nodeOptions?.[3])
+
+  if (!width || Number.isNaN(width) || width <= 0 || width === -1) {
+    return 1
+  }
+
+  return width
+}
+
+/**
+ * ノーツの左端座標（レーン領域基準・px）を返す。
+ * 単体通常ノーツ（type: 1）ではwidthオプションを適用せず、ロングの終点・中点のみ適用する。
+ */
+function getLeft(note: NoteData | ExtendedNoteData, isEndpoint = false) {
+  const nodeDrawType = note.type === 90 ? Number(note.option[0]) : note.type
+  const nodeOptions = note.type === 90 ? note.option.slice(1) : note.option
+
   // TAP, ロング, 終点, 区切り線, コメント
-  if ([1, 2, 89, 95, 100].includes(drawType)) {
-    if ([1, 89].includes(drawType) && drawOptions?.[3]) {
-      let _width = Number(drawOptions[3]) || 1
-      if (_width === -1 || _width <= 0) _width = 1
-      const _center = (note.lane - 1) * 60 + 30
-      return _center - (_width / 2) * 60
+  if ([1, 2, 89, 95, 100].includes(nodeDrawType)) {
+    if (isEndpoint && [1, 89].includes(nodeDrawType) && nodeOptions?.[3]) {
+      let width = Number(nodeOptions[3]) || 1
+
+      if (width === -1 || width <= 0) {
+        width = 1
+      }
+
+      const center = (note.lane - 1) * 60 + 30
+      return center - (width / 2) * 60
     }
+
     return (note.lane - 1) * 60
   }
+
   // 左右フリック, 上下フリック
-  else if ([3, 4, 6, 7].includes(drawType)) {
-    let _width = Number(drawOptions[0]) || 3
-    if (_width === -1) _width = 3
-    const _left = (note.lane - 1) * 60 + 30
-    let _offset = 0
-    if (drawOptions[1] && drawOptions[2]) _offset = (Number(drawOptions[1]) / Number(drawOptions[2])) * 60
-    return _left - (_width / 2) * 60 + _offset
+  if ([3, 4, 6, 7].includes(nodeDrawType)) {
+    let width = Number(nodeOptions[0]) || 3
+
+    if (width === -1) {
+      width = 3
+    }
+
+    const center = (note.lane - 1) * 60 + 30
+    const offset = getOptionOffset(nodeOptions[1], nodeOptions[2])
+    return center - (width / 2) * 60 + offset
+  }
+
   // テクスチャ
-  } else if (drawType === 94) {
-    let _width = Number(drawOptions[1]) || 1
-    const _left = (note.lane - 1) * 60 + 30
-    let _offset = 0
-    if (drawOptions[3] && drawOptions[4]) _offset = (Number(drawOptions[3]) / Number(drawOptions[4])) * 60
-    return _left - (_width / 2) * 60 + _offset
+  if (nodeDrawType === 94) {
+    const width = Number(nodeOptions[1]) || 1
+    const center = (note.lane - 1) * 60 + 30
+    const offset = getOptionOffset(nodeOptions[3], nodeOptions[4])
+    return center - (width / 2) * 60 + offset
+  }
+
   // LED制御
-  } else if (drawType === 96) return -50
+  if (nodeDrawType === 96) {
+    return -50
+  }
+
   // 音札, その他特殊ノーツ
-  else return 0
+  return 0
 }
 
-function getAbsoluteLeft(note: NoteData | ExtendedNoteData) {
-  return getLeft(note) + 60
+/** 小節左の余白60pxを含めた、譜面領域内の左端座標（px）を返す。 */
+function getAbsoluteLeft(note: NoteData | ExtendedNoteData, isEndpoint = false) {
+  return getLeft(note, isEndpoint) + 60
 }
 
 function getAbsoluteBottom(note: NoteData | ExtendedNoteData) {
@@ -303,37 +352,68 @@ function getAbsoluteBottom(note: NoteData | ExtendedNoteData) {
   }
 }
 
-function getWidth(note: NoteData | ExtendedNoteData) {
-  const drawType = (note.type === 90) ? Number(note.option[0]) : note.type
-  const drawOptions = (note.type === 90) ? note.option.slice(1) : note.option
+/**
+ * ノーツの表示幅（px）を返す。
+ * 単体通常ノーツ（type: 1）ではwidthオプションを適用せず、ロングの終点・中点のみ適用する。
+ */
+function getWidth(note: NoteData | ExtendedNoteData, isEndpoint = false) {
+  const nodeDrawType = note.type === 90 ? Number(note.option[0]) : note.type
+  const nodeOptions = note.type === 90 ? note.option.slice(1) : note.option
+
   // TAP, ロング, 終点, コメント
-  if ([1, 2, 89, 100].includes(drawType)) {
-    if ([1, 89].includes(drawType) && drawOptions?.[3]) {
-      let _width = Number(drawOptions[3]) || 1
-      if (_width === -1 || _width <= 0) _width = 1
-      return 60 * _width
+  if ([1, 2, 89, 100].includes(nodeDrawType)) {
+    if (isEndpoint && [1, 89].includes(nodeDrawType) && nodeOptions?.[3]) {
+      let width = Number(nodeOptions[3]) || 1
+
+      if (width === -1 || width <= 0) {
+        width = 1
+      }
+
+      return 60 * width
     }
+
     return 60
   }
+
   // 左右フリック, 上下フリック
-  else if ([3, 4, 6, 7].includes(drawType)) {
-    let _width = Number(drawOptions[0]) || 3
-    if (_width === -1) _width = 3
-    return 60 * _width
+  if ([3, 4, 6, 7].includes(nodeDrawType)) {
+    let width = Number(nodeOptions[0]) || 3
+
+    if (width === -1) {
+      width = 3
+    }
+
+    return 60 * width
+  }
+
   // テクスチャ
-  } else if (drawType === 94) {
-    let _width = Number(drawOptions[1]) || 1
-    return 60 * _width
+  if (nodeDrawType === 94) {
+    const width = Number(nodeOptions[1]) || 1
+    return 60 * width
+  }
+
   // 区切り線
-  } else if (drawType === 95) {
-    let _width = Number(drawOptions[0]) || 1
-    if (_width === -1) _width = 1
-    if (note.position === 0) _width = 5
-    return 60 * _width
+  if (nodeDrawType === 95) {
+    let width = Number(nodeOptions[0]) || 1
+
+    if (width === -1) {
+      width = 1
+    }
+
+    if (note.position === 0) {
+      width = 5
+    }
+
+    return 60 * width
+  }
+
   // LED制御
-  } else if (drawType === 96) return 40
+  if (nodeDrawType === 96) {
+    return 40
+  }
+
   // その他
-  else return 300
+  return 300
 }
 
 interface HoldSegment {
@@ -402,18 +482,70 @@ const treeData = computed(() => {
   return { segments, endpoints }
 })
 
-const dispColor = computed(() => {
-  if (props.note.type === 96) {
-    if (Number(props.note.option[0]) === -1 && Number(props.note.option[1]) === -1 && Number(props.note.option[2]) === -1) {
-      return 'linear-gradient(0deg, #ff5151 20%, #44a5ff 80%)'
-    } else return `rgb(${props.note.option[0]},${props.note.option[1]},${props.note.option[2]})`
+/** 描画用のノート種別。ダミー時は擬態対象の種別を返す。 */
+const drawType = computed(() => {
+  if (props.note.type === 90) {
+    return Number(props.note.option[0])
   }
-  return null
+
+  return props.note.type
 })
 
-const drawType = computed(() => {
-  if (props.note.type === 90) return Number(props.note.option[0])
-  return props.note.type
+/** 描画用のオプション配列。ダミー時は先頭の擬態先種別を除いた配列を返す。 */
+const drawOptions = computed(() => {
+  if (props.note.type === 90) {
+    return props.note.option.slice(1)
+  }
+
+  return props.note.option
+})
+
+/** ノート種別ごとの定義に従って読み取った速度と軌道。 */
+const noteMotion = computed(() => getNoteMotion(props.note))
+
+/** 始点・単独ノーツの速度バッジ表示値。既定値（1）のときは非表示にする。 */
+const noteSpeed = computed(() => noteMotion.value?.speed ?? 1)
+
+/** 始点・単独ノーツの軌道バッジ表示値。既定値（0）のときは非表示にする。 */
+const noteOrbit = computed(() => noteMotion.value?.orbit ?? 0)
+
+/** テクスチャノーツの表示用画像URL。相対パスはOtofuda DBのURLへ補完する。 */
+const textureSrc = computed(() => {
+  const source = drawOptions.value[0] ?? ''
+
+  if (String(source).startsWith('texture')) {
+    return `https://db.otofuda.com/${source}`
+  }
+
+  return source
+})
+
+/** テクスチャノーツの表示高さ（px）。対象小節が存在しない場合は末尾小節を基準にする。 */
+const textureHeight = computed(() => {
+  const targetMeasure = props.measureData[props.note.measure] ?? props.measureData.at(-1)
+  const measureHeight = targetMeasure?.measureHeight ?? 0
+  const scale = Number(drawOptions.value[2])
+
+  if (!Number.isFinite(scale)) {
+    return 0
+  }
+
+  return measureHeight * scale
+})
+
+/** LED制御ノーツの背景色。ダミーで擬態している場合もdrawOptionsから解決する。 */
+const dispColor = computed(() => {
+  if (drawType.value !== 96) {
+    return null
+  }
+
+  const [red, green, blue] = drawOptions.value
+
+  if (Number(red) === -1 && Number(green) === -1 && Number(blue) === -1) {
+    return 'linear-gradient(0deg, #ff5151 20%, #44a5ff 80%)'
+  }
+
+  return `rgb(${red},${green},${blue})`
 })
 </script>
 

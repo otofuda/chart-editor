@@ -422,23 +422,14 @@ const dispColor = computed(() => {
   return null
 })
 
-const noteSpeed = computed(() => {
-  if ([1, 2, 5].includes(drawType.value) && drawOptions.value[0]) return Number(drawOptions.value[0]) // TAP, ロング, 音札
-  else if ([3, 4].includes(drawType.value) && drawOptions.value[3]) return Number(drawOptions.value[3]) // 左右フリック
-  else if ([6, 7].includes(drawType.value) && drawOptions.value[3]) return Number(drawOptions.value[3]) // 上下フリック
-  else if (drawType.value === 94 && drawOptions.value[5]) return Number(drawOptions.value[5]) // テクスチャ
-  else if (drawType.value === 95 && drawOptions.value[1]) return Number(drawOptions.value[1]) // 区切り線
-  return 1
-})
+/** ノート種別ごとの定義に従って読み取った速度と軌道。 */
+const noteMotion = computed(() => getNoteMotion(props.note))
 
-const noteOrbit = computed(() => {
-  if ([1, 2].includes(drawType.value) && drawOptions.value[1]) return Number(drawOptions.value[1]) // TAP, ロング
-  else if ([3, 4].includes(drawType.value) && drawOptions.value[4]) return Number(drawOptions.value[4]) // 左右フリック
-  else if ([6, 7].includes(drawType.value) && drawOptions.value[4]) return Number(drawOptions.value[4]) // 上下フリック
-  else if (drawType.value === 94 && drawOptions.value[6]) return Number(drawOptions.value[6]) // テクスチャ
-  else if (drawType.value === 95 && drawOptions.value[2]) return Number(drawOptions.value[2]) // 区切り線
-  return 0
-})
+/** 速度バッジの表示値。既定値（1）のときは非表示にする。 */
+const noteSpeed = computed(() => noteMotion.value?.speed ?? 1)
+
+/** 軌道バッジの表示値。既定値（0）のときは非表示にする。 */
+const noteOrbit = computed(() => noteMotion.value?.orbit ?? 0)
 
 const getDuplicated = computed(() => isDuplicated(props.note, props.currentChart, [], { checkPreAppend: false }))
 const getError = computed(() => hasError(props.note))
