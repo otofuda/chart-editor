@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
+    "target": "ESNext",
+    "module": "ESNext",
     "strict": false,
     "jsx": "preserve",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -13,19 +13,15 @@
     "useDefineForClassFields": true,
     "sourceMap": true,
     "baseUrl": ".",
-    "types": [
-      "vuetify"
-    ],
     "paths": {
       "@/*": [
         "src/*"
       ]
     },
     "lib": [
-      "esnext",
-      "dom",
-      "dom.iterable",
-      "scripthost"
+      "ESNext",
+      "DOM",
+      "DOM.Iterable"
     ],
     "isolatedModules": true
   },
@@ -33,8 +29,8 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.vue",
-    "tests/**/*.ts",
-    "tests/**/*.tsx"
+    "vitest.config.ts",
+    "vite.config.ts"
   ],
   "exclude": [
     "node_modules"

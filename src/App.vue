@@ -1,714 +1,814 @@
 <template>
-  <v-app id="app">
-    <Preview
-      :currentChart="currentChart"
-      :currentDifficulty="currentDifficulty"
-      :infoObject="chartObject.info"
-      :measureData="measureData"
-      :audioVolume="audioVolume"
-      :previewAudio="previewAudio"
-      :appendNote="getAppendNote"
-      :preAppendNotes="preAppendNotes"
-      :isShowDetail="isShowDetail"
-      :isCaptureMode="isCaptureMode"
-      :isPreviewMode="isPreviewMode"
-      :isImageMode="isImageMode"
-    />
+  <v-app
+    id="app"
+    :class="{
+      'layout-stacked': layout === 'stacked',
+      'layout-narrow-side': layout === 'side-by-side' && narrow
+    }"
+  >
+    <div class="editor-layout">
+      <!-- 狭い画面で左右分割を選んだ場合は、この領域全体を横スクロールする。 -->
+      <div class="editor-canvas">
+        <!-- 譜面は、画面幅と手動選択から決まるレイアウトで表示する。 -->
+        <Preview
+          ref="previewRef"
+          :layout="layout"
+          :contained="contained"
+          controlsTarget="#preview-controls"
+          :currentChart="currentChart"
+          :currentDifficulty="currentDifficulty"
+          :infoObject="chartInfo"
+          :measureData="measureData"
+          :audioVolume="audioVolume"
+          :previewAudio="previewAudio"
+          :appendNote="getAppendNote"
+          :preAppendNotes="preAppendNotes"
+          :isShowDetail="isShowDetail"
+          :isCaptureMode="isCaptureMode"
+          :isPreviewMode="isPreviewMode"
+          :isImageMode="isImageMode"
+          :placementSplit="appendNote.split"
+          :beatHeight="beatHeight"
+        />
 
-    <v-container fluid class="panel">
-      <img
-        src="https://otofuda.github.io/chart-editor/logo.png"
-        alt="Otofuda Chart Editor V2"
-        class="logo"
-      />
+        <!-- 編集用の操作パネル。上下分割では譜面と独立してスクロールする。 -->
+        <v-container fluid class="panel">
+          <!-- Previewの再生コントロールを、状態を保ったまま受け入れる移動先。 -->
+          <div id="preview-controls"></div>
 
-      <h3>譜面ファイル</h3>
+          <img
+            src="https://otofuda.github.io/chart-editor/logo.png"
+            alt="Otofuda Chart Editor V2"
+            class="logo"
+          />
 
-      <v-row align="center">
-        <v-file-input
-          accept=".json, application/json"
-          label="ファイルを選択"
-          hide-details
-          outlined
-          dense
-          prepend-icon="mdi-folder"
-          @change="readFile"
-        ></v-file-input>
-        <v-col>
-          <v-select
-            :items="difficulties"
-            label="難易度"
-            v-model="currentDifficulty"
-            align="left"
-            hide-details
-            outlined
-            dense
-            :menu-props="{
-              rounded: 'lg'
-            }"
-          ></v-select>
-        </v-col>
-      </v-row>
+          <h3>譜面ファイル</h3>
 
-      <v-row class="difficulty-select">
-        <v-btn small dark color="blue" @click="currentDifficulty = 'raku'">
-          RAKU
-        </v-btn>
-        <v-btn small dark color="green" @click="currentDifficulty = 'easy'">
-          EASY
-        </v-btn>
-        <v-btn small dark color="orange" @click="currentDifficulty = 'normal'">
-          NORMAL
-        </v-btn>
-        <v-btn small dark color="#ff0984" @click="currentDifficulty = 'hard'">
-          HARD
-        </v-btn>
-        <v-btn small dark color="purple" @click="currentDifficulty = 'extra'">
-          EXTRA
-        </v-btn>
-      </v-row>
+          <v-row>
+            <v-file-input
+              accept=".json, application/json"
+              label="ファイルを選択"
+              hide-details
+              variant="outlined"
+              density="compact"
+              prepend-icon="mdi-folder"
+              @update:model-value="readFile"
+            ></v-file-input>
+            <v-col>
+              <v-select
+                :items="difficulties"
+                label="難易度"
+                v-model="currentDifficulty"
+                align="left"
+                hide-details
+                variant="outlined"
+                density="compact"
+                :menu-props="{}"
+              ></v-select>
+            </v-col>
+          </v-row>
 
-      <h3>ノートの挿入（仮配置：{{ preAppendNotes.size }}個）</h3>
+          <v-btn-group density="compact" class="difficulty-select">
+            <v-btn size="small" theme="dark" color="blue" @click="currentDifficulty = 'raku'">
+              RAKU
+            </v-btn>
+            <v-btn size="small" theme="dark" color="green" @click="currentDifficulty = 'easy'">
+              EASY
+            </v-btn>
+            <v-btn size="small" theme="dark" color="orange" @click="currentDifficulty = 'normal'">
+              NORMAL
+            </v-btn>
+            <v-btn size="small" theme="dark" color="#ff0984" @click="currentDifficulty = 'hard'">
+              HARD
+            </v-btn>
+            <v-btn size="small" theme="dark" color="purple" @click="currentDifficulty = 'extra'">
+              EXTRA
+            </v-btn>
+          </v-btn-group>
 
-      <v-checkbox
-        v-model="isAppendMode"
-        label="ノート挿入モード"
-        hide-details
-        class="mb-2"
-      />
+          <HistoryControls
+            v-model:open="dialog.history"
+            :history="history"
+            @undo="undo"
+            @redo="redo"
+            @update:open="handleHistoryVisibility"
+          />
 
-      <div v-show="isAppendMode">
-        <v-row justify="space-between">
+          <h3>ノートの挿入（仮配置：{{ preAppendNotes.length }}個）</h3>
+
           <v-checkbox
-            v-model="isAutoFollow"
-            label="編集小節を自動追従"
-            class="mt-0 ml-3"
+            v-model="isAppendMode"
+            label="ノート挿入モード"
+            :title="shortcutTitle('toggleAppendMode')"
+            density="compact"
             hide-details
-          ></v-checkbox>
-          <v-btn
-            class="ml-4 white--text"
-            color="orange darken-4"
-            outlined
-            @click="appendSimultaneously(appendNote)"
+            class="mb-2"
+          />
+
+          <v-card
+            v-show="isAppendMode"
+            class="append-card pa-4"
+            rounded="0"
+            data-editor-placement
           >
-            このノートのみを全難易度に同時挿入
-            <v-icon right>mdi-plus-circle</v-icon>
-          </v-btn>
-        </v-row>
-        <v-row>
-          <!-- Type -->
-          <v-col cols="12" sm="3">
-            <v-select
-              :items="noteTypes"
-              hide-details
-              label="ノート種別"
-              @change="changeAppendNoteType"
-              v-model="appendNote.type"
-              outlined
-              dense
-              :menu-props="{ rounded: 'lg' }"
-            >
-              <template v-slot:item="{ item }">
-                <v-chip label outlined class="mr-4">{{ item.value }}</v-chip>
-                {{ item.text }}
-              </template>
-            </v-select>
-          </v-col>
-          <!-- Measure -->
-          <v-col cols="12" sm="3">
-            <v-text-field
-              v-model.number="appendNote.measure"
-              label="measure"
-              outlined
-              dense
-              hide-details
-              type="number"
-              min="0"
-            ></v-text-field>
-          </v-col>
-          <!-- Position -->
-          <v-col cols="12" sm="3">
-            <v-text-field
-              v-model.number="appendNote.position"
-              label="position"
-              outlined
-              dense
-              hide-details
-              min="0"
-              :max="appendNote.split - 1"
-              background-color="#f0f0b0"
-              @keydown.enter="placeNotes(appendNote)"
-              @keydown.left="appendNoteToLeft"
-              @keydown.right="appendNoteToRight"
-              @keydown.up="appendNoteToUp"
-              @keydown.down="appendNoteToDown"
-            ></v-text-field>
-          </v-col>
-          <!-- Split -->
-          <v-col cols="12" sm="3">
-            <v-combobox
-              v-model.number="appendNote.split"
-              :items="[4, 8, 16, 32, 12, 24, 48]"
-              label="split"
-              outlined
-              hide-details
-              dense
-              :menu-props="{
-                rounded: 'lg'
-              }"
-            ></v-combobox>
-          </v-col>
-        </v-row>
-
-        <!-- オプション入力欄(汎用) -->
-        <div
-          v-for="(opt, i) in noteOptionsForAppendNote"
-          :key="`option_${i}`"
-          class="my-4"
-        >
-          <v-text-field
-            v-model="appendNote.option[i]"
-            hide-details
-            :label="opt.label"
-            :type="opt.type"
-            append-outer-icon="mdi-help"
-            outlined
-            dense
-            @click:append-outer="
-              showSnackbar(`${opt.label}の説明：${opt.desc}`)
-            "
-          ></v-text-field>
-        </div>
-
-        <!-- Type94 テクスチャ選択 -->
-        <v-menu
-          v-if="appendNote.type === 94"
-          v-model="dialog.texture"
-          :close-on-content-click="false"
-          max-width="600"
-          offset-overflow
-        >
-          <template v-slot:activator="{ on, attrs }">
-            <v-btn color="indigo" dark outlined v-bind="attrs" v-on="on">
-              テクスチャをデータベースから探す
-            </v-btn>
-          </template>
-
-          <v-card rounded="lg">
-            <v-tabs v-model="textureCurrentTab" show-arrows>
-              <v-tabs-slider color="indigo"></v-tabs-slider>
-              <v-tab v-for="tabName in textureTabs" :key="tabName">
-                {{ tabName }}
-              </v-tab>
-            </v-tabs>
-
-            <v-tabs-items v-model="textureCurrentTab">
-              <v-tab-item
-                v-for="tabName in textureTabs"
-                :key="tabName"
-                class="px-6"
-              >
-                <v-row>
-                  <v-col
-                    v-for="texture in texturePayload.contents.filter(tx =>
-                      tx.tab.includes(tabName)
-                    )"
-                    :key="texture.id"
-                    cols="12"
-                    sm="6"
-                    md="4"
-                  >
-                    <v-card rounded="lg" class="texture-card" elevation="2">
-                      <v-img
-                        :src="
-                          texture.url.startsWith('texture')
-                          ? `https://db.otofuda.com/${texture.url}`
-                          : texture.url
-                        "
-                        height="100px"
-                      >
-                        <span class="texture-card__name">
-                          {{ texture.name }}
-                        </span>
-                      </v-img>
-
-                      <v-card-actions class="justify-end pa-0">
-                        <v-btn
-                          small
-                          text
-                          color="primary"
-                          @click="setTexture(texture)"
-                        >
-                          これにする
-                        </v-btn>
-                      </v-card-actions>
-                    </v-card>
-                  </v-col>
-                </v-row>
-              </v-tab-item>
-            </v-tabs-items>
-          </v-card>
-        </v-menu>
-
-        <!-- Type96 カラーピッカー -->
-        <v-row v-if="appendNote.type === 96" class="pl-2">
-          <v-color-picker
-            v-model="appendNoteColorOption"
-            :swatches="colorSwatches"
-            show-swatches
-            elevation="2"
-            class="mr-4 mb-2"
-            hide-inputs
-          ></v-color-picker>
-          <div>
-            <div><strong>特殊な色を設定</strong></div>
-            <v-btn
-              outlined
-              color="primary"
-              @click="appendNote.option = ['-1', '-1', '-1']"
-              class="my-2"
-            >
-              青赤(default)に戻す
-            </v-btn>
-            <p><code>['-1', '-1', '-1']</code> を設定します</p>
-          </div>
-        </v-row>
-
-        <v-row align="center" justify="space-between">
-          <v-radio-group
-            v-model="appendNote.lane"
-            row
-            prepend-icon="mdi-view-column-outline"
-            :disabled="isLanelessNote(appendNote)"
-          >
-            <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
-          </v-radio-group>
-          <div>
-            <v-btn
-              class="ml-1 white--text"
-              color="green darken-1"
-              @click="placeNotes(appendNote)"
-            >
-              ノートを仮配置
-              <v-icon right>mdi-keyboard-return</v-icon>
-            </v-btn>
-            <v-badge
-              overlap
-              color="orange darken-4"
-              :value="preAppendNotes.size"
-              :content="preAppendNotes.size"
-            >
+            <v-row justify="space-between">
+              <v-checkbox
+                v-model="isAutoFollow"
+                label="編集小節を自動追従"
+                class="mt-0"
+                hide-details
+                density="compact"
+              ></v-checkbox>
               <v-btn
-                class="ml-4 white--text"
-                color="orange darken-4"
-                @click="appendNotes(...preAppendNotes)"
+                color="orange"
+                size="small"
+                variant="outlined"
+                append-icon="mdi-plus-circle-outline"
+                @click="appendSimultaneously(appendNote)"
               >
-                挿入する
-                <v-icon right>mdi-plus-circle-outline</v-icon>
+                このノートのみを全難易度に同時挿入
               </v-btn>
-            </v-badge>
-          </div>
-        </v-row>
+            </v-row>
+            <v-row>
+              <!-- Type -->
+              <v-col cols="12" sm="3">
+                <v-select
+                  :items="noteTypes"
+                  hide-details
+                  label="ノート種別"
+                  @update:model-value="changeAppendNoteType"
+                  v-model="appendNote.type"
+                  variant="outlined"
+                  density="compact"
+                >
+                </v-select>
+              </v-col>
+              <!-- Measure -->
+              <v-col cols="12" sm="3">
+                <v-text-field
+                  v-model.number="appendNote.measure"
+                  label="measure"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  type="number"
+                  min="0"
+                ></v-text-field>
+              </v-col>
+              <!-- Position -->
+              <v-col cols="12" sm="3">
+                <v-text-field
+                  v-model.number="appendNote.position"
+                  label="position"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  min="0"
+                  :max="appendNote.split - 1"
+                  bg-color="editor-highlight"
+                  @keydown.enter="handlePositionEnter($event, () => placeNotes(appendNote))"
+                  @keydown.left="appendNoteToLeft"
+                  @keydown.right="appendNoteToRight"
+                  @keydown.up="appendNoteToUp"
+                  @keydown.down="appendNoteToDown"
+                ></v-text-field>
+              </v-col>
+              <!-- Split -->
+              <v-col cols="12" sm="3">
+                <v-combobox
+                  v-model.number="appendNote.split"
+                  :items="[4, 8, 16, 32, 12, 24, 48]"
+                  label="split"
+                  variant="outlined"
+                  hide-details
+                  density="compact"
+                  :menu-props="{}"
+                ></v-combobox>
+              </v-col>
+            </v-row>
 
-        <div class="my-4" v-show="appendNote.type === 2 || (appendNote.type == 90 && Number(appendNote.option[0]) === 2)">
-          <v-row align="center" justify="space-between">
-            <h4>ロングノーツ編集</h4>
-            <v-btn
-              class="white--text"
-              color="green darken-1"
-              @click="addEndToAppendNote"
+            <!-- オプション入力欄(汎用) -->
+            <div
+              v-for="(opt, i) in noteOptionsForAppendNote"
+              :key="`option_${i}`"
+              class="my-4"
             >
-              終点を追加
+              <v-text-field
+                v-model="appendNote.option[i]"
+                hide-details
+                :label="opt.label"
+                :type="opt.type"
+                append-outer-icon="mdi-help"
+                variant="outlined"
+                density="compact"
+                @click:append-outer="
+                  showSnackbar(`${opt.label}の説明：${opt.desc}`)
+                "
+              ></v-text-field>
+            </div>
+
+            <!-- Type94 テクスチャ選択 -->
+            <v-menu
+              v-if="appendNote.type === 94"
+              v-model="dialog.texture"
+              :close-on-content-click="false"
+              max-width="600"
+              offset-overflow
+            >
+              <template v-slot:activator="{ props }">
+                <v-btn color="indigo" variant="outlined" v-bind="props">
+                  テクスチャをデータベースから探す
+                </v-btn>
+              </template>
+
+              <v-card rounded="lg">
+                <v-tabs v-model="textureCurrentTab" show-arrows color="primary">
+                  <v-tab v-for="tabName in textureTabs" :key="tabName">
+                    {{ tabName }}
+                  </v-tab>
+                </v-tabs>
+
+                <v-window v-model="textureCurrentTab">
+                  <v-window-item
+                    v-for="tabName in textureTabs"
+                    :key="tabName"
+                    class="px-2"
+                  >
+                    <v-row>
+                      <v-col
+                        v-for="texture in texturePayload.contents.filter(tx =>
+                          tx.tab.includes(tabName)
+                        )"
+                        :key="texture.id"
+                        cols="12"
+                        sm="6"
+                        md="4"
+                      >
+                        <v-card rounded="lg" class="texture-card" elevation="2">
+                          <v-img
+                            :src="
+                              texture.url.startsWith('texture')
+                              ? `https://db.otofuda.com/${texture.url}`
+                              : texture.url
+                            "
+                            height="100px"
+                          >
+                            <span class="texture-card__name">
+                              {{ texture.name }}
+                            </span>
+                          </v-img>
+
+                          <v-card-actions class="justify-end pa-0">
+                            <v-btn
+                              small
+                              variant="text"
+                              color="primary"
+                              @click="setTexture(texture)"
+                            >
+                              これにする
+                            </v-btn>
+                          </v-card-actions>
+                        </v-card>
+                      </v-col>
+                    </v-row>
+                  </v-window-item>
+                </v-window>
+              </v-card>
+            </v-menu>
+
+            <!-- Type96 カラーピッカー -->
+            <v-row v-if="appendNote.type === 96" class="pl-2">
+              <v-color-picker
+                v-model="appendNoteColorOption"
+                :swatches="colorSwatches"
+                show-swatches
+                elevation="2"
+                class="mr-4 mb-2"
+                hide-inputs
+              ></v-color-picker>
+              <div>
+                <div><strong>特殊な色を設定</strong></div>
+                <v-btn
+                  variant="outlined"
+                  color="primary"
+                  @click="appendNote.option = ['-1', '-1', '-1']"
+                  class="my-2"
+                >
+                  青赤(default)に戻す
+                </v-btn>
+                <p><code>['-1', '-1', '-1']</code> を設定します</p>
+              </div>
+            </v-row>
+
+            <v-row>
+              <v-radio-group
+                v-model="appendNote.lane"
+                inline
+                :max-width="240"
+                hide-details
+                prepend-icon="mdi-view-column-outline"
+                :disabled="isLanelessNote(appendNote)"
+              >
+                <v-radio v-for="n in 5" :key="n" :value="n"></v-radio>
+              </v-radio-group>
+              <v-spacer></v-spacer>
+              <div>
+                <v-btn
+                  class="ml-1"
+                  color="green"
+                  :title="shortcutTitle('placeNotes')"
+                  @click="placeNotes(appendNote)"
+                >
+                  ノートを仮配置
+                  <v-icon right>mdi-keyboard-return</v-icon>
+                </v-btn>
+                <v-badge
+                  overlap
+                  color="orange darken-4"
+                  :model-value="preAppendNotes.length > 0"
+                  :content="preAppendNotes.length"
+                >
+                  <v-btn
+                    class="ml-4"
+                    color="orange"
+                    theme="dark"
+                    append-icon="mdi-plus-circle-outline"
+                    :title="shortcutTitle('appendNotes')"
+                    @click="appendNotes(...preAppendNotes)"
+                  >
+                    挿入する
+                  </v-btn>
+                </v-badge>
+              </div>
+            </v-row>
+
+            <div
+              class="my-4"
+              v-show="appendNote.type === 2 || (appendNote.type == 90 && Number(appendNote.option[0]) === 2)"
+            >
+              <v-row align="center" justify="space-between">
+                <h4>ロングノーツ編集</h4>
+                <v-btn
+                  color="green"
+                  prepend-icon="mdi-plus-circle-outline"
+                  @click="addEndToAppendNote"
+                >
+                  終点を追加
+                </v-btn>
+              </v-row>
+
+              <EndForm
+                v-for="(end, i) in appendNote.end"
+                :key="`append_end_${i}`"
+                :end="end"
+                :parent="appendNote"
+                :index="i"
+                :max-measure="maxMeasure"
+                @delete-end="deleteEndOfAppendNote"
+                @shift-lane="shiftAppendLongLane"
+                @shift-position="shiftAppendLongPosition"
+                @place-notes="placeNotes(appendNote)"
+              >
+              </EndForm>
+
+              <v-alert
+                v-if="appendNote.end.length === 0"
+                class="mt-2"
+                density="compact"
+                type="warning"
+                rounded="lg"
+              >
+                終点が1つもありません
+              </v-alert>
+            </div>
+          </v-card>
+
+          <h3>プレビュー領域の設定</h3>
+
+          <h5>現在のハイスピードの速度値:{{ (musicBpm * beatHeight) / 100 }}</h5>
+
+          <v-slider
+            v-model="beatHeight"
+            :thumb-size="24"
+            color="primary"
+            thumb-label="always"
+            min="20"
+            max="300"
+            append-icon="mdi-magnify-plus-outline"
+            prepend-icon="mdi-magnify-minus-outline"
+            @click:append="zoomIn"
+            @click:prepend="zoomOut"
+            step="10"
+            hide-details
+          ></v-slider>
+
+          <v-row align="center">
+            <v-col cols="12" sm="6">
+              <v-file-input
+                accept="audio/*"
+                label="楽曲ファイル選択"
+                variant="outlined"
+                density="compact"
+                prepend-icon="mdi-music"
+                @update:model-value="readAudioFile"
+                hide-details
+              ></v-file-input>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-slider
+                v-model="audioVolume"
+                :thumb-size="24"
+                color="primary"
+                thumb-label="hover"
+                min="0"
+                max="100"
+                prepend-icon="mdi-volume-high"
+                step="5"
+                hide-details
+              ></v-slider>
+            </v-col>
+          </v-row>
+
+          <v-row align="center" class="mb-4">
+            <v-text-field
+              v-model.number="scrollTo"
+              suffix="小節へ"
+              variant="outlined"
+              density="compact"
+              hide-details
+            ></v-text-field>
+            <v-btn
+              prepend-icon="mdi-arrow-right"
+              color="primary"
+              @click="scrollToMeasure(scrollTo)"
+            >
+              遷移
             </v-btn>
           </v-row>
 
-          <EndForm
-            v-for="(end, i) in appendNote.end"
-            :key="`append_end_${i}`"
-            :end="end"
-            :parent="appendNote"
-            :index="i"
-            :max-measure="maxMeasure"
-            @delete-end="deleteEndOfAppendNote"
-            @append-to-left="appendNoteToLeft"
-            @append-to-right="appendNoteToRight"
-            @append-to-up="appendNoteToUp"
-            @append-to-down="appendNoteToDown"
-            @place-notes="placeNotes(appendNote)"
-          >
-          </EndForm>
+          <h3>プレビュー表示モード</h3>
 
-          <v-alert
-            v-if="appendNote.end.size === 0"
-            class="mt-2"
-            dense
-            type="warning"
-            rounded="lg"
-          >
-            終点が1つもありません
-          </v-alert>
-        </div>
-      </div>
+          <v-row class="my-0">
+            <v-checkbox
+              prepend-icon="mdi-format-align-justify"
+              v-model="isShowDetail"
+              label="ノーツ詳細を表示"
+              hide-details
+              density="compact"
+            ></v-checkbox>
+          </v-row>
+          <v-row class="my-0">
+            <v-checkbox
+              prepend-icon="mdi-camera"
+              :disabled="!isShowDetail"
+              v-model="isCaptureMode"
+              label="キャプチャ用モード"
+              hide-details
+              density="compact"
+            ></v-checkbox>
+          </v-row>
+          <v-row class="my-0">
+            <v-checkbox
+              prepend-icon="mdi-play-circle-outline"
+              :disabled="!isShowDetail || !isCaptureMode || isImageMode"
+              v-model="isPreviewMode"
+              label="譜面プレビュー用"
+              hide-details
+              density="compact"
+            ></v-checkbox>
+          </v-row>
+          <v-row class="my-0">
+            <v-checkbox
+              prepend-icon="mdi-image"
+              :disabled="!isShowDetail || !isCaptureMode || isPreviewMode"
+              v-model="isImageMode"
+              label="譜面画像生成用"
+              hide-details
+              density="compact"
+            ></v-checkbox>
+          </v-row>
+          <v-row class="my-0">
+            <v-checkbox
+              prepend-icon="mdi-stop-circle"
+              v-model="isSimulateStop"
+              label="譜面停止をシミュレート"
+              density="compact"
+            ></v-checkbox>
+          </v-row>
 
-      <h3>プレビュー領域の設定</h3>
+          <h3>選択ノーツ（選択中：{{ selectionNumber }}個）</h3>
 
-      <h5>現在のハイスピードの速度値:{{ (musicBpm * beatHeight) / 100 }}</h5>
-
-      <v-slider
-        v-model="beatHeight"
-        :thumb-size="24"
-        thumb-label="always"
-        min="20"
-        max="300"
-        append-icon="mdi-magnify-plus-outline"
-        prepend-icon="mdi-magnify-minus-outline"
-        @click:append="zoomIn"
-        @click:prepend="zoomOut"
-        step="10"
-        hide-details
-      ></v-slider>
-
-      <v-row align="center">
-        <v-col cols="12" sm="6">
-          <v-file-input
-            accept="audio/*"
-            label="楽曲ファイル選択"
-            outlined
-            dense
-            prepend-icon="mdi-music"
-            @change="readAudioFile"
-            hide-details
-          ></v-file-input>
-        </v-col>
-        <v-col cols="12" sm="6">
-          <v-slider
-            v-model="audioVolume"
-            :thumb-size="24"
-            thumb-label="always"
-            min="0"
-            max="100"
-            prepend-icon="mdi-volume-high"
-            step="5"
-            hide-details
-          ></v-slider>
-        </v-col>
-      </v-row>
-
-      <v-row align="center" class="mb-4">
-        <v-text-field
-          v-model.number="scrollTo"
-          suffix="小節へ"
-          outlined
-          dense
-          hide-details
-        ></v-text-field>
-        <v-btn class="ml-4" color="primary" @click="scrollToMeasure(scrollTo)">
-          <v-icon left>mdi-arrow-right</v-icon> 遷移
-        </v-btn>
-      </v-row>
-
-      <h3>プレビュー表示モード</h3>
-
-      <v-row class="mb-0">
-        <v-checkbox
-          prepend-icon="mdi-format-align-justify"
-          v-model="isShowDetail"
-          label="ノーツ詳細を表示"
-          hide-details
-        ></v-checkbox>
-      </v-row>
-      <v-row class="mb-0">
-        <v-checkbox
-          prepend-icon="mdi-camera"
-          :disabled="!isShowDetail"
-          v-model="isCaptureMode"
-          label="キャプチャ用モード"
-          hide-details
-        ></v-checkbox>
-      </v-row>
-      <v-row class="mb-0">
-        <v-checkbox
-          prepend-icon="mdi-play-circle-outline"
-          :disabled="!isShowDetail || !isCaptureMode || isImageMode"
-          v-model="isPreviewMode"
-          label="譜面プレビュー用"
-          hide-details
-        ></v-checkbox>
-      </v-row>
-      <v-row class="mb-0">
-        <v-checkbox
-          prepend-icon="mdi-image"
-          :disabled="!isShowDetail || !isCaptureMode || isPreviewMode"
-          v-model="isImageMode"
-          label="譜面画像生成用"
-          hide-details
-        ></v-checkbox>
-      </v-row>
-      <v-row>
-        <v-checkbox
-          prepend-icon="mdi-stop-circle"
-          v-model="isSimulateStop"
-          label="譜面停止をシミュレート"
-        ></v-checkbox>
-      </v-row>
-
-      <h3>選択ノーツ（選択中：{{ selectionNumber }}個）</h3>
-
-      <v-row align="center" class="py-2">
-        <v-btn color="primary" text @click="dialog.batchcheck = true">
-          <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
-          ノーツの一括選択
-        </v-btn>
-
-        <v-btn color="warning" text @click="selectionClear">
-          <v-icon left>mdi-select-off</v-icon>
-          すべて選択解除
-        </v-btn>
-
-        <v-dialog v-model="dialog.selectionDelete" width="500">
-          <template v-slot:activator="{ on, attrs }">
+          <v-row align="center" class="py-2">
             <v-btn
-              color="error"
-              text
-              @click="dialog.selectionDelete = true"
-              v-bind="attrs"
-              v-on="on"
+              data-testid="select-all"
+              color="primary"
+              variant="outlined"
+              prepend-icon="mdi-select-all"
+              :title="shortcutTitle('selectAll')"
+              @click="selectionAll"
             >
-              <v-icon left>mdi-delete-forever</v-icon>
-              選択ノーツを削除
+              すべて選択
             </v-btn>
-          </template>
-          <v-card>
-            <v-card-title class="headline">確認</v-card-title>
-            <v-card-text>
-              本当に選択したノーツ{{ selectionNumber }}個をすべて削除しますか？
-            </v-card-text>
-            <v-divider></v-divider>
-            <v-card-actions>
-              <v-spacer></v-spacer>
+
+            <v-btn
+              color="primary"
+              variant="outlined"
+              prepend-icon="mdi-checkbox-marked-circle-outline"
+              @click="dialog.batchcheck = true"
+            >
+              ノーツの一括選択
+            </v-btn>
+
+            <v-btn
+              color="warning"
+              variant="outlined"
+              prepend-icon="mdi-select-off"
+              :title="shortcutTitle('escape')"
+              @click="selectionClear"
+            >
+              すべて選択解除
+            </v-btn>
+
+            <v-dialog v-model="dialog.selectionDelete" width="500">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  color="error"
+                  variant="outlined"
+                  prepend-icon="mdi-delete-forever"
+                  :title="shortcutTitle('deleteSelection')"
+                  :disabled="selectionNumber === 0"
+                  @click="openSelectionDelete"
+                  v-bind="props"
+                >
+                  選択ノーツを削除
+                </v-btn>
+              </template>
+              <v-card>
+                <v-card-title class="headline">確認</v-card-title>
+                <v-card-text>
+                  本当に選択したノーツ{{ selectionNumber }}個をすべて削除しますか？
+                </v-card-text>
+                <v-divider></v-divider>
+                <v-card-actions>
+                  <v-spacer></v-spacer>
+                  <v-btn
+                    color="primary"
+                    variant="outlined"
+                    @click="dialog.selectionDelete = false"
+                  >
+                    キャンセル
+                  </v-btn>
+                  <v-btn color="error" variant="outlined" @click="selectionDelete">
+                    削除する
+                  </v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+
+            <v-btn
+              color="primary"
+              variant="outlined"
+              prepend-icon="mdi-auto-fix"
+              @click="dialog.checked = true"
+            >
+              ノーツの一括操作
+            </v-btn>
+          </v-row>
+
+          <h3>譜面情報</h3>
+
+          <v-row align="center">
+            <v-col>
+              <v-text-field
+                v-model.number="chartObject.info.offset"
+                v-history-field="infoField('オフセットを変更')"
+                label="オフセット"
+                required
+                variant="outlined"
+                density="compact"
+                hide-details
+              ></v-text-field>
+            </v-col>
+            <v-col>
+              <v-text-field
+                v-model.number="chartObject.info.bpm"
+                v-history-field="infoField('BPMを変更')"
+                label="BPM"
+                required
+                variant="outlined"
+                density="compact"
+                hide-details
+              ></v-text-field>
+            </v-col>
+            <v-col>
+              <v-text-field
+                v-model.number="chartObject.info.beat"
+                v-history-field="infoField('拍子を変更')"
+                label="拍子"
+                required
+                variant="outlined"
+                density="compact"
+                hide-details
+              ></v-text-field>
+            </v-col>
+            <v-col>
+              <v-text-field
+                v-model.number="chartObject.info.version"
+                label="譜面ver"
+                variant="outlined"
+                density="compact"
+                disabled
+                hide-details
+              ></v-text-field>
+            </v-col>
+          </v-row>
+
+          <v-row>
+            <v-btn
+              color="primary"
+              @click="dialog.help = true"
+              :title="shortcutTitle('help')"
+              variant="outlined"
+              prepend-icon="mdi-help-circle"
+            >
+              使い方
+            </v-btn>
+            <v-btn
+              color="primary"
+              @click="toggleMessageLog"
+              variant="outlined"
+              prepend-icon="mdi-message-outline"
+            >
+              メッセージログ
+            </v-btn>
+            <v-btn
+              color="primary"
+              @click="analyze"
+              variant="outlined"
+              prepend-icon="mdi-chart-timeline-variant"
+            >
+              譜面分析
+            </v-btn>
+            <ThemeToggle />
+            <!-- ダークモードの隣で、自動判定と手動のレイアウト指定を切り替える。 -->
+            <v-btn-group
+              class="layout-switch"
+              rounded="lg"
+              divided
+              density="compact"
+              role="group"
+              aria-label="レイアウト"
+            >
+              <!-- 共通の角丸設定を上書きし、グループの両端だけを丸める。 -->
               <v-btn
+                v-for="option in layoutOptions"
+                :key="option.value"
+                :aria-pressed="preference === option.value"
+                :variant="preference === option.value ? 'flat' : 'outlined'"
+                :prepend-icon="option.icon"
                 color="primary"
-                text
-                @click="dialog.selectionDelete = false"
+                size="small"
+                rounded
+                @click="preference = option.value"
               >
-                キャンセル
+                {{ option.label }}
               </v-btn>
-              <v-btn color="error" text @click="selectionDelete">
-                削除する
-              </v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-dialog>
+            </v-btn-group>
+          </v-row>
+          <v-row>
+            <v-btn
+              color="success"
+              @click="saveFile"
+              variant="outlined"
+              prepend-icon="mdi-content-save"
+            >
+              名前をつけて保存
+            </v-btn>
+            <v-btn
+              color="success"
+              @click="restoreBackup"
+              variant="outlined"
+              prepend-icon="mdi-file-restore"
+            >
+              復元
+            </v-btn>
+          </v-row>
 
-        <v-btn color="primary" text @click="dialog.checked = true">
-          <v-icon left>mdi-auto-fix</v-icon>
-          ノーツの一括操作
-        </v-btn>
-      </v-row>
-
-      <h3>譜面情報</h3>
-
-      <v-row align="center">
-        <v-col>
-          <v-text-field
-            v-model.number="chartObject.info.offset"
-            label="オフセット"
-            required
-            outlined
-            dense
-          ></v-text-field>
-        </v-col>
-        <v-col>
-          <v-text-field
-            v-model.number="chartObject.info.bpm"
-            label="BPM"
-            required
-            outlined
-            dense
-          ></v-text-field>
-        </v-col>
-        <v-col>
-          <v-text-field
-            v-model.number="chartObject.info.beat"
-            label="拍子"
-            required
-            outlined
-            dense
-          ></v-text-field>
-        </v-col>
-        <v-col>
-          <v-text-field
-            v-model.number="chartObject.info.version"
-            label="譜面ver"
-            outlined
-            dense
-            disabled
-          ></v-text-field>
-        </v-col>
-      </v-row>
-
-      <v-row>
-        <v-btn color="primary" @click="dialog.help = true" text>
-          <v-icon left>mdi-help-circle</v-icon> 使い方
-        </v-btn>
-        <v-btn
-          class="ml-2"
-          color="primary"
-          @click="dialog.logs = !dialog.logs"
-          text
-        >
-          <v-icon left>mdi-message-outline</v-icon> メッセージログ
-        </v-btn>
-        <v-btn class="ml-2" color="primary" @click="analyze" text>
-          <v-icon left>mdi-chart-timeline-variant</v-icon> 譜面分析
-        </v-btn>
-      </v-row>
-      <v-row>
-        <v-btn color="success" @click="saveFile">
-          <v-icon left>mdi-content-save</v-icon> 名前をつけて保存
-        </v-btn>
-        <v-btn class="ml-2" color="success" @click="restoreBackup" outlined>
-          <v-icon left>mdi-file-restore</v-icon> 復元
-        </v-btn>
-      </v-row>
-
-      <v-card
-        v-if="dialog.logs"
-        class="mx-auto message-log"
-        elevation="2"
-        rounded="lg"
-      >
-        <v-card-title>
-          <v-btn icon class="mr-4" @click="dialog.logs = false">
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
-          メッセージログ
-        </v-card-title>
-
-        <v-list subheader>
-          <v-list-item v-for="item in logs.slice().reverse()" :key="item.date">
-            <v-list-item-content>
-              <p class="mb-2 d-flex">
-                <v-chip class="flex-shrink-0 mr-2" label>
-                  {{ item.type }}
-                </v-chip>
-                {{ item.message }}
-              </p>
-              <v-list-item-subtitle>
-                {{ item.date.toLocaleString("ja-JP") }}
-              </v-list-item-subtitle>
-            </v-list-item-content>
-          </v-list-item>
-        </v-list>
-      </v-card>
-    </v-container>
-
-    <v-dialog v-model="dialog.help" width="800">
-      <v-card rounded="lg">
-        <v-card-title class="headline">
-          エディタの使い方
-        </v-card-title>
-        <v-card-text>
-          <a
-            href="https://github.com/otofuda/chart-types"
-            target="_blank"
-            rel="noopener noreferrer"
+          <v-card
+            v-if="dialog.logs"
+            class="mx-auto message-log"
+            elevation="2"
+            rounded="lg"
+            title="メッセージログ"
           >
-            譜面フォーマットについて
-          </a>
+            <template #prepend>
+              <v-btn icon="mdi-close" variant="text" @click="dialog.logs = false" />
+            </template>
+
+            <v-list subheader>
+              <v-list-item v-for="item in logs.slice().reverse()" :key="item.date.getTime()">
+                <p class="mb-2 d-flex">
+                  <v-chip class="flex-shrink-0 mr-2" label>
+                    {{ item.type }}
+                  </v-chip>
+                  {{ item.message }}
+                </p>
+                <v-list-item-subtitle>
+                  {{ item.date.toLocaleString("ja-JP") }}
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+          </v-card>
+        </v-container>
+      </div>
+    </div>
+
+    <v-dialog v-model="dialog.help" width="800" scrollable>
+      <v-card rounded="xl" title="エディタの使い方" prepend-icon="mdi-help-circle">
+        <template #append>
+          <v-btn icon="mdi-close" variant="text" @click="dialog.help = false" />
+        </template>
+        <v-divider></v-divider>
+        <v-card-text style="max-height: 70vh; overflow-y: auto;">
+          <div v-html="renderedUsage" class="usage-content"></div>
         </v-card-text>
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="dialog.analyzer" width="800">
-      <v-card rounded="lg">
-        <v-card-title class="headline">
-          譜面分析 ({{ currentDifficulty }})
-        </v-card-title>
+    <v-dialog v-model="dialog.analyzer" width="800" scrollable>
+      <v-card
+        rounded="xl"
+        prepend-icon="mdi-chart-timeline-variant"
+        :title="`譜面分析 (${currentDifficulty})`"
+      >
+        <v-divider></v-divider>
         <v-card-text>
           ノーツ数：{{ analysisData.notesCount }}
           <br />
-          オブジェクト数：{{ currentChart.size }}
+          オブジェクト数：{{ currentChart.length }}
           <br />
           平均密度：{{
-            (analysisData.notesCount / measureData.last.measureReachTime) *
+            (analysisData.notesCount / (measureData.at(-1)?.measureReachTime ?? 1)) *
               1000
           }}Notes / 秒
+          <v-divider></v-divider>
+          <DensityGraph
+            v-if="dialog.analyzer"
+            :trend-values="analysisData.trendValues"
+            :otofuda-notes="analysisData.otofudaNotes"
+            @jump="handleJumpToMeasure"
+          />
+          <v-table>
+            <thead>
+              <tr>
+                <th class="text-left">
+                  種類別ノーツ数
+                </th>
+                <th class="text-left">
+                  数
+                </th>
+                <th class="text-left">
+                  割合
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="type in noteTypes" :key="`note_count_${type.value}`">
+                <td>{{ type.title }}</td>
+                <td>{{ analysisData.typeCount[type.value] }}</td>
+                <td>
+                  {{
+                    [1, 2, 3, 4, 5, 6, 7].includes(type.value)
+                      ? analysisData.notesCount === 0 ? '0％' : `${Math.floor(
+                          (analysisData.typeCount[type.value] /
+                            analysisData.notesCount) *
+                            10000
+                        ) / 100}％`
+                      : "－"
+                  }}
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+          <NoteTypePie :type-count="analysisData.typeCount" />
         </v-card-text>
-        <v-divider></v-divider>
-        <v-sparkline
-          v-if="dialog.analyzer"
-          :labels="analysisData.trendLabels"
-          :value="analysisData.trendValues"
-          :gradient="['#f72047', '#ffd200', '#1feaea']"
-          color="black"
-          line-width="2"
-          padding="10"
-          smooth="3"
-        ></v-sparkline>
-        <v-sparkline
-          v-if="dialog.analyzer"
-          :value="analysisData.otofudaNotes"
-          color="orange"
-          line-width="2"
-          height="10"
-          padding="0"
-          smooth="0"
-          fill
-        ></v-sparkline>
-        <v-card-text class="mt-4">
-          ▲音札ノーツの位置
-        </v-card-text>
-        <v-simple-table>
-          <thead>
-            <tr>
-              <th class="text-left">
-                種類別ノーツ数
-              </th>
-              <th class="text-left">
-                数
-              </th>
-              <th class="text-left">
-                割合
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="type in noteTypes" :key="`note_count_${type.value}`">
-              <td>{{ type.text }}</td>
-              <td>{{ analysisData.typeCount[type.value] }}</td>
-              <td>
-                {{
-                  [1, 2, 3, 4, 5, 6, 7].includes(type.value)
-                    ? `${Math.floor(
-                        (analysisData.typeCount[type.value] /
-                          analysisData.notesCount) *
-                          10000
-                      ) / 100}％`
-                    : "－"
-                }}
-              </td>
-            </tr>
-          </tbody>
-        </v-simple-table>
       </v-card>
     </v-dialog>
 
     <v-dialog v-model="dialog.checked" width="800">
-      <v-card rounded="lg">
-        <v-card-title>
-          <v-icon left>mdi-auto-fix</v-icon>
-          選択ノーツへの一括操作
-          <v-spacer></v-spacer>
-          <v-btn icon @click="dialog.checked = false" right>
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
-        </v-card-title>
+      <v-card rounded="xl" prepend-icon="mdi-auto-fix" title="選択ノーツへの一括操作">
+        <template #append>
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            @click="dialog.checked = false"
+          />
+        </template>
         <v-divider></v-divider>
-        <v-card-title>
-          種別の変更
-        </v-card-title>
         <v-card-text>
+          <strong>
+            種別の変更
+          </strong>
           <p>
             選択したノーツ(ロングノーツと音札ノーツを除く)を特定の種別に一括で変更します。
           </p>
@@ -719,24 +819,101 @@
               min="1"
               max="99"
               prefix="Type："
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
               hide-details
             ></v-text-field>
             <v-btn
-              class="ml-4"
+              prepend-icon="mdi-auto-fix"
               color="primary"
               @click="selectionChangeType(selectionTypeTo)"
             >
-              <v-icon left>mdi-auto-fix</v-icon> 選択ノーツを全て種別変更
+              選択ノーツを全て種別変更
             </v-btn>
           </v-row>
         </v-card-text>
         <v-divider></v-divider>
-        <v-card-title>
-          レーンの変更
-        </v-card-title>
+        <!-- 同じtype、または上下左右フリックの共通optionを一括変更する。 -->
+        <v-card-text data-testid="selection-options">
+          <strong>
+            オプションの変更
+          </strong>
+
+          <p>
+            同じtypeのノーツ、または上下左右のフリックを1つ以上選択すると、チェックした項目だけを一括変更できます。
+            チェックした項目が空欄の場合は値を消去します。保存時は既存の規則で省略・既定値補完されます。
+            ロングノーツは始点のオプションのみ変更します。
+          </p>
+
+          <!-- 実行できない場合は、選択条件に応じた理由を表示する。 -->
+          <v-alert
+            v-if="selectionOptionsDisabledReason"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="my-2"
+          >
+            {{ selectionOptionsDisabledReason }}
+          </v-alert>
+
+          <v-row
+            v-for="(opt, i) in selectionOptionDefinitions"
+            :key="`selection_option_${i}`"
+            align="center"
+            class="mx-1"
+          >
+            <v-col
+              cols="12"
+              sm="4"
+            >
+              <v-checkbox
+                v-model="selectionOptionFields[i].checked"
+                :label="`${opt.label}を変更`"
+                density="compact"
+                hide-details
+              />
+            </v-col>
+
+            <v-col
+              cols="12"
+              sm="8"
+            >
+              <!-- 混在値は空欄で表示し、チェック前の入力を無効にする。 -->
+              <v-text-field
+                v-model="selectionOptionFields[i].value"
+                :label="opt.label"
+                :type="opt.type === 'number' ? 'number' : 'text'"
+                :disabled="!selectionOptionFields[i].checked"
+                :placeholder="selectionOptionFields[i].mixed ? '値が混在' : undefined"
+                :hint="[
+                  selectionOptionFields[i].mixed ? '値が混在' : '',
+                  opt.desc,
+                ].filter(Boolean).join('｜')"
+                persistent-hint
+                variant="outlined"
+                density="compact"
+              />
+            </v-col>
+          </v-row>
+
+          <v-btn
+            prepend-icon="mdi-auto-fix"
+            color="primary"
+            class="mt-2"
+            :disabled="
+              Boolean(selectionOptionsDisabledReason) ||
+              !selectionOptionFields.some(field => field.checked)
+            "
+            @click="applySelectionOptions"
+          >
+            選択ノーツのオプションを変更
+          </v-btn>
+        </v-card-text>
+        <v-divider></v-divider>
         <v-card-text>
+          <strong>
+            レーンの変更
+          </strong>
           <p>
             選択したノーツ(ロングノーツと音札ノーツを除く)を特定のレーンに一括で移動します。(選択範囲、または対象レーンに対して)同時押しを含む範囲に対して実行すると重複が発生します。
           </p>
@@ -747,20 +924,23 @@
               min="1"
               max="5"
               prefix="Lane："
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
               hide-details
             ></v-text-field>
             <v-btn
-              class="ml-4"
+              prepend-icon="mdi-auto-fix"
               color="primary"
               @click="selectionChangeLane(selectionLaneTo)"
             >
-              <v-icon left>mdi-auto-fix</v-icon> 選択ノーツを全てレーン移動
+              選択ノーツを全てレーン移動
             </v-btn>
           </v-row>
         </v-card-text>
         <v-card-text>
+          <strong>
+            レーンの加算／減算
+          </strong>
           <p>
             選択したノーツ(ロングノーツと音札ノーツを除く)のそれぞれのレーンを1～5の範囲内で加算または減算します。入力は「－4」～「＋4」の範囲。
           </p>
@@ -771,25 +951,24 @@
               min="-4"
               max="4"
               prefix="値："
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
               hide-details
             ></v-text-field>
             <v-btn
-              class="ml-4"
+              prepend-icon="mdi-auto-fix"
               color="primary"
               @click="selectionAddLane(selectionLaneAddition)"
             >
-              <v-icon left>mdi-auto-fix</v-icon>
               各選択ノーツのレーンを加算／減算
             </v-btn>
           </v-row>
         </v-card-text>
         <v-divider></v-divider>
-        <v-card-title>
-          小節移動
-        </v-card-title>
         <v-card-text>
+          <strong>
+            小節の移動
+          </strong>
           <p>
             選択したノーツの配置小節位置を加算または減算します。入力は正または負の整数。
           </p>
@@ -800,16 +979,15 @@
               min="-4"
               max="4"
               prefix="値："
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
               hide-details
             ></v-text-field>
             <v-btn
-              class="ml-4"
+              prepend-icon="mdi-auto-fix"
               color="primary"
               @click="selectionAddMeasure(selectionMeasureAddition)"
             >
-              <v-icon left>mdi-auto-fix</v-icon>
               選択ノーツの小節を加算／減算
             </v-btn>
           </v-row>
@@ -818,56 +996,65 @@
     </v-dialog>
 
     <v-dialog v-model="dialog.batchcheck" width="800">
-      <v-card rounded="lg">
-        <v-card-title>
-          <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
-          ノーツの一括選択
-          <v-spacer></v-spacer>
-          <v-btn icon @click="dialog.batchcheck = false" right>
-            <v-icon>mdi-close</v-icon>
+      <v-card rounded="xl" prepend-icon="mdi-checkbox-marked-circle-outline" title="ノーツの一括選択">
+        <template #append>
+          <v-btn
+            icon="mdi-close"
+            @click="dialog.batchcheck = false"
+            variant="text"
+          >
           </v-btn>
-        </v-card-title>
+        </template>
         <v-divider></v-divider>
-        <v-card-title>
-          対象Type
-        </v-card-title>
         <v-card-text>
+          <strong>
+            対象Type
+          </strong>
           <p>
             対象Typeに合致するノーツを選択対象に加えます。
-            <a @click="batchSelectTypes = noteTypes.map(t => t.value)">
+            <v-btn
+              color="primary"
+              variant="text"
+              @click="batchSelectTypes = noteTypes.map(t => t.value)"
+            >
               すべて選択
-            </a>
-            ・
-            <a @click="batchSelectTypes = []">すべて解除</a>
+            </v-btn>
+            <v-btn
+              color="primary"
+              variant="text"
+              @click="batchSelectTypes = []"
+            >
+              すべて解除
+            </v-btn>
           </p>
           <v-checkbox
             class="d-inline-block mr-4"
             v-for="(type) in noteTypes"
             :key="`batch-select-type_${type.value}`"
             v-model="batchSelectTypes"
-            :label="type.text"
+            :label="type.title"
             :value="type.value"
             hide-details
+            density="compact"
           ></v-checkbox>
         </v-card-text>
         <v-divider></v-divider>
-        <v-card-title>
-          対象小節
-        </v-card-title>
         <v-card-text>
+          <strong>
+            対象小節
+          </strong>
           <p>
             対象小節の範囲内のノーツを選択対象に加えます。終了小節を0にすると譜面の最後までを対象とします。
           </p>
-          <v-row align="center" class="mx-1">
+          <v-row align="center">
             <v-text-field
-              class="mr-4"
               v-model.number="batchSelectStart"
               type="number"
               min="0"
               prefix="開始："
               suffix="小節"
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
               hide-details
             ></v-text-field>
             <v-text-field
@@ -876,29 +1063,31 @@
               min="0"
               prefix="終了："
               suffix="小節"
-              outlined
-              dense
+              variant="outlined"
+              density="compact"
               hide-details
             ></v-text-field>
           </v-row>
+          <p>予測される選択個数：{{ batchSelectTarget.length }}</p>
         </v-card-text>
-        <v-card-text>
-          <p>予測される選択個数：{{ batchSelectTarget.size }}</p>
-        </v-card-text>
-        <v-card-actions>
+        <template #actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" @click="batchSelect">
-            <v-icon left>mdi-checkbox-marked-circle-outline</v-icon>
+          <v-btn
+            color="primary"
+            variant="outlined"
+            prepend-icon="mdi-checkbox-marked-circle-outline"
+            @click="batchSelect"
+          >
             すべて選択する
           </v-btn>
-        </v-card-actions>
+        </template>
       </v-card>
     </v-dialog>
 
     <v-snackbar v-model="snackbar" rounded="lg" vertical>
       {{ snackbarText }}
-      <template v-slot:action="{ attrs }">
-        <v-btn color="error" text v-bind="attrs" @click="snackbar = false">
+      <template v-slot:actions>
+        <v-btn color="error" variant="text" @click="snackbar = false">
           閉じる
         </v-btn>
       </template>
@@ -906,889 +1095,456 @@
   </v-app>
 </template>
 
-<script lang="ts">
-import "buryjs";
-// @ts-ignore
-import { Bury } from "buryjs/dist/bury";
-import Vue from "vue";
-
+<script setup lang="ts">
 import {
-  DifficultyString,
-  Measure,
-  ColorObject,
-  TextureObject,
-  ExtendedNoteData,
-  ExtendedChartData
-} from "./types";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { ChartData, NoteData, LaneType } from "chart-types";
-import { NoteTypesDataType, NoteTypesMethodsType } from "./mixins/noteTypes";
+  ref,
+  computed,
+  provide,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+} from 'vue'
 
-import Preview from "./components/Preview.vue";
-import EndForm from "./components/EndForm.vue";
+import Preview from './components/Preview.vue'
+import EndForm from './components/EndForm.vue'
+import DensityGraph from './components/DensityGraph.vue'
+import NoteTypePie from './components/NoteTypePie.vue'
+import ThemeToggle from './components/ThemeToggle.vue'
+import HistoryControls from './components/HistoryControls.vue'
+import { vHistoryField } from './composables/useHistoryField'
+import {
+  handlePositionEnter,
+  shortcutTitle,
+  useEditorShortcuts,
+  type EditorShortcutId,
+} from './composables/useEditorShortcuts'
 
-import noteTypes from "./mixins/noteTypes";
-import noteCheck from "./mixins/noteCheck";
+import usageContent from '../Usage.md?raw'
 
-export type DataType = {
-  isLoaded: boolean;
-  reader: FileReader;
-  previewAudio: HTMLAudioElement;
-  fileName: string;
-  difficulties: DifficultyString[];
-  currentDifficulty: DifficultyString;
-  audioVolume: number;
-  chartObject: ExtendedChartData;
-  dialog: {
-    selectionDelete: boolean;
-    analyzer: boolean;
-    help: boolean;
-    logs: boolean;
-    checked: boolean;
-    batchcheck: boolean;
-    texture: boolean;
-  };
-  texturePayload: {
-    contents: TextureObject[];
-  };
-  textureTabs: string[];
-  textureCurrentTab: string | null;
-  analysisData: {
-    notesCount: number;
-    trendValues: number[];
-    trendLabels: string[];
-    otofudaNotes: number[];
-    typeCount: Record<number, number>;
-  };
-  appendNote: ExtendedNoteData;
-  preAppendNotes: ExtendedNoteData[];
-  colorSwatches: string[][];
-  isAppendMode: boolean;
-  isAutoFollow: boolean;
-  scrollTo: number;
-  isShowDetail: boolean;
-  isCaptureMode: boolean;
-  isPreviewMode: boolean;
-  isImageMode: boolean;
-  isSimulateStop: boolean;
-  batchSelectTypes: number[];
-  batchSelectStart: number;
-  batchSelectEnd: number;
-  selectionLaneTo: LaneType;
-  selectionLaneAddition: number;
-  selectionTypeTo: number;
-  selectionMeasureAddition: number;
-  snackbar: boolean;
-  snackbarText: string;
-  logs: {
-    message: string;
-    type: string;
-    date: Date;
-  }[];
-  beatHeight: number;
-};
+import { useChartData } from './composables/useChartData'
+import { useNoteEditor } from './composables/useNoteEditor'
+import { useSelection } from './composables/useSelection'
+import { useFileIO } from './composables/useFileIO'
+import { useTextureDB } from './composables/useTextureDB'
+import { useBackup } from './composables/useBackup'
+import { usePersistedRef } from './composables/usePersistedRef'
+import { useEditorLayout, type LayoutPreference } from './composables/useEditorLayout'
+import { noteTypes, noteOptions } from './composables/useNoteTypes'
+import { getOtofudaMismatchWarnings, isLanelessNote } from './composables/useNoteCheck'
+import {
+  showSnackbarKey,
+  otofudaWarningKey,
+  deleteNotesKey,
+  cancelNoteKey,
+  appendNotesKey,
+  getMovedNoteKey,
+  copyNotesToDifficultyKey,
+  setAppendNoteInfoKey,
+  chartHistoryKey,
+} from './composables/injectionKeys'
 
-type MethodsType = {
-  readFile: (file: File) => void;
-  newFile(): void;
-  saveFile(): void;
-  readAudioFile(file: File): void;
-  zoomOut(): void;
-  zoomIn(): void;
-  scrollToMeasure(measureNumber: number): void;
-  appendNotes(...notes: NoteData[]): void;
-  placeNotes(...notes: NoteData[]): void;
-  appendSimultaneously(...notes: NoteData[]): void;
-  addEndToAppendNote(): void;
-  deleteEndOfAppendNote(index: number): void;
-  changeAppendNoteType(): void;
-  appendNoteToLeft(): void;
-  appendNoteToRight(): void;
-  appendNoteToUp(): void;
-  appendNoteToDown(): void;
-  deleteNotes(...index: number[]): void;
-  setAppendNoteInfo(object: NoteData): void;
-  cancelNote(index: number): void;
-  copyNotesToDifficulty(
-    targetDifficulty: DifficultyString | null,
-    ...targets: NoteData[]
-  ): void;
-  getMovedNote(oldNote: NoteData, newMeasure: number): NoteData;
-  selectionClear(): void;
-  selectionDelete(): void;
-  selectionChangeType(type: number): void;
-  selectionChangeLane(lane: LaneType): void;
-  selectionAddLane(diff: number): void;
-  selectionAddMeasure(diff: number): void;
-  batchSelect(): void;
-  showSnackbar(message: string): void;
-  analyze(): void;
-  setTexture(obj: TextureObject): void;
-  restoreBackup(): void;
-  onPressKey(e: KeyboardEvent): void;
-};
+// --- composable の初期化 ---
+// 自動判定・手動選択と、ボタングループの表示項目をまとめて管理する。
+const { preference, layout, narrow, contained } = useEditorLayout()
+const layoutOptions: { value: LayoutPreference; label: string; icon: string }[] = [
+  { value: 'auto', label: '自動', icon: 'mdi-monitor-cellphone' },
+  { value: 'side-by-side', label: '左右', icon: 'mdi-view-column' },
+  { value: 'stacked', label: '上下', icon: 'mdi-view-agenda' },
+]
+const chartData = useChartData()
+const { history } = chartData
+const {
+  chartObject,
+  currentChart,
+  currentDifficulty,
+  measureData,
+  beatHeight,
+  maxMeasure,
+  isSimulateStop,
+  musicBpm,
+  difficulties,
+} = chartData
 
-type ComputedType = {
-  currentChart: ExtendedNoteData[];
-  musicBpm: number;
-  musicBeat: number;
-  musicOffset: number;
-  maxMeasure: number;
-  measureData: Measure[];
-  batchSelectTarget: ExtendedNoteData[];
-  selectionNumber: number;
-  getAppendNote: ExtendedNoteData | null;
-  appendNoteColorOption: ColorObject | null;
-  noteOptionsForAppendNote: {
-    label: string;
-    type: string;
-    desc: string;
-  }[];
-};
+const otofudaWarnings = computed(() => getOtofudaMismatchWarnings(chartObject.value, difficulties))
 
-export default Vue.extend<
-  // data
-  DataType & NoteTypesDataType,
-  // methods
-  MethodsType & NoteTypesMethodsType,
-  // computed
-  ComputedType
->({
-  name: "App",
-  mixins: [noteTypes, noteCheck],
-  // @ts-ignore noteTypes と noteCheck は mixins で定義
-  data(): DataType {
-    return {
-      isLoaded: false,
-      reader: new FileReader(),
-      previewAudio: new Audio(),
-      audioVolume: 100,
-      fileName: "default-song.json",
-      difficulties: ["raku", "easy", "normal", "hard", "extra"],
-      currentDifficulty: "easy",
-      chartObject: {
-        raku: [],
-        easy: [],
-        normal: [],
-        hard: [],
-        extra: [],
-        info: {
-          version: 2,
-          offset: 0,
-          bpm: 120,
-          beat: 4
-        }
-      },
-      dialog: {
-        selectionDelete: false, // 選択ノーツ削除確認
-        analyzer: false, // 譜面分析
-        help: false, // 使い方
-        logs: false, // メッセージログ
-        checked: false, // 選択ノーツへの操作
-        batchcheck: false, // ノーツの一括選択
-        texture: false // テクスチャセレクター
-      },
-      texturePayload: {
-        contents: []
-      }, // テクスチャDBからの応答
-      textureTabs: [], // テクスチャの持つタブ
-      textureCurrentTab: null,
-      analysisData: {
-        notesCount: 0,
-        trendValues: [],
-        trendLabels: [],
-        otofudaNotes: [],
-        typeCount: {}
-      },
-      // 配置するノート
-      appendNote: {
-        type: 1,
-        lane: 1,
-        measure: 1,
-        position: 0,
-        split: 8,
-        option: [],
-        end: []
-      },
-      preAppendNotes: [], // 保管する配置ノーツ
-      colorSwatches: [
-        ["#ff5151", "#000000"],
-        ["#44a5ff", "#202020"],
-        ["#ff0000", "#505050"],
-        ["#00ff00", "#a0a0a0"],
-        ["#0000ff", "#ffffff"]
-      ],
-      isAppendMode: true,
-      isAutoFollow: true,
-      scrollTo: 0,
-      isShowDetail: false,
-      isCaptureMode: false,
-      isPreviewMode: false,
-      isImageMode: false,
-      isSimulateStop: false,
+const backup = useBackup(chartData)
+const {
+  snackbar,
+  snackbarText,
+  logs,
+  analysisData,
+  showSnackbar,
+  saveBackup,
+  restoreBackup,
+  analyze: runAnalyze,
+} = backup
 
-      // 一括選択の対象
-      batchSelectTypes: [],
-      batchSelectStart: 0,
-      batchSelectEnd: 0,
+/** 譜面情報の入力欄を、難易度共通の履歴へ接続する設定を生成する。 */
+function infoField(label: string) {
+  return { history, meta: { label, difficulties: [] } }
+}
 
-      // 選択ノーツへの操作
-      selectionLaneTo: 1,
-      selectionLaneAddition: 1,
-      selectionTypeTo: 1,
-      selectionMeasureAddition: 0,
+/** 直前の操作を取り消し、取り消した操作名を通知する。 */
+function undo() {
+  const entry = history.undo()
 
-      snackbar: false, // 通知表示管理
-      snackbarText: "メッセージ", // 通知内容
-      logs: [], // メッセージログ
-
-      // 一拍あたりの高さ(px)
-      beatHeight:
-        Number(localStorage.getItem("chart-editor__beat-height")) || 100
-    };
-  },
-  // 依存性注入(DI)
-  provide() {
-    return {
-      showSnackbar: this.showSnackbar,
-      deleteNotes: this.deleteNotes,
-      cancelNote: this.cancelNote,
-      appendNotes: this.appendNotes,
-      getMovedNote: this.getMovedNote,
-      copyNotesToDifficulty: this.copyNotesToDifficulty,
-      setAppendNoteInfo: this.setAppendNoteInfo
-    };
-  },
-  beforeCreate() {
-    new Bury(); // Bury.jsを初期化
-  },
-  created: function() {
-    document.addEventListener("keydown", this.onPressKey);
-  },
-  mounted() {
-    this.reader.onload = event => {
-      if (!event.target || !event.target.result) {
-        return;
-      }
-
-      this.chartObject = JSON.parse(String(event.target.result));
-      this.difficulties.each((d: DifficultyString) => {
-        this.chartObject[d] = this.chartObject[d].map((note, index) => {
-          // 編集用の情報を付加
-          return {
-            ...note,
-            index,
-            isSelected: false
-          };
-        });
-      });
-      this.isLoaded = true;
-    };
-    window.addEventListener("beforeunload", e => {
-      e.preventDefault();
-      e.returnValue = "移動してもよろしいですか？";
-    });
-    // テクスチャDB取得
-    fetch("https://otofuda.microcms.io/api/v1/textures?limit=1000", {
-      headers: {
-        "X-API-KEY": "91c69bf8-3df5-445f-81e7-30b54ab4a7d4"
-      }
-    })
-      .then(res => res.json())
-      .then(data => {
-        this.texturePayload = data;
-        // タブ一覧を生成
-        const tabs: string[] = [];
-        this.texturePayload.contents.each((obj: TextureObject) =>
-          tabs.append(...obj.tab)
-        );
-        this.textureTabs = tabs.uniq;
-        this.textureCurrentTab = tabs.first;
-      });
-    console.log('App', this)
-  },
-  // @ts-ignore noteTypes と noteCheck は mixins で定義
-  methods: {
-    readFile(file: File): void {
-      this.fileName = file.name;
-      this.reader.readAsText(file);
-    },
-    newFile(): void {
-      this.fileName = "default.json";
-      this.isLoaded = true;
-    },
-    /** JSONファイルを保存 */
-    saveFile(): void {
-      const saveObject = {
-        raku: [],
-        easy: [],
-        normal: [],
-        hard: [],
-        extra: [],
-        info: {
-          version: 2,
-          ...this.chartObject.info
-        }
-      };
-      // 各ノートにValidationを実行
-      this.difficulties.each((d: DifficultyString) => {
-        saveObject[d] = this.chartObject[d].map(this.getValidatedNote);
-      });
-      console.log("saveObject", saveObject);
-      const blob = new Blob([JSON.stringify(saveObject, null, 4)], {
-        type: "application/json"
-      });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = this.fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      this.showSnackbar(`ファイル「${this.fileName}」を保存しました`);
-    },
-    readAudioFile(file: File): void {
-      this.previewAudio.src = window.URL.createObjectURL(file);
-    },
-    zoomOut(): void {
-      this.beatHeight = this.beatHeight - 10 || 0;
-    },
-    zoomIn(): void {
-      this.beatHeight = this.beatHeight + 10 || 100;
-    },
-    scrollToMeasure(measureNumber: number): void {
-      if (!this.measureData[measureNumber]) {
-        this.showSnackbar(`${measureNumber}小節はありません`);
-        return;
-      }
-      const measurePositionTop =
-        this.measureData.last?.measurePositionBottom -
-        this.measureData[measureNumber].measurePositionBottom;
-      this.$vuetify.goTo(measurePositionTop);
-    },
-    // ノーツを挿入
-    appendNotes(...notes: NoteData[]): void {
-      notes.each((note: NoteData) => {
-        const dup = this.isDuplicated(note, {
-          checkPreAppend: false
-        });
-        if (dup) {
-          this.showSnackbar(
-            `${dup}個のノーツと重複しているため、挿入できないノーツがありました`
-          );
-          return false;
-        }
-        // 配置ノートのindexは、currentChart内の最大index+1
-        const index =
-          this.currentChart.size === 0
-            ? 1
-            : // @ts-ignore
-              this.currentChart.max_by((n) => n.index).index +
-              1;
-        this.currentChart?.append({
-          isSelected: false,
-          ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
-          index,
-          option: this.getValidatedOptions(note)
-        });
-      });
-      this.showSnackbar(`${notes.size}個のノートの挿入を試行しました`);
-      this.preAppendNotes = [];
-    },
-    // ノーツを仮配置
-    placeNotes(...notes: NoteData[]): void {
-      notes.each((note: NoteData) => {
-        const dup = this.isDuplicated(note);
-        if (dup) {
-          this.showSnackbar(
-            `${dup}個のノーツと重複しているため、配置はキャンセルされました`
-          );
-          return false;
-        }
-        // 仮配置のindexは、preAppendNotes内の最大index + 1
-        const index =
-          this.preAppendNotes.size === 0
-            ? 1
-            : // @ts-ignore
-              this.preAppendNotes.max_by((n) => n.index || -1)
-                .index + 1;
-        this.preAppendNotes.append({
-          isSelected: false,
-          ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
-          option: this.getValidatedOptions(note),
-          index
-        });
-      });
-    },
-    // ノーツを全ての難易度に同時挿入
-    appendSimultaneously(...notes: NoteData[]): void {
-      notes.each((note: NoteData) => {
-        let difficultyCount = 0;
-        // 各難易度に対して重複検査＋append
-        this.difficulties.each((difficulty: DifficultyString) => {
-          const dup = this.isDuplicated(note, {
-            comparators: this.chartObject[difficulty]
-          });
-          if (dup) {
-            this.showSnackbar(
-              `${dup}個のノーツと重複しているため、${difficulty}に挿入できません`
-            );
-            return false;
-          }
-          this.chartObject[difficulty]?.append({
-            isSelected: false,
-            ...JSON.parse(JSON.stringify(note)), // FIXME: deep-copyしたい
-            index: this.chartObject[difficulty].size
-          });
-          difficultyCount++;
-        });
-        this.showSnackbar(`ノートを${difficultyCount}難易度に同時挿入しました`);
-      });
-    },
-    // appendNoteに終点を追加
-    addEndToAppendNote(): void {
-      this.appendNote.end.append({
-        type: 1,
-        lane: this.appendNote.lane,
-        measure: this.appendNote.measure,
-        position: Math.min(this.appendNote.position + 1, this.appendNote.split),
-        split: this.appendNote.split,
-        option: [],
-        end: []
-      });
-    },
-    // appendNoteから終点を削除
-    deleteEndOfAppendNote(index: number): void {
-      this.appendNote.end.delete_at(index);
-    },
-    // ノーツ種別変更時制御
-    changeAppendNoteType(): void {
-      // endを自動生成／削除
-      if (this.appendNote.type === 2) this.addEndToAppendNote();
-      else this.appendNote.end = [];
-
-      // typeによってoptionを自動生成
-      switch (this.appendNote.type) {
-        case 3:
-        case 4:
-        case 6:
-        case 7:
-          this.appendNote.option = ["-1"];
-          break;
-        case 90:
-          this.appendNote.option = ["1"];
-          break;
-        case 93:
-          this.appendNote.option = ["4"];
-          break;
-        case 94:
-          this.appendNote.option = [
-            "texture/202020.png",
-            "1",
-            "0.25"
-          ];
-          break;
-        case 95:
-          this.appendNote.option = ["5"];
-          break;
-        case 96:
-          this.appendNote.option = ["255", "81", "81"];
-          break;
-        case 100:
-          this.appendNote.option = ["ここにコメントを入力"];
-          break;
-        default:
-          this.appendNote.option = [];
-      }
-
-      // laneを自動変更
-      if (this.isLanelessNote(this.appendNote)) this.appendNote.lane = -1;
-      else if (this.appendNote.lane === -1) this.appendNote.lane = 1;
-    },
-    appendNoteToLeft(): void {
-      const lane = Math.max(this.appendNote.lane - 1, 1) as LaneType;
-      this.appendNote.lane = lane;
-      // TODO: ネスト終点に対応
-      this.appendNote.end.each((end) => {
-        end.lane = lane;
-      });
-    },
-    appendNoteToRight(): void {
-      const lane = Math.min(this.appendNote.lane + 1, 5) as LaneType;
-      this.appendNote.lane = lane;
-      // TODO: ネスト終点に対応
-      this.appendNote.end.each((end) => {
-        end.lane = lane;
-      });
-    },
-    appendNoteToUp(): void {
-      const note = this.appendNote;
-      if (note.split - 1 <= note.position) {
-        note.measure++;
-        note.position = 0;
-        // 小節切替時に自動追従
-        if (this.isAutoFollow && this.measureData[note.measure])
-          this.scrollToMeasure(note.measure);
-      } else note.position++;
-    },
-    appendNoteToDown(): void {
-      const note = this.appendNote;
-      if (note.position === 0) {
-        note.measure--;
-        note.position = note.split - 1;
-        // 小節切替時に自動追従
-        if (this.isAutoFollow) this.scrollToMeasure(note.measure);
-      } else note.position--;
-    },
-    deleteNotes(...index: number[]): void {
-      index.each((i: number) => {
-        this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
-          (note: ExtendedNoteData) => note.index === i
-        );
-      });
-    },
-    // appendNoteに任意のデータをセット
-    setAppendNoteInfo(object: NoteData): void {
-      this.appendNote = {
-        ...this.appendNote,
-        ...object,
-        index: null
-      };
-    },
-    cancelNote(index: number): void {
-      this.preAppendNotes = this.preAppendNotes?.delete_if(
-        (note: ExtendedNoteData) => note.index === index
-      );
-    },
-    // 対象難易度とノーツオブジェクトからノーツを複製 (現在の難易度=>対象難易度)
-    copyNotesToDifficulty(
-      targetDifficulty: DifficultyString | null,
-      ...targets: NoteData[]
-    ): void {
-      const currentDifficulty = this.currentDifficulty;
-      this.currentDifficulty = targetDifficulty || this.currentDifficulty;
-      this.appendNotes(...targets);
-      this.currentDifficulty = currentDifficulty;
-    },
-    // oldNoteがnewMeasure小節に移動した時のノートオブジェクトを返す
-    getMovedNote(oldNote: NoteData, newMeasure: number): NoteData {
-      const diff = newMeasure - oldNote.measure;
-      return {
-        ...oldNote,
-        measure: newMeasure,
-        end: oldNote.end.map(end => {
-          return this.getMovedNote({ ...end }, newMeasure + diff);
-        })
-      };
-    },
-    // すべて選択解除
-    selectionClear(): void {
-      this.chartObject[this.currentDifficulty] = this.currentChart?.map(
-        (note: NoteData) => {
-          return {
-            ...note,
-            isSelected: false
-          };
-        }
-      );
-    },
-    // 選択ノーツを削除
-    selectionDelete(): void {
-      const num = this.selectionNumber;
-      this.chartObject[this.currentDifficulty] = this.currentChart?.delete_if(
-        (note: ExtendedNoteData) => note.isSelected
-      );
-      this.dialog.selectionDelete = false;
-      this.showSnackbar(`${num}個のノーツを削除しました`);
-    },
-    // 選択ノーツのTypeを変更
-    selectionChangeType(type: number): void {
-      const t = Number(type);
-      if ([2, 5, 94].includes(t)) {
-        this.showSnackbar(`Typeを${t}に一括変更することはできません`);
-        return;
-      }
-      const targets = this.chartObject[this.currentDifficulty].filter(
-        note => note.isSelected && ![2, 5].includes(note.type)
-      );
-      if (targets.size === 0) {
-        this.showSnackbar("対象ノーツがありません(Type一括変更)");
-        return;
-      }
-      targets.each((note: ExtendedNoteData) => (note.type = t));
-      this.showSnackbar(`Type:${t}への一括変更を実行しました`);
-      this.dialog.checked = false;
-    },
-    // 選択ノーツのレーンを変更
-    selectionChangeLane(lane: LaneType): void {
-      const l = lane;
-      const targets = this.chartObject[this.currentDifficulty].filter(
-        note => note.isSelected && ![2, 5].includes(note.type)
-      );
-      if (targets.size === 0) {
-        this.showSnackbar("対象ノーツがありません(Lane一括変更)");
-        return;
-      }
-      targets.each((note: ExtendedNoteData) => (note.lane = l));
-      this.showSnackbar(`Lane:${l}への一括変更を実行しました`);
-      this.dialog.checked = false;
-    },
-    // 選択ノーツのレーンを加算または減算
-    selectionAddLane(diff: number): void {
-      const d = Number(diff);
-      const targets = this.chartObject[this.currentDifficulty].filter(
-        note => note.isSelected && ![2, 5].includes(note.type)
-      );
-      if (targets.size === 0) {
-        this.showSnackbar("対象ノーツがありません(Lane一括加算)");
-        return;
-      }
-      if (d < 0) {
-        targets.each(
-          (note: NoteData) =>
-            (note.lane = Math.max(note.lane + d, 1) as LaneType)
-        );
-        this.showSnackbar(`${d} 一括減算処理を実行しました`);
-      } else {
-        targets.each(
-          (note: NoteData) =>
-            (note.lane = Math.min(note.lane + d, 5) as LaneType)
-        );
-        this.showSnackbar(`+${d} 一括加算処理を実行しました`);
-      }
-      this.dialog.checked = false;
-    },
-    // 選択ノーツの小節を加算または減算
-    selectionAddMeasure(diff: number): void {
-      const d = Number(diff);
-      const targets = this.chartObject[this.currentDifficulty].filter(
-        note => note.isSelected
-      );
-      targets.each((note: NoteData) => {
-        note.measure = Math.max(note.measure + d, 0);
-        // TODO: ネスト終点に対応
-        note.end.each((end: NoteData) => {
-          end.measure = Math.max(end.measure + d, 0);
-        });
-      });
-      this.showSnackbar(`小節位置 ${d} 一括処理を実行しました`);
-      this.dialog.checked = false;
-    },
-    // 対象ノーツを一括選択
-    batchSelect(): void {
-      const num = this.batchSelectTarget.size;
-      this.batchSelectTarget.each(
-        (target: ExtendedNoteData) => (target.isSelected = true)
-      );
-      this.dialog.batchcheck = false;
-      this.showSnackbar(`${num}個のノーツを一括選択しました`);
-    },
-    // 通知を表示
-    showSnackbar(message: string): void {
-      this.snackbar = false;
-      this.snackbarText = message;
-      setTimeout(() => (this.snackbar = true), 100);
-      this.logs.append({
-        message,
-        type: "通知バー",
-        date: new Date()
-      });
-    },
-    // 譜面分析
-    analyze(): void {
-      // 分析データを初期化
-      this.analysisData.trendLabels = [];
-      this.analysisData.trendValues = [];
-      this.analysisData.otofudaNotes = [];
-      this.analysisData.notesCount = 0;
-      this.noteTypes.each((type: { text: string; value: number }) => {
-        this.analysisData.typeCount[type.value] = 0;
-      });
-      // ラベルとデータ配列を初期化
-      this.measureData.each((m: Measure) => {
-        if (m.measure % 10 === 0)
-          this.analysisData.trendLabels.append(String(m.measure));
-        else this.analysisData.trendLabels.append(" ");
-        this.analysisData.trendValues.append(0);
-        this.analysisData.otofudaNotes.append(0);
-      });
-      // 分析
-      this.currentChart.each((note: ExtendedNoteData) => {
-        // 判定オブジェクト => ノーツ数を加算
-        if ([1, 2, 3, 4, 5, 6, 7].includes(note.type)) {
-          this.analysisData.trendValues[note.measure] += 1;
-          this.analysisData.notesCount += 1;
-        }
-        if (note.type === 5) this.analysisData.otofudaNotes[note.measure] += 1;
-        this.analysisData.typeCount[note.type] += 1;
-      });
-      this.dialog.analyzer = true;
-    },
-    // テクスチャをセットする
-    setTexture(obj: TextureObject): void {
-      const note = this.appendNote;
-      if (note.type === 94) {
-        this.$set(note.option, 0, obj.url);
-        this.$set(note.option, 1, obj.width || note.option[1]);
-        this.showSnackbar(`テクスチャ「${obj.name}をセットしました`);
-      } else this.showSnackbar("挿入中のノートがテクスチャではありません");
-    },
-    // バックアップから復元
-    restoreBackup(): void {
-      const dialog = window.confirm(
-        "バックアップからデータを復元しますか？(現在の譜面データは失われます)"
-      );
-      const backupData = localStorage.getItem("chart-editor__backup");
-      if (dialog && backupData) {
-        this.chartObject = JSON.parse(backupData);
-        this.showSnackbar("バックアップから復元しました");
-      }
-    },
-    onPressKey(e: KeyboardEvent): void {
-      // localStorageに譜面バックアップを保存
-      if (e.ctrlKey && e.key === "s") {
-        e.preventDefault();
-        console.log(JSON.stringify(this.chartObject));
-        localStorage.setItem(
-          "chart-editor__backup",
-          JSON.stringify(this.chartObject)
-        );
-        this.showSnackbar("譜面バックアップを保存しました");
-      }
-    }
-  },
-  // localStorageにコンフィグを書き込む
-  watch: {
-    beatHeight(value) {
-      localStorage.setItem("chart-editor__beat-height", value)
-    }
-  },
-  computed: {
-    // 選択中の難易度の譜面データ配列
-    currentChart(): NoteData[] {
-      return this.chartObject[this.currentDifficulty] || [];
-    },
-    musicBpm(): number {
-      return this.chartObject.info.bpm;
-    },
-    musicBeat(): number {
-      return this.chartObject.info.beat;
-    },
-    musicOffset(): number {
-      return this.chartObject.info.offset;
-    },
-    maxMeasure(): number {
-      return this.currentChart.size > 0
-        ? this.currentChart.max_by((n: ExtendedNoteData) => n.measure).measure
-        : 1;
-    },
-    /** 小節情報を生成 */
-    measureData(): Measure[] {
-      const measureData: Measure[] = [];
-      let measureBeat = this.musicBeat;
-      let measureBpm = this.musicBpm;
-      let measureReachTime = this.musicOffset;
-      let measurePositionBottom =
-        (this.musicOffset / ((60 / measureBpm) * 1000)) * this.beatHeight;
-      // 小節データを生成
-      (this.maxMeasure + 1).times((measure: number) => {
-        // type 97, 98 をfindして求める
-        const beatChangeNote = this.currentChart.find(
-          n => n.type === 97 && n.measure === measure
-        );
-        const bpmChangeNote = this.currentChart.find(
-          n => n.type === 98 && n.measure === measure
-        );
-        // type 92, 93 をfindして求める
-        const stopNote = this.currentChart.find(
-          n => n.type === 92 && n.measure === measure
-        );
-        const warpNote = this.currentChart.find(
-          n => n.type === 93 && n.measure === measure
-        );
-        if (beatChangeNote) measureBeat = Number(beatChangeNote.option[0]);
-        if (bpmChangeNote) measureBpm = Number(bpmChangeNote.option[0]);
-
-        // 小節の高さ(px)
-        let measureHeight = this.beatHeight * measureBeat;
-        if (stopNote && this.isSimulateStop) {
-          measureHeight = 0;
-        }
-        if (warpNote) {
-          measureHeight = this.beatHeight * Number(warpNote.option[0]);
-        }
-
-        // 小節の長さ(ms)
-        let measureLength = (60 / measureBpm) * measureBeat * 1000;
-        if (warpNote) {
-          measureLength = 0; // 瞬間移動小節は 0ms
-        }
-
-        measureData.push({
-          measure,
-          measureBpm,
-          measureBeat,
-          measureReachTime,
-          measurePositionBottom,
-          measureHeight,
-          measureLength
-        });
-        measureReachTime += measureLength;
-        measurePositionBottom += measureHeight;
-      });
-      return measureData;
-    },
-    // 一括選択の対象ノーツ
-    batchSelectTarget(): NoteData[] {
-      const min = this.batchSelectStart;
-      const max = this.batchSelectEnd === 0 ? Infinity : this.batchSelectEnd;
-      return this.currentChart.filter(
-        note =>
-          this.batchSelectTypes.includes(note.type) &&
-          note.measure >= min &&
-          note.measure <= max
-      );
-    },
-    // 選択中のノーツ個数
-    selectionNumber(): number {
-      return this.currentChart.filter(note => note.isSelected).size;
-    },
-    getAppendNote(): NoteData | null {
-      return this.isAppendMode ? this.appendNote : null;
-    },
-    // 色オブジェクト⇔option配列のためのgetterとsetter
-    appendNoteColorOption: {
-      get: function(): ColorObject | null {
-        return this.appendNote.type === 96
-          ? {
-              r: String(this.appendNote.option[0]),
-              g: String(this.appendNote.option[1]),
-              b: String(this.appendNote.option[2]),
-              a: 1
-            }
-          : null;
-      },
-      set: function(value) {
-        if (this.appendNote.type === 96 && value) {
-          this.$set(this.appendNote.option, 0, value.r);
-          this.$set(this.appendNote.option, 1, value.g);
-          this.$set(this.appendNote.option, 2, value.b);
-        }
-      }
-    },
-    /** 現在のAppendNote用のオプションを取得する */
-    noteOptionsForAppendNote(): {
-      label: string;
-      type: string;
-      desc: string;
-    }[] {
-      return this.noteOptions(this.appendNote as NoteData);
-    }
-  },
-  components: {
-    Preview,
-    EndForm
+  if (entry) {
+    showSnackbar(`${entry.label}：元に戻しました`)
   }
-});
+}
+
+/** 取り消した操作をやり直し、再実行した操作名を通知する。 */
+function redo() {
+  const entry = history.redo()
+
+  if (entry) {
+    showSnackbar(`${entry.label}：やり直しました`)
+  }
+}
+
+/**
+ * 指定した小節の存在を確認し、譜面領域をスクロールする。
+ *
+ * @param measureNumber 移動先の小節番号
+ */
+function scrollToMeasure(measureNumber: number): void {
+  const measure = measureData.value[measureNumber]
+  const last = measureData.value.at(-1)
+
+  if (!measure || !last) {
+    showSnackbar(`${measureNumber}小節はありません`)
+    return
+  }
+
+  previewRef.value?.scrollToMeasure(measureNumber)
+}
+
+const noteEditor = useNoteEditor(chartData, showSnackbar, scrollToMeasure)
+const {
+  appendNote, preAppendNotes, isAppendMode, isAutoFollow,
+  appendNoteColorOption, appendNotes, placeNotes, appendSimultaneously,
+  addEndToAppendNote, deleteEndOfAppendNote, changeAppendNoteType,
+  appendNoteToLeft, appendNoteToRight, appendNoteToUp, appendNoteToDown,
+  shiftAppendLongLane, shiftAppendLongPosition,
+  setAppendNoteInfo, cancelNote, copyNotesToDifficulty, getMovedNote,
+} = noteEditor
+
+const selection = useSelection(chartData, showSnackbar)
+const {
+  batchSelectTypes,
+  batchSelectStart,
+  batchSelectEnd,
+  batchSelectTarget,
+  selectionNumber,
+  selectionLaneTo,
+  selectionLaneAddition,
+  selectionTypeTo,
+  selectionMeasureAddition,
+  selectionAll,
+  selectionClear,
+  selectionDelete: doSelectionDelete,
+  selectionChangeType,
+  selectionChangeLane,
+  selectionAddLane,
+  selectionAddMeasure,
+  batchSelect,
+  selectionNotes,
+  selectionOptionDefinitions,
+  selectionOptionsDisabledReason,
+  selectionChangeOptions,
+} = selection
+
+/** 再生・停止・スクロールなど、譜面領域に属する操作の呼び出し先。 */
+const previewRef = ref<InstanceType<typeof Preview> | null>(null)
+
+// 親のクラスを書き換える前に譜面位置を記録し、DOM更新後に復元する。
+watch([layout, contained], async ([nextLayout]) => {
+  const restore = previewRef.value?.prepareLayoutChange(nextLayout)
+  await nextTick()
+  restore?.()
+}, { flush: 'sync' })
+
+const removeHistoryRestore = history.onBeforeRestore(() => {
+  previewRef.value?.stop()
+  previewRef.value?.cancelDrag()
+})
+onBeforeUnmount(removeHistoryRestore)
+
+const fileIO = useFileIO(chartData, showSnackbar, () => previewRef.value?.stop())
+const { fileName, isLoaded, previewAudio, audioVolume, readFile, newFile, saveFile, readAudioFile } = fileIO
+
+const textureDB = useTextureDB(appendNote, showSnackbar)
+const { texturePayload, textureTabs, textureCurrentTab, setTexture } = textureDB
+
+// --- ローカル UI 状態 ---
+const dialog = ref({
+  selectionDelete: false,
+  analyzer: false,
+  help: false,
+  logs: false,
+  history: false,
+  checked: false,
+  batchcheck: false,
+  texture: false,
+})
+
+/** 削除はキー・ボタンとも、対象がある場合だけ確認へ進む。 */
+function openSelectionDelete(): void {
+  if (selectionNumber.value > 0) {
+    dialog.value.selectionDelete = true
+  }
+}
+
+/**
+ * モードや選択数に応じて、現在実行できるショートカットを判断する。
+ *
+ * @param id 利用可否を調べる操作の識別子
+ * @returns 操作対象が存在し、実行できる状態ならtrue
+ */
+function isEditorShortcutEnabled(id: EditorShortcutId): boolean {
+  switch (id) {
+    case 'togglePlayback':
+      return previewRef.value !== null
+    case 'placeNotes':
+      return isAppendMode.value
+    case 'appendNotes':
+      return isAppendMode.value && preAppendNotes.value.length > 0
+    case 'deleteSelection':
+      return selectionNumber.value > 0
+    case 'escape':
+      return Boolean(previewRef.value?.isPlaying) || selectionNumber.value > 0
+    default:
+      return true
+  }
+}
+
+// ボタンと同じ処理を登録し、キー操作専用の履歴や編集経路を作らない。
+useEditorShortcuts({
+  undo,
+  redo,
+  saveBackup,
+  togglePlayback: () => previewRef.value?.togglePlayback(),
+  toggleAppendMode: () => {
+    isAppendMode.value = !isAppendMode.value
+  },
+  placeNotes: () => placeNotes(appendNote.value),
+  appendNotes: () => appendNotes(...preAppendNotes.value),
+  selectAll: selectionAll,
+  deleteSelection: openSelectionDelete,
+  escape: () => {
+    // 一回のEscで再生停止と選択解除の両方を行わない。
+    if (previewRef.value?.isPlaying) {
+      previewRef.value.stopPlayback()
+    } else {
+      selectionClear()
+    }
+  },
+  help: () => {
+    dialog.value.help = true
+  },
+}, {
+  isDragging: () => previewRef.value?.isDragging ?? false,
+  enabled: isEditorShortcutEnabled,
+})
+
+/** 一括変更フォームの入力状態。値が混在している項目は空欄で表示する。 */
+type SelectionOptionField = {
+  checked: boolean
+  value: string
+  mixed: boolean
+}
+
+const selectionOptionFields = ref<SelectionOptionField[]>([])
+
+/** 共通値を読み直し、変更対象のチェックと未確定の入力を初期化する。 */
+function resetSelectionOptions(): void {
+  selectionOptionFields.value = selectionOptionDefinitions.value.map((_, index) => {
+    const value = selectionNotes.value[0]?.option[index] ?? ''
+    const mixed = selectionNotes.value.some(note => (note.option[index] ?? '') !== value)
+
+    return {
+      checked: false,
+      value: mixed ? '' : value,
+      mixed,
+    }
+  })
+}
+
+// 件数が同じでも、選択対象の入れ替えやダイアログの再表示で入力を持ち越さない。
+// 混在フリック間で方向だけが変わった場合も、各ノーツのtypeを監視して初期化する。
+watch(
+  [
+    selectionNotes,
+    () => selectionNotes.value.map(note => note.type),
+    currentDifficulty,
+    () => dialog.value.checked,
+  ],
+  resetSelectionOptions,
+  { immediate: true }
+)
+
+/** チェックした項目だけを渡し、成功時はダイアログを開いたまま再初期化する。 */
+function applySelectionOptions(): void {
+  const changes: Record<number, string> = {}
+
+  selectionOptionFields.value.forEach((field, index) => {
+    if (field.checked) {
+      // 空欄も値の消去として適用し、チェックしていない項目は渡さない。
+      changes[index] = field.value ?? ''
+    }
+  })
+
+  if (selectionChangeOptions(changes)) {
+    resetSelectionOptions()
+  }
+}
+
+/** 操作履歴を開く際に、同じ位置に表示するメッセージログを閉じる。 */
+function handleHistoryVisibility(isOpen: boolean): void {
+  if (isOpen) {
+    dialog.value.logs = false
+  }
+}
+
+/** メッセージログの表示を切り替え、開く際は操作履歴を閉じる。 */
+function toggleMessageLog(): void {
+  dialog.value.logs = !dialog.value.logs
+
+  if (dialog.value.logs) {
+    dialog.value.history = false
+  }
+}
+
+const scrollTo = ref(0)
+
+// プレビュー表示モードは、無効化された子項目の選択状態も保持する。
+const isShowDetail = usePersistedRef('chart-editor__show-detail', false)
+const isCaptureMode = usePersistedRef('chart-editor__capture-mode', false)
+const isPreviewMode = usePersistedRef('chart-editor__preview-mode', false)
+const isImageMode = usePersistedRef('chart-editor__image-mode', false)
+
+const colorSwatches = [
+  ['#ff5151', '#000000'],
+  ['#44a5ff', '#202020'],
+  ['#ff0000', '#505050'],
+  ['#00ff00', '#a0a0a0'],
+  ['#0000ff', '#ffffff'],
+]
+
+// getAppendNote
+const getAppendNote = computed(() => isAppendMode.value ? appendNote.value : null)
+
+// noteOptionsForAppendNote
+const noteOptionsForAppendNote = computed(() => noteOptions(appendNote.value))
+
+// infoObject (version を必須に正規化)
+const chartInfo = computed(() => ({
+  ...chartObject.value.info,
+  version: chartObject.value.info.version ?? 2,
+}))
+
+// selectionDelete (ダイアログを閉じるコールバック付き)
+function selectionDelete() {
+  doSelectionDelete(() => { dialog.value.selectionDelete = false })
+}
+
+// analyze (ダイアログ開く)
+function analyze() {
+  runAnalyze()
+  dialog.value.analyzer = true
+}
+
+// 密度グラフの小節クリックでジャンプ
+function handleJumpToMeasure(measure: number) {
+  dialog.value.analyzer = false
+  setTimeout(() => {
+    scrollToMeasure(measure)
+  }, 250)
+}
+
+// Usage.md をシンプルなHTMLに変換（行ごとの状態管理パーサー）
+const renderedUsage = computed((): string => {
+  const inline = (s: string) => s
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+
+  const out: string[] = []
+  let inTable = false
+  let tableInBody = false
+
+  for (const line of usageContent.split('\n')) {
+    const t = line.trim()
+    const isRow = t.startsWith('|') && t.endsWith('|') && t.length > 1
+    // セパレータ行: | --- | または |:---|---:| など
+    const isSep = isRow && /^\|[- |:=]+\|$/.test(t)
+
+    if (isSep) {
+      // ヘッダー → ボディへ切り替え
+      out.push('</thead><tbody>')
+      tableInBody = true
+      continue
+    }
+
+    if (isRow) {
+      if (!inTable) {
+        out.push('<table style="border-collapse:collapse;width:100%;margin:8px 0"><thead>')
+        inTable = true
+        tableInBody = false
+      }
+      const cells = t.slice(1, -1).split('|').map(c => inline(c.trim()))
+      const tag = tableInBody ? 'td' : 'th'
+      out.push(`<tr>${cells.map(c => `<${tag}>${c}</${tag}>`).join('')}</tr>`)
+      continue
+    }
+
+    // テーブル外の行: テーブルを閉じる
+    if (inTable) {
+      out.push('</tbody></table>')
+      inTable = false
+      tableInBody = false
+    }
+
+    if (/^### /.test(line))       out.push(inline(line).replace(/^### (.+)$/, '<h4 class="text-subtitle-1 font-weight-bold mt-3 mb-1">$1</h4>'))
+    else if (/^## /.test(line))   out.push(inline(line).replace(/^## (.+)$/, '<h3 class="text-h6 mt-4 mb-1">$1</h3>'))
+    else if (/^# /.test(line))    out.push(inline(line).replace(/^# (.+)$/, '<h2 class="text-h5 mt-4 mb-2">$1</h2>'))
+    else if (/^\- /.test(line))   out.push(inline(line).replace(/^\- (.+)$/, '<li style="margin-left:20px">$1</li>'))
+    else if (t === '---')         out.push('<hr style="margin:16px 0">')
+    else if (/^> /.test(line))    out.push(inline(line).replace(/^> (.+)$/, '<blockquote>$1</blockquote>'))
+    else if (t === '')            out.push('<br>')
+    else                          out.push(inline(line))
+  }
+
+  if (inTable) out.push('</tbody></table>')
+
+  return out.join('\n')
+})
+
+// zoom
+function zoomIn() { beatHeight.value = (beatHeight.value + 10) || 100 }
+function zoomOut() { beatHeight.value = Math.max((beatHeight.value - 10) || 0, 0) }
+
+// --- Provide (typed) ---
+provide(showSnackbarKey, showSnackbar)
+provide(otofudaWarningKey, note => otofudaWarnings.value.get(note) ?? false)
+provide(chartHistoryKey, history)
+provide(deleteNotesKey, chartData.deleteNotes)
+provide(cancelNoteKey, cancelNote)
+provide(appendNotesKey, appendNotes)
+provide(getMovedNoteKey, getMovedNote)
+provide(copyNotesToDifficultyKey, copyNotesToDifficulty)
+provide(setAppendNoteInfoKey, setAppendNoteInfo)
+
+// --- Lifecycle ---
+onMounted(() => {
+  textureDB.fetchTextures()
+  window.addEventListener('beforeunload', (e) => {
+    e.preventDefault()
+    e.returnValue = '移動してもよろしいですか？'
+  })
+})
+
 </script>
 
 <style lang="scss">
@@ -1796,11 +1552,21 @@ export default Vue.extend<
   font-family: "Open Sans", "Noto Sans JP", Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #333333;
   background: #202020;
+  .layout-switch {
+    flex-shrink: 0;
+    margin-left: 8px;
+    .v-btn {
+      min-width: 0;
+    }
+  }
+  .append-card {
+    margin: 0 -32px;
+  }
   .panel {
     position: fixed;
-    background: #f0f0f0;
+    background: rgb(var(--v-theme-editor-panel));
+    color: rgb(var(--v-theme-on-surface));
     top: 0;
     left: 0;
     width: calc(100% - 420px);
@@ -1818,7 +1584,7 @@ export default Vue.extend<
     }
   }
   .difficulty-select {
-    margin-bottom: 16px;
+    margin-top: 8px;
     .v-btn {
       width: 90px;
       border-radius: 0;
@@ -1837,6 +1603,169 @@ export default Vue.extend<
     margin-top: 0;
     margin-bottom: 10px;
   }
+}
+
+// 通常の左右分割は従来の固定配置を使い、分割領域が必要な場合だけ上書きする。
+#app.layout-stacked {
+  .editor-layout {
+    position: fixed;
+    inset: 0;
+    height: 100vh;
+    height: 100dvh;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .editor-canvas {
+    display: contents;
+  }
+  .panel {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    overscroll-behavior: contain;
+    border-top: 1px solid rgba(var(--v-theme-on-surface), 0.25);
+    .logo {
+      max-width: 100%;
+    }
+  }
+}
+
+// 狭い画面の手動左右分割では、操作パネル348pxと譜面420pxの幅を確保する。
+#app.layout-narrow-side {
+  .editor-layout {
+    position: fixed;
+    inset: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .editor-canvas {
+    position: relative;
+    width: 768px;
+    height: 100%;
+  }
+  .preview-host {
+    position: absolute;
+    top: 0;
+    left: 348px;
+    width: 420px;
+  }
+  .panel {
+    position: absolute;
+    width: 348px;
+    height: 100%;
+  }
+}
+
+#app.layout-stacked,
+#app.layout-narrow-side {
+  .panel {
+    container-type: inline-size;
+    .logo {
+      max-width: 100%;
+    }
+    .message-log,
+    .history-log {
+      position: relative;
+      top: auto;
+      left: auto;
+      width: 100%;
+      > .v-list {
+        height: auto;
+        max-height: 300px;
+        max-height: min(300px, 30dvh);
+      }
+    }
+  }
+}
+
+// 画面幅ではなく操作パネルの幅に合わせて、入力欄やボタンを折り返す。
+@container (width < 600px) {
+  #app .panel {
+    .difficulty-select {
+      width: 100%;
+      .v-btn {
+        width: auto;
+        min-width: 0;
+        flex: 1;
+        padding-inline: 4px;
+      }
+    }
+    > .v-row {
+      gap: 8px 0;
+    }
+    > .v-row > .v-col {
+      flex: 1 1 140px;
+      max-width: 100%;
+    }
+    > .v-row > .v-file-input {
+      flex: 1 1 100%;
+    }
+    .v-row {
+      min-width: 0;
+    }
+    .v-input {
+      min-width: 0;
+    }
+    .v-btn:not(.v-btn--icon) {
+      white-space: normal;
+      height: auto;
+      min-height: 32px;
+      max-width: 100%;
+    }
+    .v-btn__content {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+  }
+}
+
+// スマートフォンでは余白を減らし、メニューとダイアログを画面内に収める。
+@media (width < 768px) {
+  #app .panel {
+    padding-inline: 16px;
+    .append-card {
+      margin-inline: -16px;
+    }
+  }
+  .v-overlay__content {
+    max-width: calc(100vw - 24px);
+  }
+  .v-dialog > .v-overlay__content {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+  .v-dialog > .v-overlay__content > .v-card {
+    overflow-y: auto;
+  }
+}
+
+.usage-content {
+  code {
+    background: rgb(var(--v-theme-surface-light));
+    color: rgb(var(--v-theme-on-surface));
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+  th, td {
+    padding: 4px 8px;
+    border: 1px solid rgba(var(--v-theme-on-surface), 0.25);
+  }
+  th {
+    background: rgb(var(--v-theme-surface-light));
+    text-align: left;
+  }
+  blockquote {
+    border-left: 4px solid rgba(var(--v-theme-on-surface), 0.35);
+    padding-left: 12px;
+    color: rgba(var(--v-theme-on-surface), 0.75);
+    margin: 8px 0;
+  }
+  a { color: rgb(var(--v-theme-primary)); }
 }
 .note {
   position: absolute;
@@ -2053,7 +1982,9 @@ export default Vue.extend<
 
 // キャプチャ用モード
 .preview.detail.capture_mode {
-  .note {
+  .note,
+  .note-invisible-badge,
+  .note-midpoint {
     color: #a0a0a0;
     > .v-icon {
       display: none;
@@ -2080,7 +2011,9 @@ export default Vue.extend<
     .measure__number {
       visibility: hidden;
     }
-    .note {
+    .note,
+    .note-invisible-badge,
+    .note-midpoint {
       color: transparent;
       text-shadow: none;
 
@@ -2108,7 +2041,9 @@ export default Vue.extend<
     .measure > .v-btn {
       opacity: 0;
     }
-    .note {
+    .note,
+    .note-invisible-badge,
+    .note-midpoint {
       color: transparent;
       text-shadow: none;
       &.shadow,
@@ -2218,7 +2153,7 @@ export default Vue.extend<
 
 // テクスチャセレクター
 .texture-card {
-  width: 200px;
+  width: 180px;
   &__name {
     display: inline-block;
     font-size: 12px;
@@ -2243,8 +2178,109 @@ export default Vue.extend<
   transition: 0.1s all ease;
 }
 
-.message-log {
+// ロングノーツの帯（SVG）
+.long-note-svg {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 420px;
+  z-index: 98;
+  pointer-events: none;
+  overflow: visible;
+
+  .hold-fill {
+    fill: #ffffec;
+    fill-opacity: 0.9;
+    transition: 0.1s all ease;
+  }
+  .hold-border {
+    fill: none;
+    stroke: #6ecc6e;
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+
+  // 他難易度シャドー表示時
+  &.shadow {
+    opacity: 0.6;
+  }
+
+  // ノート仮配置時
+  &.preappend {
+    opacity: 0.85;
+  }
+}
+
+// ロングノーツのコンボ加算中点（type: 1 の中間中継点）
+.note-midpoint {
+  position: absolute;
+  z-index: 101;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #6ecc6e;
+  box-sizing: border-box;
+  transition: 0.1s all ease;
+  pointer-events: auto;
+
+  .midpoint-badges {
+    position: absolute;
+    left: 13px;
+    top: -5px;
+    white-space: nowrap;
+    line-height: 1;
+    pointer-events: none;
+
+    strong {
+      color: #a0a0a0;
+      &.speed { color: #f08080; }
+      &.orbit { color: #87cefa; margin-left: 2px; }
+    }
+  }
+
+  // 他難易度シャドー表示時
+  &.shadow {
+    opacity: 0.6;
+  }
+
+  // ノート仮配置時
+  &.preappend {
+    opacity: 0.85;
+  }
+}
+
+// 不可視ノード（type: 89）の speed / orbit バッジ表示用アンカー
+.note-invisible-badge {
+  position: absolute;
+  z-index: 100;
+  height: 4px;
+  overflow: visible;
+  text-align: right;
+  pointer-events: auto;
+
+  strong {
+    color: #a0a0a0;
+    &.speed { color: #f08080; }
+    &.orbit { color: #87cefa; margin-left: 2px; }
+  }
+
+  // 他難易度シャドー表示時
+  &.shadow {
+    opacity: 0.6;
+  }
+
+  // ノート仮配置時
+  &.preappend {
+    opacity: 0.85;
+  }
+}
+
+.message-log,
+.history-log {
   position: fixed;
+  // Vuetifyのカードの既定値（0）を上書きし、後続の編集カードより前面に表示する。
+  z-index: 120;
   top: 20px;
   left: 20px;
   width: 400px;

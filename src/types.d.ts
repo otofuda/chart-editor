@@ -12,11 +12,13 @@ export interface Measure {
   measureReachTime: number;
 }
 
+/** Vuetify 4 カラーピッカーに合わせた RGBA オブジェクト */
 export interface ColorObject {
-  r: string;
-  g: string;
-  b: string;
+  r: number;
+  g: number;
+  b: number;
   a: number;
+  [key: string]: unknown;
 }
 
 export interface TextureObject {
@@ -50,6 +52,7 @@ export type PreviewEvent = {
   color: string | null;
   count: number;
   sound: boolean;
+  endSound: boolean;
   handMove: null | "-left" | "-right" | "-up" | "-down";
   noteObject: null | ExtendedNoteData;
 };
