@@ -7,7 +7,7 @@
     <div
       ref="scrollViewport"
       class="preview-scroll"
-      @scroll="updateViewport"
+      @scroll="handleViewportScroll"
     >
       <div
         class="preview-stage"
@@ -434,6 +434,7 @@ import {
   readonly,
   inject,
   provide,
+  nextTick,
   onMounted,
   onBeforeUnmount,
   watch,
@@ -460,6 +461,12 @@ import { noteDragKey, useNoteDrag } from '@/composables/useNoteDrag'
 import { shortcutTitle } from '@/composables/useEditorShortcuts'
 import { hasMovableLane, noteBottom } from '@/composables/noteMovement'
 import { createPreviewNoteMotion, motionSourceKey } from '@/composables/usePreviewNoteMotion'
+import {
+  capturePreviewZoomAnchor,
+  getEntireChartHeight,
+  resolvePreviewZoomScrollTop,
+  type PreviewZoomAnchor,
+} from '@/composables/previewZoom'
 
 const props = defineProps<{
   currentChart?: ExtendedNoteData[]
@@ -492,19 +499,118 @@ const scrollViewport = ref<HTMLElement | null>(null)
 const viewportHeight = ref(0)
 const effectsLeft = ref(0)
 const scrollContainer = computed(() => props.contained ? scrollViewport.value : null)
+const currentBeatHeight = computed(() => props.beatHeight ?? 100)
 const goTo = useGoTo()
+
+/** ズーム補正直後のスクロールイベントを、手動スクロールと区別するための許容誤差（px）。 */
+const ZOOM_SCROLL_TOLERANCE_PX = 1
+
+/** 連続したハイスピード変更中に保持する、表示中央の基準小節位置。 */
+let zoomAnchor: PreviewZoomAnchor | null = null
+/** 直前のズーム補正で適用した縦スクロール位置（px）。 */
+let appliedZoomScrollTop: number | null = null
+/** DOM更新からズーム後のスクロール適用完了まで、手動スクロール判定を止めるフラグ。 */
+let isAdjustingZoomScroll = false
+/** 進行中のズーム補正を識別し、古い非同期処理の適用を防ぐ連番。 */
+let zoomTransition = 0
+/** 再生開始前の表示中央位置を、再生中のハイスピード変更へ追従させるためのアンカー。 */
+let playbackReturnAnchor: PreviewZoomAnchor | null = null
+/** 再生開始前に記録した、譜面領域（.preview）視覚上端のオフセット（px）。 */
+let playbackReturnContentTop = 0
+
+/** 現在のスクロール対象から縦スクロール位置（px）を取得する。 */
+function getScrollTop(): number {
+  return scrollContainer.value?.scrollTop ?? window.scrollY
+}
+
+/** 現在のスクロール対象から表示領域の高さ（px）を取得する。 */
+function getViewportHeight(): number {
+  const element = scrollViewport.value
+
+  if (props.contained && element) {
+    return element.clientHeight
+  }
+
+  return window.innerHeight
+}
+
+/**
+ * スクロール領域先頭から譜面領域（.preview）視覚上端までのオフセット（px）を求める。
+ *
+ * @param scrollTop 現在の縦スクロール位置（px）
+ * @returns 視覚上端のオフセット（px）。譜面領域がない場合は0
+ */
+function getPreviewContentTop(scrollTop: number): number {
+  if (!preview.value) {
+    return 0
+  }
+
+  const containerTop = scrollContainer.value?.getBoundingClientRect().top ?? 0
+
+  return preview.value.getBoundingClientRect().top - containerTop + scrollTop
+}
+
+/** 記憶しているズーム基準位置と進行中のズーム補正予約を破棄する。 */
+function clearZoomAnchor(): void {
+  zoomTransition++
+  zoomAnchor = null
+  appliedZoomScrollTop = null
+  isAdjustingZoomScroll = false
+}
+
+/** ズーム補正以外で縦スクロール位置が変わった場合に、記憶済みのズーム基準位置を破棄する。 */
+function handleScrollPositionChange(): void {
+  if (isAdjustingZoomScroll || isPreviewing.value) {
+    return
+  }
+
+  const currentTop = getScrollTop()
+
+  if (
+    appliedZoomScrollTop !== null &&
+    Math.abs(currentTop - appliedZoomScrollTop) <= ZOOM_SCROLL_TOLERANCE_PX
+  ) {
+    return
+  }
+
+  clearZoomAnchor()
+}
 
 /** 譜面とエフェクトを、横スクロール後も同じ原寸の座標に揃える。 */
 function updateViewport() {
   const element = scrollViewport.value
-  viewportHeight.value = props.contained && element ? element.clientHeight : window.innerHeight
+  const nextHeight = props.contained && element ? element.clientHeight : window.innerHeight
+
+  if (viewportHeight.value !== 0 && nextHeight !== viewportHeight.value && !isAdjustingZoomScroll) {
+    clearZoomAnchor()
+  }
+
+  viewportHeight.value = nextHeight
   if (element && props.contained) {
     effectsLeft.value = Math.max(0, (element.clientWidth - 420) / 2) - element.scrollLeft
   }
 }
 
+/** 専用スクロール領域のスクロール時に、エフェクト座標の更新と手動スクロール検知を行う。 */
+function handleViewportScroll(): void {
+  updateViewport()
+
+  if (props.contained) {
+    handleScrollPositionChange()
+  }
+}
+
+/** ページ全体スクロール時に、非分割レイアウトの手動スクロールを検知する。 */
+function handleWindowScroll(): void {
+  if (!props.contained) {
+    handleScrollPositionChange()
+  }
+}
+
 /** 広い画面のページスクロールと、分割領域内のスクロールを共通化する。 */
 function scrollToMeasure(measureNumber: number) {
+  clearZoomAnchor()
+
   const measure = measures.value[measureNumber]
   const last = measures.value.at(-1)
   if (!measure || !last) return
@@ -822,7 +928,21 @@ function previewStart() {
     return false
   }
   clearPlayback()
-  returnPosition.value = scrollContainer.value?.scrollTop ?? window.scrollY
+  const startScrollTop = getScrollTop()
+
+  returnPosition.value = startScrollTop
+  playbackReturnContentTop = getPreviewContentTop(startScrollTop)
+  playbackReturnAnchor = zoomAnchor ?? capturePreviewZoomAnchor(
+    measures.value,
+    {
+      scrollTop: startScrollTop,
+      viewportHeight: getViewportHeight(),
+      contentTop: playbackReturnContentTop,
+    },
+    currentBeatHeight.value,
+  )
+  clearZoomAnchor()
+
   if (scrollContainer.value) scrollContainer.value.scrollTop = 0
   isPreviewing.value = true
   if (preview.value) preview.value.style.transition = 'none'
@@ -859,6 +979,9 @@ function previewStart() {
 function previewStop(restoreScroll = true) {
   const position = returnPosition.value
   returnPosition.value = -1
+  playbackReturnAnchor = null
+  playbackReturnContentTop = 0
+  clearZoomAnchor()
   isPreviewing.value = false
   currentCombo.value = 0
   if (currentComboEl.value) currentComboEl.value.textContent = '0'
@@ -930,10 +1053,100 @@ watch(isPlayGuide, (enabled, _, onCleanup) => {
   })
 })
 
+// ハイスピード変更時は、現在の中央小節位置を保持したままスクロール位置を補正する。
+watch([currentBeatHeight, measures], ([nextBeatHeight, nextMeasures], [prevBeatHeight, prevMeasures]) => {
+  // 倍率以外の要因で小節情報が更新された場合は、古い中央アンカーを持ち越さない。
+  if (nextBeatHeight === prevBeatHeight) {
+    clearZoomAnchor()
+    return
+  }
+
+  if (isObjectBasedPreview.value) {
+    clearZoomAnchor()
+    return
+  }
+
+  // 再生中は画面を直接スクロールせず、停止時の復帰位置だけを同じ小節位置へ追従させる。
+  if (isPreviewing.value) {
+    if (playbackReturnAnchor && returnPosition.value >= 0) {
+      const nextReturnPosition = resolvePreviewZoomScrollTop(
+        playbackReturnAnchor,
+        nextMeasures,
+        getViewportHeight(),
+        playbackReturnContentTop,
+      )
+
+      if (nextReturnPosition !== null) {
+        returnPosition.value = nextReturnPosition
+      }
+    }
+
+    return
+  }
+
+  // 連続操作中は最初の基準位置を維持し、端や0を経由して戻しても元の小節位置へ復元する。
+  if (!zoomAnchor) {
+    const scrollTop = getScrollTop()
+
+    zoomAnchor = capturePreviewZoomAnchor(
+      prevMeasures,
+      {
+        scrollTop,
+        viewportHeight: getViewportHeight(),
+        contentTop: getPreviewContentTop(scrollTop),
+      },
+      prevBeatHeight,
+    )
+  }
+
+  if (!zoomAnchor) {
+    return
+  }
+
+  const transition = ++zoomTransition
+  const activeAnchor = zoomAnchor
+  isAdjustingZoomScroll = true
+
+  void nextTick().then(() => {
+    if (transition !== zoomTransition) {
+      return
+    }
+
+    if (isPreviewing.value || isObjectBasedPreview.value) {
+      isAdjustingZoomScroll = false
+      return
+    }
+
+    const targetTop = resolvePreviewZoomScrollTop(
+      activeAnchor,
+      measures.value,
+      getViewportHeight(),
+      getPreviewContentTop(getScrollTop()),
+    )
+
+    if (targetTop !== null) {
+      const target = scrollContainer.value ?? window
+
+      target.scrollTo({ top: targetTop, behavior: 'instant' })
+      appliedZoomScrollTop = getScrollTop()
+    }
+
+    isAdjustingZoomScroll = false
+    updateViewport()
+  })
+})
+
+// 表示モードや描画位置オフセットが変わった場合は、記憶済みのズーム基準位置を破棄する。
+watch([isObjectBasedPreview, drawOffset], () => {
+  clearZoomAnchor()
+})
+
 let layoutTransition = 0
 
 /** 親のクラスが変わる前に位置を記録し、更新後に同じ小節内の位置へ戻す。 */
 function prepareLayoutChange(nextLayout: EditorLayout) {
+  clearZoomAnchor()
+
   const transition = ++layoutTransition
   const oldContainer = scrollContainer.value
   const wasPlaying = isPreviewing.value
@@ -994,6 +1207,7 @@ let viewportObserver: ResizeObserver | undefined
 onMounted(() => {
   updateViewport()
   window.addEventListener('resize', updateViewport)
+  window.addEventListener('scroll', handleWindowScroll, { passive: true })
   if (typeof ResizeObserver !== 'undefined' && scrollViewport.value) {
     viewportObserver = new ResizeObserver(updateViewport)
     viewportObserver.observe(scrollViewport.value)
@@ -1026,16 +1240,16 @@ const previewEvents = computed((): PreviewEvents =>
 
 onBeforeUnmount(() => {
   layoutTransition++
+  clearZoomAnchor()
+  playbackReturnAnchor = null
   window.removeEventListener('resize', updateViewport)
+  window.removeEventListener('scroll', handleWindowScroll)
   viewportObserver?.disconnect()
   clearPlayback()
   previewSounds.dispose()
 })
 
-const entireHeight = computed(() => {
-  const last = measures.value.at(-1)
-  return (last?.measurePositionBottom ?? 0) + (last?.measureHeight ?? 0)
-})
+const entireHeight = computed(() => getEntireChartHeight(measures.value))
 
 </script>
 
