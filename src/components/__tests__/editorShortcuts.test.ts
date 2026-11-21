@@ -402,4 +402,32 @@ describe('画面からショートカットで編集する', () => {
     expect((await key('Enter', {}, wrapper.get('input[aria-label="BPM"]').element)).defaultPrevented).toBe(false)
     expect(wrapper.getComponent(Preview).classes()).not.toContain('playing')
   })
+
+  it('ノート挿入モードの再帰終点から Shift+矢印でロング全体を移動し、そのまま確定挿入できる', async () => {
+    const data = setup([note({ type: 99, measure: 3 })])
+
+    // ロング種別を選び、第1終点の下に子終点を追加する。
+    await wrapper.get('input[aria-label="ノート種別"]').setValue('2')
+    findButton('ここに終点を追加').click()
+    await settle()
+
+    const endPositions = wrapper.findAll('[data-editor-placement] input[aria-label="position"]')
+    const leafPosition = endPositions[2].element
+
+    // 初期状態（始点 lane=1）から左移動は始点下限 1 で止まり、右・上移動は全体を動かす。
+    expect((await key('ArrowLeft', { shiftKey: true }, leafPosition)).defaultPrevented).toBe(true)
+    expect((await key('ArrowRight', { shiftKey: true }, leafPosition)).defaultPrevented).toBe(true)
+    expect((await key('ArrowUp', { shiftKey: true }, leafPosition)).defaultPrevented).toBe(true)
+
+    // 仮配置から確定挿入し、始点・中点・子終点がすべて移動後の位置で保存されることを確認する。
+    await key('Enter', {}, leafPosition)
+    await key('Enter', { ctrlKey: true }, leafPosition)
+
+    const inserted = data.currentChart.value.find(item => item.type === 2)!
+
+    expect(inserted).toMatchObject({ lane: 2, measure: 1, position: 1, split: 8 })
+    expect(inserted.end[0]).toMatchObject({ lane: 2, measure: 1, position: 2, split: 8 })
+    expect(inserted.end[0].end[0]).toMatchObject({ lane: 2, measure: 1, position: 3, split: 8 })
+    expect(data.history.entries.value).toHaveLength(1)
+  })
 })

@@ -271,6 +271,101 @@ describe('ロングノートの編集・描画', () => {
     expect(end.lane).toBe(boundary)
     wrapper.unmount()
   })
+
+  it('終点 position 欄の Shift+矢印は親へ委譲し、IME 変換中や他修飾キー併用時は無視する', async () => {
+    const leaf = note({ lane: 3, measure: 1, position: 2, split: 8 })
+    const mid = note({ lane: 2, measure: 1, position: 0, split: 4, end: [leaf] })
+    const root = note({ type: 2, lane: 1, measure: 0, position: 2, split: 4, end: [mid] })
+    const wrapper = mount(EndForm, {
+      props: { end: mid, parent: root, index: 0 },
+      global: { stubs },
+    })
+
+    try {
+      const leafPosition = wrapper.get('.recursive-end input[aria-label="position"]')
+
+      // 再帰した子終点の Shift+矢印は既定のテキスト選択を防ぎつつルート側へ中継する。
+      const dispatch = (init: KeyboardEventInit) => {
+        const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
+        leafPosition.element.dispatchEvent(event)
+
+        return event
+      }
+
+      expect(dispatch({ key: 'ArrowLeft', shiftKey: true }).defaultPrevented).toBe(true)
+      expect(dispatch({ key: 'ArrowRight', shiftKey: true }).defaultPrevented).toBe(true)
+      expect(dispatch({ key: 'ArrowUp', shiftKey: true }).defaultPrevented).toBe(true)
+      expect(dispatch({ key: 'ArrowDown', shiftKey: true }).defaultPrevented).toBe(true)
+
+      expect(wrapper.emitted('shift-lane')).toEqual([[-1], [1]])
+      expect(wrapper.emitted('shift-position')).toEqual([[1, 8], [-1, 8]])
+      expect(leaf).toMatchObject({ lane: 3, measure: 1, position: 2 })
+
+      // IME 変換中や Ctrl/Meta/Alt 併用時は終点も親も動かさない。
+      dispatch({ key: 'ArrowRight', isComposing: true })
+      dispatch({ key: 'ArrowRight', ctrlKey: true, shiftKey: true })
+      dispatch({ key: 'ArrowUp', metaKey: true, shiftKey: true })
+      dispatch({ key: 'ArrowDown', altKey: true })
+
+      expect(wrapper.emitted('shift-lane')).toHaveLength(2)
+      expect(wrapper.emitted('shift-position')).toHaveLength(2)
+      expect(leaf).toMatchObject({ lane: 3, measure: 1, position: 2 })
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('配置済みロングの編集メニューで再帰終点の Shift+矢印から全体を移動し、小節変更を閉じても保持する', async () => {
+    const leaf = note({ lane: 4, measure: 1, position: 2, split: 8 })
+    const mid = note({ lane: 3, measure: 1, position: 0, split: 4, end: [leaf] })
+    const branch = note({ lane: 2, measure: 1, position: 1, split: 4 })
+    const root = note({
+      index: 10,
+      type: 2,
+      lane: 1,
+      measure: 0,
+      position: 3,
+      split: 4,
+      end: [mid, branch],
+    })
+    const wrapper = mount(LongNote, {
+      props: { note: root, measureData: measures },
+      global: {
+        stubs: { ...stubs, 'v-menu': interactiveMenu },
+        provide: { [deleteNotesKey as symbol]: vi.fn() },
+      },
+    })
+
+    try {
+      await wrapper.get('.note').trigger('click')
+
+      const leafPosition = wrapper.findAllComponents(EndForm)[1].get('input[aria-label="position"]')
+
+      // 配置済みロングでは始点も 0〜6 で移動でき、境界を超えるときは形状を保つ。
+      await leafPosition.trigger('keydown', { key: 'ArrowLeft', shiftKey: true })
+      expect([root.lane, mid.lane, leaf.lane, branch.lane]).toEqual([0, 2, 3, 1])
+
+      await leafPosition.trigger('keydown', { key: 'ArrowLeft', shiftKey: true })
+      expect([root.lane, mid.lane, leaf.lane, branch.lane]).toEqual([0, 2, 3, 1])
+
+      // 操作中終点（split=8）基準で 2 回上げると始点が 0小節 -> 1小節へ進む。
+      await leafPosition.trigger('keydown', { key: 'ArrowUp', shiftKey: true })
+      await leafPosition.trigger('keydown', { key: 'ArrowUp', shiftKey: true })
+
+      expect(root).toMatchObject({ measure: 1, position: 0, split: 8 })
+      expect(mid).toMatchObject({ measure: 1, position: 2, split: 8 })
+      expect(leaf).toMatchObject({ measure: 1, position: 4, split: 8 })
+      expect(branch).toMatchObject({ measure: 1, position: 4, split: 8 })
+
+      // メニューを閉じても、古い localMeasure（0小節）で始点の小節番号を上書きしない。
+      wrapper.findComponent(interactiveMenu).vm.$emit('update:modelValue', false)
+      await nextTick()
+
+      expect(root.measure).toBe(1)
+    } finally {
+      wrapper.unmount()
+    }
+  })
 })
 
 describe('Previewとの接続と後始末', () => {

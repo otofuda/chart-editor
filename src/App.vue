@@ -365,10 +365,8 @@
                 :index="i"
                 :max-measure="maxMeasure"
                 @delete-end="deleteEndOfAppendNote"
-                @append-to-left="appendNoteToLeft"
-                @append-to-right="appendNoteToRight"
-                @append-to-up="appendNoteToUp"
-                @append-to-down="appendNoteToDown"
+                @shift-lane="shiftAppendLongLane"
+                @shift-position="shiftAppendLongPosition"
                 @place-notes="placeNotes(appendNote)"
               >
               </EndForm>
@@ -1228,6 +1226,7 @@ const {
   appendNoteColorOption, appendNotes, placeNotes, appendSimultaneously,
   addEndToAppendNote, deleteEndOfAppendNote, changeAppendNoteType,
   appendNoteToLeft, appendNoteToRight, appendNoteToUp, appendNoteToDown,
+  shiftAppendLongLane, shiftAppendLongPosition,
   setAppendNoteInfo, cancelNote, copyNotesToDifficulty, getMovedNote,
 } = noteEditor
 

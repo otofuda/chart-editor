@@ -88,19 +88,23 @@ function compare(a: Fraction, b: Fraction): bigint {
 }
 
 /**
- * 元の split と移動先の分母の最小公倍数を使い、候補ノーツの時刻を更新する。
+ * 元の split と移動先の分母の最小公倍数を使い、小節・位置・分割数を計算する。
  *
- * @param note 時刻を書き換える移動候補
+ * @param currentSplit 元の分割数
  * @param value 小節単位で表した移動先の時刻
+ * @returns 更新後の小節番号・小節内位置・分割数
  * @throws 譜面の先頭より前、または安全な整数で表せない時刻の場合
  */
-function applyTime(note: NoteData, value: Fraction): void {
+function resolveTimePosition(
+  currentSplit: number,
+  value: Fraction,
+): { measure: number; position: number; split: number } {
   if (value.n < 0n) {
     throw new Error('譜面の先頭より前には移動できません。')
   }
 
   const measure = value.n / value.d
-  const oldSplit = BigInt(note.split)
+  const oldSplit = BigInt(currentSplit)
   const split = oldSplit / gcd(oldSplit, value.d) * value.d
   const position = value.n % value.d * (split / value.d)
 
@@ -108,11 +112,134 @@ function applyTime(note: NoteData, value: Fraction): void {
     throw new Error('移動先を正確に表せる split の範囲を超えています。')
   }
 
-  Object.assign(note, {
+  return {
     measure: Number(measure),
     position: Number(position),
     split: Number(split),
-  })
+  }
+}
+
+/**
+ * 元の split と移動先の分母の最小公倍数を使い、候補ノーツの時刻を更新する。
+ *
+ * @param note 時刻を書き換える移動候補
+ * @param value 小節単位で表した移動先の時刻
+ * @throws 譜面の先頭より前、または安全な整数で表せない時刻の場合
+ */
+function applyTime(note: NoteData, value: Fraction): void {
+  Object.assign(note, resolveTimePosition(note.split, value))
+}
+
+/** ロングノーツのレーン移動で許容する最小・最大レーン。 */
+export interface LaneBounds {
+  /** 許容する最小レーン。 */
+  min: number
+  /** 許容する最大レーン。 */
+  max: number
+}
+
+/** ロングノーツの中点・終点に適用する既定のレーン許容範囲。 */
+const LONG_END_LANE_BOUNDS: LaneBounds = { min: 0, max: 6 }
+
+/** ロングノーツの始点と、分岐・ネストを含むすべての中点・終点を収集する。 */
+function collectLongNodes(root: NoteData): NoteData[] {
+  const nodes: NoteData[] = []
+
+  /** 親から子孫へ再帰的にたどり、全ノードを順序通りに集める。 */
+  function visit(node: NoteData): void {
+    nodes.push(node)
+
+    if (Array.isArray(node.end)) {
+      node.end.forEach(visit)
+    }
+  }
+
+  visit(root)
+
+  return nodes
+}
+
+/**
+ * ロングノーツ全体（始点とすべての中点・終点・分岐）のレーンを平行移動する。
+ * いずれかのノードが許容範囲外、または数値でない場合は形状を保つため一切変更しない。
+ *
+ * @param root ロングノーツの始点ノーツ
+ * @param delta レーンの移動量（左なら負、右なら正）
+ * @param rootBounds 始点に適用するレーン許容範囲。省略時は 0〜6
+ * @returns 移動を適用した場合は true、境界や不正値で中止した場合は false
+ */
+export function shiftLongNoteLane(
+  root: NoteData,
+  delta: number,
+  rootBounds: LaneBounds = LONG_END_LANE_BOUNDS,
+): boolean {
+  if (!Number.isFinite(delta) || delta === 0) {
+    return false
+  }
+
+  const nodes = collectLongNodes(root)
+  const updates: { node: NoteData; lane: NoteData['lane'] }[] = []
+
+  for (const node of nodes) {
+    if (typeof node.lane !== 'number' || !Number.isFinite(node.lane)) {
+      return false
+    }
+
+    const next = Math.round((node.lane + delta) * 10) / 10
+    const bounds = node === root ? rootBounds : LONG_END_LANE_BOUNDS
+
+    if (next < bounds.min || next > bounds.max) {
+      return false
+    }
+
+    updates.push({ node, lane: next as NoteData['lane'] })
+  }
+
+  for (const { node, lane } of updates) {
+    node.lane = lane
+  }
+
+  return true
+}
+
+/**
+ * ロングノーツ全体（始点とすべての中点・終点・分岐）の位置を、指定分割数のステップ分だけ平行移動する。
+ * いずれかのノードが 0 小節未満になる場合や不正な値を含む場合は、間隔を保つため一切変更しない。
+ *
+ * @param root ロングノーツの始点ノーツ
+ * @param step 移動する目盛り数（上なら正、下なら負）
+ * @param split 1 目盛りを決める基準の分割数
+ * @returns 移動を適用した場合は true、0 小節未満や不正値で中止した場合は false
+ */
+export function shiftLongNotePosition(
+  root: NoteData,
+  step: number,
+  split: number,
+): boolean {
+  if (!Number.isSafeInteger(step) || step === 0 || !Number.isSafeInteger(split) || split <= 0) {
+    return false
+  }
+
+  const delta = fraction(BigInt(step), BigInt(split))
+  const nodes = collectLongNodes(root)
+  const updates: { node: NoteData; next: { measure: number; position: number; split: number } }[] = []
+
+  try {
+    for (const node of nodes) {
+      const nextTime = add(time(node), delta)
+      const next = resolveTimePosition(node.split, nextTime)
+
+      updates.push({ node, next })
+    }
+  } catch {
+    return false
+  }
+
+  for (const { node, next } of updates) {
+    Object.assign(node, next)
+  }
+
+  return true
 }
 
 /** 元のノーツと、複製したノーツツリー内の位置を対応付ける移動対象。 */

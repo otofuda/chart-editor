@@ -260,6 +260,8 @@
             :max-measure="maxMeasure"
             history-enabled
             @delete-end="deleteEnd(i)"
+            @shift-lane="shiftLongLane"
+            @shift-position="shiftLongPosition"
             @place-notes="menu = false"
           />
         </div>
@@ -284,6 +286,7 @@ import { generateHoldSvgPaths, getCurveType, type CurveType } from '@/composable
 import EndForm from './EndForm.vue'
 import { useNoteMeasureEdit } from '@/composables/useNoteMeasureEdit'
 import { useNoteMenuLocation } from '@/composables/useNoteMenuLocation'
+import { shiftLongNoteLane, shiftLongNotePosition } from '@/composables/noteMovement'
 import { noteDragKey } from '@/composables/useNoteDrag'
 import { numberInputValue, useHistoryFields, vHistoryField } from '@/composables/useHistoryField'
 import {
@@ -580,6 +583,23 @@ function addEndToRoot(): void {
 /** 指定した終点とその子孫を削除し、1操作として記録する。 */
 function deleteEnd(index: number): void {
   change('ロングの終点を削除', () => props.note.end.splice(index, 1))
+}
+
+/** 終点フォームの Shift+左右キーから、配置済みロングノーツ全体のレーンを 0〜6 の範囲で平行移動する。 */
+function shiftLongLane(delta: number): void {
+  shiftLongNoteLane(props.note, delta)
+}
+
+/**
+ * 終点フォームの Shift+上下キーから、配置済みロングノーツ全体の位置を平行移動する。
+ * 始点の小節が変わった場合は、メニュー閉鎖時に古い値へ戻らないよう小節入力欄も同期する。
+ */
+function shiftLongPosition(step: number, split: number): void {
+  const moved = shiftLongNotePosition(props.note, step, split)
+
+  if (moved) {
+    localMeasure.value = props.note.measure
+  }
 }
 
 function deleteThisNote(): void {

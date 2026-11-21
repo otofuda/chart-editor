@@ -172,6 +172,8 @@
         :max-measure="props.maxMeasure"
         :history-enabled="historyEnabled"
         @delete-end="deleteChild"
+        @shift-lane="delta => emit('shift-lane', delta)"
+        @shift-position="(step, split) => emit('shift-position', step, split)"
         @place-notes="placeNotes"
       />
     </div>
@@ -183,7 +185,7 @@ import { computed } from 'vue'
 import type { LaneType, NoteData } from 'chart-types'
 import { curveTypeOptions, getCurveType, type CurveType } from '@/composables/useNoteTypes'
 import { numberInputValue, useHistoryFields, vHistoryField } from '@/composables/useHistoryField'
-import { handlePositionEnter } from '@/composables/useEditorShortcuts'
+import { handlePositionEnter, isIgnoredKeyboardEvent } from '@/composables/useEditorShortcuts'
 
 const props = withDefaults(
   defineProps<{
@@ -198,7 +200,12 @@ const props = withDefaults(
   }
 )
 
-const emit = defineEmits(['delete-end', 'append-to-up', 'append-to-down', 'place-notes'])
+const emit = defineEmits<{
+  'delete-end': [index: number]
+  'shift-lane': [delta: number]
+  'shift-position': [step: number, split: number]
+  'place-notes': []
+}>()
 const { field, change, input } = useHistoryFields(() => Boolean(props.historyEnabled))
 
 /** 分割数の入力や候補選択を、終点の同じ入力欄の編集として履歴へまとめる。 */
@@ -267,35 +274,106 @@ function deleteChild(index: number): void {
   change('子の終点を削除', () => props.end.end.splice(index, 1))
 }
 
-// positionにフォーカスして終点移動（その終点のみ 1.0 刻みで変更、0.0〜6.0にクランプ）
-function endToLeft(): void {
+/** IME変換中や他修飾キー併用時は入力欄の標準操作を優先するため処理しない。 */
+function isIgnoredArrowEvent(event: KeyboardEvent): boolean {
+  return (
+    isIgnoredKeyboardEvent(event)
+    || event.ctrlKey
+    || event.metaKey
+    || event.altKey
+  )
+}
+
+/**
+ * 終点 position 欄での左キー操作を処理する。
+ * Shift 同時押し時はロング全体の横移動を親へ委譲し、単独押し時はこの終点のみ 0.0〜6.0 の範囲で左へ移動する。
+ */
+function endToLeft(event: KeyboardEvent): void {
+  if (isIgnoredArrowEvent(event)) {
+    return
+  }
+
+  if (event.shiftKey) {
+    event.preventDefault()
+    emit('shift-lane', -1)
+
+    return
+  }
+
   const next = Math.round((Number(props.end.lane ?? 1) - 1) * 10) / 10
   props.end.lane = Math.min(6, Math.max(0, next)) as LaneType
 }
 
-function endToRight(): void {
+/**
+ * 終点 position 欄での右キー操作を処理する。
+ * Shift 同時押し時はロング全体の横移動を親へ委譲し、単独押し時はこの終点のみ 0.0〜6.0 の範囲で右へ移動する。
+ */
+function endToRight(event: KeyboardEvent): void {
+  if (isIgnoredArrowEvent(event)) {
+    return
+  }
+
+  if (event.shiftKey) {
+    event.preventDefault()
+    emit('shift-lane', 1)
+
+    return
+  }
+
   const next = Math.round((Number(props.end.lane ?? 1) + 1) * 10) / 10
   props.end.lane = Math.min(6, Math.max(0, next)) as LaneType
 }
 
+/**
+ * 終点 position 欄での上キー操作を処理する。
+ * Shift 同時押し時はこの終点の分割数基準でロング全体の縦移動を親へ委譲し、単独押し時はこの終点のみ進める。
+ */
 function endToUp(event: KeyboardEvent): void {
+  if (isIgnoredArrowEvent(event)) {
+    return
+  }
+
+  if (event.shiftKey) {
+    event.preventDefault()
+    emit('shift-position', 1, props.end.split)
+
+    return
+  }
+
   const note = props.end
+
   if (note.split - 1 <= note.position) {
     note.measure++
     note.position = 0
-  } else note.position++
-  // Shift同時押しで親も移動
-  if (event.shiftKey) emit('append-to-up', props.index)
+  } else {
+    note.position++
+  }
 }
 
+/**
+ * 終点 position 欄での下キー操作を処理する。
+ * Shift 同時押し時はこの終点の分割数基準でロング全体の縦移動を親へ委譲し、単独押し時はこの終点のみ戻す。
+ */
 function endToDown(event: KeyboardEvent): void {
+  if (isIgnoredArrowEvent(event)) {
+    return
+  }
+
+  if (event.shiftKey) {
+    event.preventDefault()
+    emit('shift-position', -1, props.end.split)
+
+    return
+  }
+
   const note = props.end
+
   if (note.position === 0) {
     note.measure--
     note.position = note.split - 1
-  } else note.position--
-  // Shift同時押しで親も移動
-  if (event.shiftKey) emit('append-to-down', props.index)
+  } else {
+    note.position--
+  }
 }
 
 // App.vueの配置メソッドを発火

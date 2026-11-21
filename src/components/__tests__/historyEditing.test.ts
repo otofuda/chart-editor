@@ -228,6 +228,43 @@ describe('入力欄と履歴', () => {
     expect(data.currentChart.value[0].end[0].position).toBe(0)
   })
 
+  it('終点position欄のShift+矢印で動かしたロング全体を1回のUndoで戻し、境界で動かない操作は履歴を作らない', async () => {
+    const child = note({ lane: 3, measure: 1, position: 2, split: 8 })
+    const mid = note({ lane: 2, measure: 0, position: 7, split: 8, end: [child] })
+    const root = note({ type: 2, lane: 0 as ExtendedNoteData['lane'], measure: 0, position: 6, split: 8, end: [mid] })
+    const { data, wrapper } = setup(LongNote, [root])
+
+    await wrapper.get('.note').trigger('click')
+
+    const childPosition = wrapper.findAllComponents(EndForm)[1].get('input[aria-label="position"]')
+    ;(childPosition.element as HTMLInputElement).focus()
+
+    // 始点がレーン 0 の状態で左移動しても範囲外のため動かず、履歴も作らない。
+    await childPosition.trigger('keydown', { key: 'ArrowLeft', shiftKey: true })
+    ;(childPosition.element as HTMLInputElement).blur()
+
+    expect(data.history.entries.value).toHaveLength(0)
+
+    // 右移動と小節をまたぐ上移動を連続で行い、メニューを閉じても1操作にまとまる。
+    ;(childPosition.element as HTMLInputElement).focus()
+    await childPosition.trigger('keydown', { key: 'ArrowRight', shiftKey: true })
+    await childPosition.trigger('keydown', { key: 'ArrowUp', shiftKey: true })
+    await childPosition.trigger('keydown', { key: 'ArrowUp', shiftKey: true })
+    ;(childPosition.element as HTMLInputElement).blur()
+
+    expect(data.currentChart.value[0]).toMatchObject({ lane: 1, measure: 1, position: 0, split: 8 })
+    expect(data.currentChart.value[0].end[0]).toMatchObject({ lane: 3, measure: 1, position: 1, split: 8 })
+    expect(data.currentChart.value[0].end[0].end[0]).toMatchObject({ lane: 4, measure: 1, position: 4, split: 8 })
+    expect(data.history.entries.value).toHaveLength(1)
+
+    data.history.undo()
+    await nextTick()
+
+    expect(data.currentChart.value[0]).toMatchObject({ lane: 0, measure: 0, position: 6, split: 8 })
+    expect(data.currentChart.value[0].end[0]).toMatchObject({ lane: 2, measure: 0, position: 7, split: 8 })
+    expect(data.currentChart.value[0].end[0].end[0]).toMatchObject({ lane: 3, measure: 1, position: 2, split: 8 })
+  })
+
   it('comboboxの連続入力をまとめ、空欄を0へ変換しない', async () => {
     const { data, wrapper } = setup(LongNote, [note({ type: 2 })])
     await wrapper.get('.note').trigger('click')

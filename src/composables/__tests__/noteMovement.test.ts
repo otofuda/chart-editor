@@ -6,6 +6,8 @@ import {
   commitNoteMove,
   createNoteMoveSession,
   noteBottom,
+  shiftLongNoteLane,
+  shiftLongNotePosition,
 } from '../noteMovement'
 
 /** テストごとの差分だけを指定して、移動対象のノーツを作る。 */
@@ -268,5 +270,98 @@ describe('ドラッグ移動の計算', () => {
     expect(candidate.error).toBeNull()
     commitNoteMove(candidate)
     expect(a.lane).toBe(b.lane)
+  })
+})
+
+describe('ロングノーツ全体のキー移動計算', () => {
+  it('分岐と中点を含むロング全体のレーンを小数も含めて平行移動し、境界超過時は形状を保つ', () => {
+    const leaf = note({ lane: 4.5 as ExtendedNoteData['lane'], measure: 2, position: 0 })
+    const midpoint = note({ lane: 3.5 as ExtendedNoteData['lane'], measure: 1, position: 2, end: [leaf] })
+    const branch = note({ lane: 1.5 as ExtendedNoteData['lane'], measure: 1, position: 3 })
+    const root = note({
+      type: 2,
+      lane: 2.5 as ExtendedNoteData['lane'],
+      measure: 1,
+      position: 0,
+      end: [midpoint, branch],
+    })
+
+    // 通常の 0〜6 範囲では全ノードが +1.0 ずつ平行移動する。
+    expect(shiftLongNoteLane(root, 1)).toBe(true)
+    expect([root.lane, midpoint.lane, leaf.lane, branch.lane]).toEqual([3.5, 4.5, 5.5, 2.5])
+
+    // 末端が 6.5 になる移動は全体を中止し、どのノードも変更しない。
+    expect(shiftLongNoteLane(root, 1)).toBe(false)
+    expect([root.lane, midpoint.lane, leaf.lane, branch.lane]).toEqual([3.5, 4.5, 5.5, 2.5])
+
+    // 挿入モードの始点範囲（1〜5）では、始点が 1 未満になる場合に全体を中止する。
+    const draftEnd = note({ lane: 3, measure: 1, position: 2 })
+    const draftRoot = note({ type: 2, lane: 1, measure: 1, position: 0, end: [draftEnd] })
+
+    expect(shiftLongNoteLane(draftRoot, -1, { min: 1, max: 5 })).toBe(false)
+    expect([draftRoot.lane, draftEnd.lane]).toEqual([1, 3])
+
+    // 始点が 1〜5 に収まり終点が 0〜6 に収まる移動は許可する。
+    draftEnd.lane = 5
+    expect(shiftLongNoteLane(draftRoot, 1, { min: 1, max: 5 })).toBe(true)
+    expect([draftRoot.lane, draftEnd.lane]).toEqual([2, 6])
+  })
+
+  it('不正な移動量や数値でないレーンを含む場合は何も変更しない', () => {
+    const end = note({ lane: '' as unknown as ExtendedNoteData['lane'] })
+    const root = note({ type: 2, lane: 2, end: [end] })
+
+    expect(shiftLongNoteLane(root, 0)).toBe(false)
+    expect(shiftLongNoteLane(root, Number.NaN)).toBe(false)
+    expect(shiftLongNoteLane(root, 1)).toBe(false)
+    expect(root.lane).toBe(2)
+  })
+
+  it('操作中終点の split 基準で分岐・中点を含むロング全体の位置を間隔を保って平行移動する', () => {
+    const leaf = note({ measure: 1, position: 3, split: 8 })
+    const midpoint = note({ measure: 1, position: 1, split: 4, end: [leaf] })
+    const branch = note({ measure: 1, position: 2, split: 6 })
+    const root = note({
+      type: 2,
+      measure: 0,
+      position: 3,
+      split: 4,
+      end: [midpoint, branch],
+    })
+    const intervals = [midpoint, leaf, branch].map(target => timing(target) - timing(root))
+
+    // split=8 の +1 目盛り分（+1/8）だけ全体を平行移動する。
+    expect(shiftLongNotePosition(root, 1, 8)).toBe(true)
+    expect(root).toMatchObject({ measure: 0, position: 7, split: 8 })
+    expect(midpoint).toMatchObject({ measure: 1, position: 3, split: 8 })
+    expect(leaf).toMatchObject({ measure: 1, position: 4, split: 8 })
+    expect(branch).toMatchObject({ measure: 1, position: 11, split: 24 })
+    expect([midpoint, leaf, branch].map(target => timing(target) - timing(root))).toEqual(intervals)
+
+    // 上方向は小節上限で止めず、小節境界をまたいで進められる。
+    expect(shiftLongNotePosition(root, 1, 8)).toBe(true)
+    expect(root).toMatchObject({ measure: 1, position: 0, split: 8 })
+  })
+
+  it('0 小節未満になる下移動や不正な split ではロング全体を変更しない', () => {
+    const end = note({ measure: 0, position: 2, split: 8 })
+    const root = note({ type: 2, measure: 0, position: 1, split: 8, end: [end] })
+
+    // 始点が 0/8 までは移動できる。
+    expect(shiftLongNotePosition(root, -1, 8)).toBe(true)
+    expect(root).toMatchObject({ measure: 0, position: 0, split: 8 })
+    expect(end).toMatchObject({ measure: 0, position: 1, split: 8 })
+
+    // さらに下へ動かすと始点が負になるため、終点も含めて変更しない。
+    expect(shiftLongNotePosition(root, -1, 8)).toBe(false)
+    expect(root).toMatchObject({ measure: 0, position: 0, split: 8 })
+    expect(end).toMatchObject({ measure: 0, position: 1, split: 8 })
+
+    // 基準 split やノードの split が不正な場合も変更しない。
+    expect(shiftLongNotePosition(root, 1, 0)).toBe(false)
+    expect(shiftLongNotePosition(root, 1, Number.NaN)).toBe(false)
+    end.split = '' as unknown as number
+    expect(shiftLongNotePosition(root, 1, 8)).toBe(false)
+    expect(root).toMatchObject({ measure: 0, position: 0, split: 8 })
   })
 })

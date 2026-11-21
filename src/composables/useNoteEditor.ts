@@ -7,6 +7,7 @@ import type {
   ExtendedChartData,
 } from '../types'
 import { isDuplicated, getValidatedOptions, isLanelessNote } from './useNoteCheck'
+import { shiftLongNoteLane, shiftLongNotePosition } from './noteMovement'
 import type { useChartData } from './useChartData'
 
 type ChartData = ReturnType<typeof useChartData>
@@ -291,6 +292,38 @@ export function useNoteEditor(
   }
 
   /**
+   * 仮配置前のロングノーツ全体を横方向に平行移動する。
+   * 始点は挿入フォームのラジオボタンに合わせて 1〜5、中点・終点は 0〜6 の範囲内に収まる場合だけ適用する。
+   *
+   * @param delta - レーンの移動量（左なら -1、右なら 1）
+   */
+  function shiftAppendLongLane(delta: number): void {
+    shiftLongNoteLane(appendNote.value, delta, { min: 1, max: 5 })
+  }
+
+  /**
+   * 仮配置前のロングノーツ全体を、指定した分割数の 1 目盛り分だけ縦方向に平行移動する。
+   * 始点の小節が変わり自動追従が有効な場合は、移動先の小節へスクロールする。
+   *
+   * @param step - 移動方向（上なら 1、下なら -1）
+   * @param split - 移動量の基準にする分割数
+   */
+  function shiftAppendLongPosition(step: number, split: number): void {
+    const previousMeasure = appendNote.value.measure
+    const moved = shiftLongNotePosition(appendNote.value, step, split)
+
+    if (!moved) {
+      return
+    }
+
+    const nextMeasure = appendNote.value.measure
+
+    if (isAutoFollow.value && nextMeasure !== previousMeasure && measureData.value[nextMeasure]) {
+      scrollToMeasure(nextMeasure)
+    }
+  }
+
+  /**
    * appendNote に任意のデータをセットする
    * @param object - セットするノートデータ
    */
@@ -365,6 +398,8 @@ export function useNoteEditor(
     appendNoteToRight,
     appendNoteToUp,
     appendNoteToDown,
+    shiftAppendLongLane,
+    shiftAppendLongPosition,
     setAppendNoteInfo,
     cancelNote,
     copyNotesToDifficulty: (target: DifficultyString | null, ...notes: NoteData[]) => history.run(

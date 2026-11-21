@@ -145,3 +145,65 @@ describe('useNoteEditor - 全難易度同時挿入', () => {
     })
   })
 })
+
+describe('useNoteEditor - 仮配置ロング全体のシフト移動', () => {
+  it('始点 1〜5・終点 0〜6 の範囲で仮配置ロング全体のレーンを形状を保って移動する', () => {
+    const { editor } = setup()
+    editor.appendNote.value = {
+      type: 2,
+      lane: 1,
+      measure: 1,
+      position: 0,
+      split: 8,
+      option: [],
+      end: [{ ...sampleNote, lane: 5, measure: 1, position: 2 }],
+    }
+
+    // 始点が 1 のまま左へ動かすと 1 未満になるため全体を動かさない。
+    editor.shiftAppendLongLane(-1)
+    expect(editor.appendNote.value.lane).toBe(1)
+    expect(editor.appendNote.value.end[0].lane).toBe(5)
+
+    // 右移動は始点 2・終点 6 に収まるため全体を動かす。
+    editor.shiftAppendLongLane(1)
+    expect(editor.appendNote.value.lane).toBe(2)
+    expect(editor.appendNote.value.end[0].lane).toBe(6)
+
+    // さらに右移動すると終点が 6 を超えるため全体を動かさない。
+    editor.shiftAppendLongLane(1)
+    expect(editor.appendNote.value.lane).toBe(2)
+    expect(editor.appendNote.value.end[0].lane).toBe(6)
+  })
+
+  it('仮配置ロング全体の縦移動で小節をまたぐと自動追従し、0小節未満では止まる', () => {
+    const { chartData, editor, scrollToMeasure } = setup()
+    chartData.chartObject.value.easy = [{ ...sampleNote, type: 99, measure: 3 }]
+    editor.appendNote.value = {
+      type: 2,
+      lane: 2,
+      measure: 0,
+      position: 3,
+      split: 4,
+      option: [],
+      end: [{ ...sampleNote, lane: 2, measure: 1, position: 2, split: 8 }],
+    }
+
+    // 操作中終点 split=8 で +1 ステップすると始点は 7/8（小節そのまま）でスクロールしない。
+    editor.shiftAppendLongPosition(1, 8)
+    expect(editor.appendNote.value).toMatchObject({ measure: 0, position: 7, split: 8 })
+    expect(editor.appendNote.value.end[0]).toMatchObject({ measure: 1, position: 3, split: 8 })
+    expect(scrollToMeasure).not.toHaveBeenCalled()
+
+    // もう +1 ステップで始点が 1 小節へ進み、自動追従でスクロールする。
+    editor.shiftAppendLongPosition(1, 8)
+    expect(editor.appendNote.value).toMatchObject({ measure: 1, position: 0, split: 8 })
+    expect(scrollToMeasure).toHaveBeenCalledWith(1)
+
+    // 自動追従オフ時は小節をまたいでもスクロールしない。
+    scrollToMeasure.mockClear()
+    editor.isAutoFollow.value = false
+    editor.shiftAppendLongPosition(-1, 8)
+    expect(editor.appendNote.value).toMatchObject({ measure: 0, position: 7, split: 8 })
+    expect(scrollToMeasure).not.toHaveBeenCalled()
+  })
+})
